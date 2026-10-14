@@ -14,12 +14,11 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
   
-  <!-- Firebase Compat SDKs (Versão Global Estável - Evita erros de Módulo) -->
+  <!-- Firebase Compat SDKs -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
   <script>
-    // Configuração oficial do seu Firebase
     const firebaseConfig = {
       apiKey: "AIzaSyBW0tD55afqHalda-wDh1olxH0twndIWY",
       authDomain: "inspectcbm-db.firebaseapp.com",
@@ -30,12 +29,19 @@
       measurementId: "G-0162QJ1JQ"
     };
 
-    // Inicializa o Firebase no modo Compat (Compatível e Direto)
-    firebase.initializeApp(firebaseConfig);
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
     const db = firebase.firestore();
 
     document.addEventListener("DOMContentLoaded", () => {
-      if(typeof initCloudData === 'function') initCloudData();
+      const now = new Date();
+      now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+      document.getElementById("data_coleta").value = now.toISOString().slice(0,16);
+      
+      loadSavedRotas();
+      onRotaChange(document.getElementById('rota_select').value);
+      fetchCloudRecords();
     });
   </script>
 
@@ -96,14 +102,12 @@
           </div>
           
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-            <!-- 1. Rota de Inspeção -->
             <div>
               <label class="block text-xs font-medium text-slate-300 mb-1">Rota de Inspeção *</label>
               <select id="rota_select" onchange="onRotaChange(this.value)" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
               </select>
               <input type="text" id="rota_manual" placeholder="Digite o nome da nova Rota" class="w-full mt-2 hidden bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
             </div>
-            <!-- 2. Tag do Equipamento -->
             <div>
               <div class="flex justify-between items-center mb-1">
                 <label class="block text-xs font-medium text-slate-300">Tag Base do Equipamento *</label>
@@ -113,7 +117,6 @@
               </select>
               <input type="text" id="tag_manual" placeholder="Ex: SP8001, UC8014" oninput="onTagManualInput(this.value)" class="w-full mt-2 hidden bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
             </div>
-            <!-- 3. Componente Dinâmico Vinculado -->
             <div>
               <div class="flex justify-between items-center mb-1">
                 <label class="block text-xs font-medium text-slate-300">Componente em Inspeção *</label>
@@ -124,49 +127,42 @@
             </div>
           </div>
 
-          <!-- CAMPO DE FOTO DO EQUIPAMENTO -->
+          <!-- CAMPO DE FOTO -->
           <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-700/80 mb-4 flex flex-col sm:flex-row items-center gap-4">
             <div id="photo-preview-container" class="w-20 h-20 bg-slate-800 rounded-lg border border-slate-700 flex items-center justify-center overflow-hidden shrink-0 relative">
               <i id="photo-placeholder-icon" class="fa-solid fa-camera text-slate-500 text-xl"></i>
               <img id="eq_photo_preview" src="" alt="Preview" class="w-full h-full object-cover hidden">
             </div>
             <div class="flex-1 w-full">
-              <label class="block text-xs font-bold text-slate-200 mb-1"><i class="fa-solid fa-image text-amber-400 mr-1"></i> Foto do Equipamento / Ponto de Inspeção</label>
-              <p class="text-[11px] text-slate-400 mb-2">Tire uma foto ou carregue a imagem atual do ativo em campo para anexar ao relatório.</p>
+              <label class="block text-xs font-bold text-slate-200 mb-1"><i class="fa-solid fa-image text-amber-400 mr-1"></i> Foto do Equipamento / Ponto</label>
               <div class="flex items-center space-x-2">
                 <input type="file" id="eq_photo_input" accept="image/*" onchange="handlePhotoUpload(event)" class="text-xs text-slate-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-amber-500 file:text-slate-950 hover:file:bg-amber-400 file:cursor-pointer">
-                <button type="button" id="btn-remove-photo" onclick="removePhoto()" class="hidden text-xs text-rose-400 hover:underline"><i class="fa-solid fa-trash-can mr-1"></i> Remover Foto</button>
+                <button type="button" id="btn-remove-photo" onclick="removePhoto()" class="hidden text-xs text-rose-400 hover:underline"><i class="fa-solid fa-trash-can mr-1"></i> Remover</button>
               </div>
             </div>
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            <!-- TAG FINAL PROCESSADA -->
             <div class="col-span-1 md:col-span-2 lg:col-span-5 bg-slate-900/80 p-3 rounded-lg border border-amber-500/30 flex justify-between items-center">
-              <span class="text-xs text-slate-400 font-medium">Tag Registrada para este Componente:</span>
+              <span class="text-xs text-slate-400 font-medium">Tag Registrada:</span>
               <span id="lbl_tag_final" class="text-sm font-bold text-amber-400 font-mono">SELECIONE UMA TAG...</span>
             </div>
-            <!-- SAP Number -->
             <div>
               <label class="block text-xs font-medium text-slate-300 mb-1">SAP Number</label>
               <input type="text" id="sap_number" placeholder="Ex: 10271780" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
             </div>
-            <!-- Equipamento -->
             <div>
               <label class="block text-xs font-medium text-slate-300 mb-1">Equipamento</label>
               <input type="text" id="equipamento_nome" placeholder="Ex: COMPRESSOR 01" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
             </div>
-            <!-- Setor -->
             <div>
               <label class="block text-xs font-medium text-slate-300 mb-1">Setor</label>
               <input type="text" id="setor" placeholder="Ex: UTILIDADES" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
             </div>
-            <!-- Área -->
             <div>
               <label class="block text-xs font-medium text-slate-300 mb-1">Área</label>
               <input type="text" id="area" placeholder="Ex: SALA DE COMPRESSORES" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
             </div>
-            <!-- Responsável Técnico / Inspetor -->
             <div>
               <label class="block text-xs font-medium text-slate-300 mb-1">Responsável Técnico *</label>
               <input type="text" id="inspetor" placeholder="Ex: RAFAEL AUGUSTO" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
@@ -174,17 +170,11 @@
           </div>
         </div>
 
-        <!-- BLOCO 2: PARÂMETROS OPERACIONAIS E MECÂNICOS -->
+        <!-- BLOCO 2: PARÂMETROS MECÂNICOS -->
         <div class="bg-slate-800 rounded-xl p-5 border border-slate-700 shadow-lg">
-          <div class="flex justify-between items-center mb-4">
-            <h2 class="text-sm font-bold text-amber-400 uppercase tracking-wider flex items-center">
-              <i class="fa-solid fa-gears mr-2"></i> Parâmetros Mecânicos & Data
-            </h2>
-            <button type="button" onclick="saveOnlyRegistration()" class="bg-slate-700 hover:bg-slate-600 text-amber-400 border border-amber-500/30 text-xs px-3 py-1.5 rounded-lg transition flex items-center font-semibold">
-              <i class="fa-solid fa-bookmark mr-1.5"></i> Salvar Apenas Cadastro do Componente
-            </button>
-          </div>
-          
+          <h2 class="text-sm font-bold text-amber-400 uppercase tracking-wider mb-4 flex items-center">
+            <i class="fa-solid fa-gears mr-2"></i> Parâmetros Mecânicos & Data
+          </h2>
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
               <label class="block text-xs font-medium text-slate-300 mb-1">Data e Hora da Medição *</label>
@@ -195,295 +185,139 @@
               <input type="number" id="rotacao_rpm" placeholder="Ex: 1780" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
             </div>
             <div>
-              <label class="block text-xs font-medium text-slate-300 mb-1">Rolamento LA (Acoplado)</label>
+              <label class="block text-xs font-medium text-slate-300 mb-1">Rolamento LA</label>
               <input type="text" id="rolamento_la" placeholder="Ex: 6210 C3" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
             </div>
             <div>
-              <label class="block text-xs font-medium text-slate-300 mb-1">Rolamento LOA (Oposto)</label>
+              <label class="block text-xs font-medium text-slate-300 mb-1">Rolamento LOA</label>
               <input type="text" id="rolamento_loa" placeholder="Ex: NU 214" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
-            </div>
-            <div>
-              <label class="block text-xs font-medium text-slate-300 mb-1">Potência (kW / CV)</label>
-              <input type="text" id="potencia" placeholder="Ex: 75 CV" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
             </div>
           </div>
         </div>
 
-        <!-- BLOCO 3: CONDIÇÃO E CARGA DE TRABALHO -->
+        <!-- BLOCO 3: CARGA -->
         <div class="bg-slate-800 rounded-xl p-5 border border-slate-700 shadow-lg">
           <h2 class="text-sm font-bold text-amber-400 uppercase tracking-wider mb-4 flex items-center">
-            <i class="fa-solid fa-gauge-high mr-2"></i> Condição e Carga de Trabalho (CBM)
+            <i class="fa-solid fa-gauge-high mr-2"></i> Condição e Carga de Trabalho
           </h2>
-          
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label class="block text-xs font-medium text-slate-300 mb-1">Modo / Status de Operação</label>
+              <label class="block text-xs font-medium text-slate-300 mb-1">Status de Operação</label>
               <select id="status_operacao" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
                 <option value="Carga Total">Em Carga (100%)</option>
-                <option value="Em Alívio">Em Alívio (Compressor)</option>
+                <option value="Em Alívio">Em Alívio</option>
                 <option value="Carga Parcial">Carga Parcial</option>
                 <option value="Parado">Parado / Standby</option>
               </select>
             </div>
             <div>
               <label class="block text-xs font-medium text-slate-300 mb-1">Valor da Carga / Pressão</label>
-              <input type="text" id="carga_valor" placeholder="Ex: 7.5 ou 250" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
+              <input type="text" id="carga_valor" placeholder="Ex: 7.5" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
             </div>
             <div>
-              <label class="block text-xs font-medium text-slate-300 mb-1">Unidade de Medida</label>
+              <label class="block text-xs font-medium text-slate-300 mb-1">Unidade</label>
               <select id="carga_unidade" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
                 <option value="bar">bar</option>
-                <option value="mbar">mbar</option>
                 <option value="Kgf/cm²">Kgf/cm²</option>
                 <option value="% de Carga">% de Carga</option>
-                <option value="Outro">Outra Unidade</option>
               </select>
             </div>
           </div>
         </div>
 
-        <!-- BLOCO 4: INSPEÇÃO ESTROBOSCÓPICA (STROBO) -->
-        <div class="bg-slate-800 rounded-xl p-5 border border-amber-500/40 shadow-lg relative overflow-hidden">
-          <div class="flex justify-between items-center mb-4">
-            <h2 class="text-sm font-bold text-amber-400 uppercase tracking-wider flex items-center">
-              <i class="fa-solid fa-bolt-lightning text-amber-400 mr-2"></i> Inspeção Estroboscópica (Strobo)
-            </h2>
-            <span class="text-[10px] bg-amber-400/10 text-amber-400 border border-amber-400/30 px-2 py-0.5 rounded font-semibold">
-              Congelamento de Movimento
-            </span>
-          </div>
-          
+        <!-- BLOCO 4: STROBO -->
+        <div class="bg-slate-800 rounded-xl p-5 border border-amber-500/40 shadow-lg">
+          <h2 class="text-sm font-bold text-amber-400 uppercase tracking-wider mb-4 flex items-center">
+            <i class="fa-solid fa-bolt-lightning text-amber-400 mr-2"></i> Inspeção Estroboscópica (Strobo)
+          </h2>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
             <div>
-              <label class="block text-xs font-medium text-slate-300 mb-1">Rotação Real Medida (RPM - Strobo)</label>
-              <div class="relative">
-                <input type="number" id="rpm_real_strobo" placeholder="Ex: 1774" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-amber-400 font-bold focus:outline-none focus:border-amber-500 pr-12">
-                <span class="absolute right-3 top-2 text-slate-500 text-xs font-semibold">RPM</span>
-              </div>
+              <label class="block text-xs font-medium text-slate-300 mb-1">RPM Real (Strobo)</label>
+              <input type="number" id="rpm_real_strobo" placeholder="Ex: 1774" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-amber-400 font-bold focus:outline-none focus:border-amber-500">
             </div>
             <div>
-              <label class="block text-xs font-medium text-slate-300 mb-1">Condição do Acoplamento / Transmissão</label>
+              <label class="block text-xs font-medium text-slate-300 mb-1">Condição do Acoplamento</label>
               <select id="acoplamento_status" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
-                <option value="Normal / Sem Alteração">Normal / Sem Anomalias Visíveis</option>
-                <option value="Desgaste no Elemento Elástico">Desgaste no Elemento Elástico / Aranha</option>
-                <option value="Desalinhamento Visível">Desalinhamento Angular / Paralelo Visível</option>
-                <option value="Parafusos Soltos / Ausentes">Parafusos Soltos ou Ausentes</option>
-                <option value="Vazamento de Graxa">Vazamento / Expulsão de Graxa</option>
-                <option value="Folga / Batimento">Folga Excessiva / Batimento Dinâmico</option>
-                <option value="Outra Anomalia">Outra Anomalia</option>
+                <option value="Normal / Sem Alteração">Normal / Sem Anomalias</option>
+                <option value="Desgaste no Elemento Elástico">Desgaste no Elemento Elástico</option>
+                <option value="Desalinhamento Visível">Desalinhamento Visível</option>
+                <option value="Folga / Batimento">Folga / Batimento</option>
               </select>
             </div>
           </div>
-          <div>
-            <label class="block text-xs font-medium text-slate-300 mb-1">Anomalias Detetadas via Estroboscópio</label>
-            <input type="text" id="strobo_obs" placeholder="Ex: Desgaste no elemento elástico do acoplamento." class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500">
-          </div>
         </div>
 
-        <!-- BLOCO 5: MEDIÇÃO DE TEMPERATURA DINÂMICA -->
+        <!-- BLOCO 5: TEMPERATURA -->
         <div class="bg-slate-800 rounded-xl p-5 border border-slate-700 shadow-lg space-y-4">
-          <div class="flex justify-between items-center mb-1">
-            <h2 class="text-sm font-bold text-amber-400 uppercase tracking-wider flex items-center">
-              <i class="fa-solid fa-temperature-high mr-2"></i> Medição de Temperatura no Ponto
-            </h2>
-            <span id="componente-badge" class="text-xs bg-amber-500/20 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded font-bold">
-              Medindo: <span id="lbl-componente-atual">Motor</span>
-            </span>
-          </div>
-          
+          <h2 class="text-sm font-bold text-amber-400 uppercase tracking-wider mb-1 flex items-center">
+            <i class="fa-solid fa-temperature-high mr-2"></i> Medição de Temperatura (°C)
+          </h2>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label id="lbl_temp_la" class="block text-xs font-medium text-slate-300 mb-1">Temperatura LA (Acoplado) - °C</label>
-              <div class="relative">
-                <input type="number" step="0.1" id="temp_la" placeholder="Ex: 68.5" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500 pr-10">
-                <span class="absolute right-3 top-2 text-slate-500 text-xs">°C</span>
-              </div>
+              <label id="lbl_temp_la" class="block text-xs font-medium text-slate-300 mb-1">Temperatura LA - °C</label>
+              <input type="number" step="0.1" id="temp_la" placeholder="Ex: 68.5" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
             </div>
             <div>
-              <label id="lbl_temp_loa" class="block text-xs font-medium text-slate-300 mb-1">Temperatura LOA (Oposto) - °C</label>
-              <div class="relative">
-                <input type="number" step="0.1" id="temp_loa" placeholder="Ex: 62.0" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500 pr-10">
-                <span class="absolute right-3 top-2 text-slate-500 text-xs">°C</span>
-              </div>
+              <label id="lbl_temp_loa" class="block text-xs font-medium text-slate-300 mb-1">Temperatura LOA - °C</label>
+              <input type="number" step="0.1" id="temp_loa" placeholder="Ex: 62.0" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
             </div>
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-slate-300 mb-1">Observações da Medição de Temperatura</label>
-            <input type="text" id="temp_obs" placeholder="Ex: Ponto quente detectado no mancal LA." class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500">
           </div>
         </div>
 
-        <!-- BLOCO 6: INSPEÇÃO VISUAL E SENSORIAL COM OK / NOK -->
+        <!-- BLOCO 6: VISUAL OK / NOK -->
         <div class="bg-slate-800 rounded-xl p-5 border border-slate-700 shadow-lg space-y-4">
           <h2 class="text-sm font-bold text-amber-400 uppercase tracking-wider mb-2 flex items-center">
             <i class="fa-solid fa-eye mr-2"></i> Inspeção Visual e Sensorial
           </h2>
-
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <!-- 1. Ruído Anormal -->
+            <!-- Ruído -->
             <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-700/60">
               <div class="flex justify-between items-center mb-2">
                 <label class="text-xs font-bold text-slate-200">Ruído Anormal?</label>
                 <div class="flex space-x-3">
-                  <label class="inline-flex items-center text-xs font-bold text-emerald-400 cursor-pointer">
-                    <input type="radio" name="ruido_status" value="OK" checked onclick="toggleNokObs('ruido', false)" class="text-emerald-500 focus:ring-emerald-400">
-                    <span class="ml-1.5">OK</span>
-                  </label>
-                  <label class="inline-flex items-center text-xs font-bold text-rose-400 cursor-pointer">
-                    <input type="radio" name="ruido_status" value="NOK" onclick="toggleNokObs('ruido', true)" class="text-rose-500 focus:ring-rose-400">
-                    <span class="ml-1.5">NOK</span>
-                  </label>
+                  <label class="text-xs font-bold text-emerald-400 cursor-pointer"><input type="radio" name="ruido_status" value="OK" checked onclick="toggleNokObs('ruido', false)"> OK</label>
+                  <label class="text-xs font-bold text-rose-400 cursor-pointer"><input type="radio" name="ruido_status" value="NOK" onclick="toggleNokObs('ruido', true)"> NOK</label>
                 </div>
               </div>
-              <div id="ruido_obs_box" class="hidden mt-2">
-                <input type="text" id="ruido_obs" placeholder="Descreva a alteração ou ruído identificado..." class="w-full bg-slate-900 border border-rose-500/50 rounded-lg px-3 py-2 text-xs text-white focus:outline-none">
-              </div>
+              <div id="ruido_obs_box" class="hidden mt-2"><input type="text" id="ruido_obs" placeholder="Descreva..." class="w-full bg-slate-900 border border-rose-500/50 rounded-lg px-3 py-2 text-xs text-white"></div>
             </div>
-
-            <!-- 2. Limpeza / Contaminação -->
+            <!-- Limpeza -->
             <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-700/60">
               <div class="flex justify-between items-center mb-2">
-                <label class="text-xs font-bold text-slate-200">Limpeza & Contaminação Visual</label>
+                <label class="text-xs font-bold text-slate-200">Limpeza & Contaminação</label>
                 <div class="flex space-x-3">
-                  <label class="inline-flex items-center text-xs font-bold text-emerald-400 cursor-pointer">
-                    <input type="radio" name="limpeza_status" value="OK" checked onclick="toggleNokObs('limpeza', false)" class="text-emerald-500 focus:ring-emerald-400">
-                    <span class="ml-1.5">OK</span>
-                  </label>
-                  <label class="inline-flex items-center text-xs font-bold text-rose-400 cursor-pointer">
-                    <input type="radio" name="limpeza_status" value="NOK" onclick="toggleNokObs('limpeza', true)" class="text-rose-500 focus:ring-rose-400">
-                    <span class="ml-1.5">NOK</span>
-                  </label>
+                  <label class="text-xs font-bold text-emerald-400 cursor-pointer"><input type="radio" name="limpeza_status" value="OK" checked onclick="toggleNokObs('limpeza', false)"> OK</label>
+                  <label class="text-xs font-bold text-rose-400 cursor-pointer"><input type="radio" name="limpeza_status" value="NOK" onclick="toggleNokObs('limpeza', true)"> NOK</label>
                 </div>
               </div>
-              <div id="limpeza_obs_box" class="hidden mt-2">
-                <input type="text" id="limpeza_obs" placeholder="Descreva o acúmulo de sujeira ou vazamento externo..." class="w-full bg-slate-900 border border-rose-500/50 rounded-lg px-3 py-2 text-xs text-white focus:outline-none">
-              </div>
+              <div id="limpeza_obs_box" class="hidden mt-2"><input type="text" id="limpeza_obs" placeholder="Descreva..." class="w-full bg-slate-900 border border-rose-500/50 rounded-lg px-3 py-2 text-xs text-white"></div>
             </div>
-
-            <!-- 3. Nível & Condição do Óleo / Graxa -->
+            <!-- Óleo -->
             <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-700/60">
               <div class="flex justify-between items-center mb-2">
-                <label class="text-xs font-bold text-slate-200">Nível & Condição do Óleo / Graxa</label>
+                <label class="text-xs font-bold text-slate-200">Nível de Óleo / Graxa</label>
                 <div class="flex space-x-3">
-                  <label class="inline-flex items-center text-xs font-bold text-emerald-400 cursor-pointer">
-                    <input type="radio" name="oleo_status" value="OK" checked onclick="toggleNokObs('oleo', false)" class="text-emerald-500 focus:ring-emerald-400">
-                    <span class="ml-1.5">OK</span>
-                  </label>
-                  <label class="inline-flex items-center text-xs font-bold text-rose-400 cursor-pointer">
-                    <input type="radio" name="oleo_status" value="NOK" onclick="toggleNokObs('oleo', true)" class="text-rose-500 focus:ring-rose-400">
-                    <span class="ml-1.5">NOK</span>
-                  </label>
+                  <label class="text-xs font-bold text-emerald-400 cursor-pointer"><input type="radio" name="oleo_status" value="OK" checked onclick="toggleNokObs('oleo', false)"> OK</label>
+                  <label class="text-xs font-bold text-rose-400 cursor-pointer"><input type="radio" name="oleo_status" value="NOK" onclick="toggleNokObs('oleo', true)"> NOK</label>
                 </div>
               </div>
-              <div id="oleo_obs_box" class="hidden mt-2">
-                <input type="text" id="oleo_obs" placeholder="Descreva: Nível baixo, óleo escuro ou visor obstruído..." class="w-full bg-slate-900 border border-rose-500/50 rounded-lg px-3 py-2 text-xs text-white focus:outline-none">
-              </div>
+              <div id="oleo_obs_box" class="hidden mt-2"><input type="text" id="oleo_obs" placeholder="Descreva..." class="w-full bg-slate-900 border border-rose-500/50 rounded-lg px-3 py-2 text-xs text-white"></div>
             </div>
-
-            <!-- 4. Vazamentos Visíveis -->
+            <!-- Vazamento -->
             <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-700/60">
               <div class="flex justify-between items-center mb-2">
-                <label class="text-xs font-bold text-slate-200">Vazamentos Visíveis</label>
+                <label class="text-xs font-bold text-slate-200">Vazamentos</label>
                 <div class="flex space-x-3">
-                  <label class="inline-flex items-center text-xs font-bold text-emerald-400 cursor-pointer">
-                    <input type="radio" name="vazamento_status" value="OK" checked onclick="toggleNokObs('vazamento', false)" class="text-emerald-500 focus:ring-emerald-400">
-                    <span class="ml-1.5">OK</span>
-                  </label>
-                  <label class="inline-flex items-center text-xs font-bold text-rose-400 cursor-pointer">
-                    <input type="radio" name="vazamento_status" value="NOK" onclick="toggleNokObs('vazamento', true)" class="text-rose-500 focus:ring-rose-400">
-                    <span class="ml-1.5">NOK</span>
-                  </label>
+                  <label class="text-xs font-bold text-emerald-400 cursor-pointer"><input type="radio" name="vazamento_status" value="OK" checked onclick="toggleNokObs('vazamento', false)"> OK</label>
+                  <label class="text-xs font-bold text-rose-400 cursor-pointer"><input type="radio" name="vazamento_status" value="NOK" onclick="toggleNokObs('vazamento', true)"> NOK</label>
                 </div>
               </div>
-              <div id="vazamento_obs_box" class="hidden mt-2">
-                <input type="text" id="vazamento_obs" placeholder="Descreva: Vazamento de óleo, água, ar ou processo..." class="w-full bg-slate-900 border border-rose-500/50 rounded-lg px-3 py-2 text-xs text-white focus:outline-none">
-              </div>
-            </div>
-
-            <!-- 5. Fixação & Base (Estrutura) -->
-            <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-700/60">
-              <div class="flex justify-between items-center mb-2">
-                <label class="text-xs font-bold text-slate-200">Fixação & Base (Estrutura)</label>
-                <div class="flex space-x-3">
-                  <label class="inline-flex items-center text-xs font-bold text-emerald-400 cursor-pointer">
-                    <input type="radio" name="fixacao_status" value="OK" checked onclick="toggleNokObs('fixacao', false)" class="text-emerald-500 focus:ring-emerald-400">
-                    <span class="ml-1.5">OK</span>
-                  </label>
-                  <label class="inline-flex items-center text-xs font-bold text-rose-400 cursor-pointer">
-                    <input type="radio" name="fixacao_status" value="NOK" onclick="toggleNokObs('fixacao', true)" class="text-rose-500 focus:ring-rose-400">
-                    <span class="ml-1.5">NOK</span>
-                  </label>
-                </div>
-              </div>
-              <div id="fixacao_obs_box" class="hidden mt-2">
-                <input type="text" id="fixacao_obs" placeholder="Descreva: Parafusos soltos, trinca na base ou pé manco..." class="w-full bg-slate-900 border border-rose-500/50 rounded-lg px-3 py-2 text-xs text-white focus:outline-none">
-              </div>
-            </div>
-
-            <!-- 6. Proteção de Segurança (NR-12) -->
-            <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-700/60">
-              <div class="flex justify-between items-center mb-2">
-                <label class="text-xs font-bold text-slate-200">Proteção de Segurança (NR-12)</label>
-                <div class="flex space-x-3">
-                  <label class="inline-flex items-center text-xs font-bold text-emerald-400 cursor-pointer">
-                    <input type="radio" name="protecao_status" value="OK" checked onclick="toggleNokObs('protecao', false)" class="text-emerald-500 focus:ring-emerald-400">
-                    <span class="ml-1.5">OK</span>
-                  </label>
-                  <label class="inline-flex items-center text-xs font-bold text-rose-400 cursor-pointer">
-                    <input type="radio" name="protecao_status" value="NOK" onclick="toggleNokObs('protecao', true)" class="text-rose-500 focus:ring-rose-400">
-                    <span class="ml-1.5">NOK</span>
-                  </label>
-                </div>
-              </div>
-              <div id="protecao_obs_box" class="hidden mt-2">
-                <input type="text" id="protecao_obs" placeholder="Descreva: Sem proteção, solta ou danificada..." class="w-full bg-slate-900 border border-rose-500/50 rounded-lg px-3 py-2 text-xs text-white focus:outline-none">
-              </div>
-            </div>
-
-            <!-- 7. Vibração Sensorial (Tátil) -->
-            <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-700/60">
-              <div class="flex justify-between items-center mb-2">
-                <label class="text-xs font-bold text-slate-200">Vibração Sensorial (Tátil)</label>
-                <div class="flex space-x-3">
-                  <label class="inline-flex items-center text-xs font-bold text-emerald-400 cursor-pointer">
-                    <input type="radio" name="vibracao_status" value="OK" checked onclick="toggleNokObs('vibracao', false)" class="text-emerald-500 focus:ring-emerald-400">
-                    <span class="ml-1.5">OK</span>
-                  </label>
-                  <label class="inline-flex items-center text-xs font-bold text-rose-400 cursor-pointer">
-                    <input type="radio" name="vibracao_status" value="NOK" onclick="toggleNokObs('vibracao', true)" class="text-rose-500 focus:ring-rose-400">
-                    <span class="ml-1.5">NOK</span>
-                  </label>
-                </div>
-              </div>
-              <div id="vibracao_obs_box" class="hidden mt-2">
-                <input type="text" id="vibracao_obs" placeholder="Descreva a severidade tátil percebida..." class="w-full bg-slate-900 border border-rose-500/50 rounded-lg px-3 py-2 text-xs text-white focus:outline-none">
-              </div>
-            </div>
-
-            <!-- 8. Refrigeração / Aletagem -->
-            <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-700/60">
-              <div class="flex justify-between items-center mb-2">
-                <label class="text-xs font-bold text-slate-200">Refrigeração / Aletagem / Ventoinha</label>
-                <div class="flex space-x-3">
-                  <label class="inline-flex items-center text-xs font-bold text-emerald-400 cursor-pointer">
-                    <input type="radio" name="refrigeracao_status" value="OK" checked onclick="toggleNokObs('refrigeracao', false)" class="text-emerald-500 focus:ring-emerald-400">
-                    <span class="ml-1.5">OK</span>
-                  </label>
-                  <label class="inline-flex items-center text-xs font-bold text-rose-400 cursor-pointer">
-                    <input type="radio" name="refrigeracao_status" value="NOK" onclick="toggleNokObs('refrigeracao', true)" class="text-rose-500 focus:ring-rose-400">
-                    <span class="ml-1.5">NOK</span>
-                  </label>
-                </div>
-              </div>
-              <div id="refrigeracao_obs_box" class="hidden mt-2">
-                <input type="text" id="refrigeracao_obs" placeholder="Descreva: Aletagem obstruída ou ventoinha danificada..." class="w-full bg-slate-900 border border-rose-500/50 rounded-lg px-3 py-2 text-xs text-white focus:outline-none">
-              </div>
+              <div id="vazamento_obs_box" class="hidden mt-2"><input type="text" id="vazamento_obs" placeholder="Descreva..." class="w-full bg-slate-900 border border-rose-500/50 rounded-lg px-3 py-2 text-xs text-white"></div>
             </div>
           </div>
-
           <div>
-            <label class="block text-xs font-medium text-slate-300 mb-1">Observações Adicionais para o Analista</label>
-            <textarea id="observacoes" rows="2" placeholder="Ex: Equipamento em regime normal de operação." class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-xs text-white focus:outline-none focus:border-amber-500"></textarea>
+            <label class="block text-xs font-medium text-slate-300 mb-1">Observações Gerais</label>
+            <textarea id="observacoes" rows="2" placeholder="Observações adicionais..." class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-xs text-white focus:outline-none focus:border-amber-500"></textarea>
           </div>
         </div>
 
@@ -494,37 +328,24 @@
       </form>
     </div>
 
-    <!-- SEÇÃO: PAINEL DO ANALISTA & GRÁFICOS -->
+    <!-- SEÇÃO: PAINEL & HISTÓRICO -->
     <div id="tab-dashboard" class="hidden space-y-6">
       <div class="bg-slate-800 rounded-xl p-5 border border-slate-700 shadow-lg flex flex-col md:flex-row justify-between items-center gap-4">
         <div>
           <h2 class="text-base font-bold text-white">Histórico em Nuvem & Tendências</h2>
           <p class="text-xs text-slate-400">Sincronizado em tempo real entre dispositivos</p>
         </div>
-        <div class="flex flex-wrap items-center gap-2 w-full md:w-auto">
-          <div>
-            <select id="filter_tag" onchange="renderDashboard()" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500">
-              <option value="TODAS">Todas as Tags</option>
-            </select>
-          </div>
-          <div class="flex items-center space-x-1">
-            <input type="date" id="filter_date" onchange="renderDashboard()" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500">
-            <button onclick="clearDateFilter()" title="Limpar data" class="bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs px-2 py-2 rounded-lg transition">
-              <i class="fa-solid fa-xmark"></i>
-            </button>
-          </div>
-          <button onclick="exportTechnicalPDF()" class="bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs px-3 py-2 rounded-lg transition flex items-center shadow">
-            <i class="fa-solid fa-file-pdf mr-1.5"></i> Laudo PDF
-          </button>
-          <button onclick="exportCSV()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs px-3 py-2 rounded-lg transition flex items-center shadow">
-            <i class="fa-solid fa-file-excel mr-1.5"></i> Exportar CSV
+        <div class="flex flex-wrap items-center gap-2">
+          <select id="filter_tag" onchange="renderDashboard()" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white">
+            <option value="TODAS">Todas as Tags</option>
+          </select>
+          <button onclick="exportTechnicalPDF()" class="bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs px-3 py-2 rounded-lg transition">
+            <i class="fa-solid fa-file-pdf mr-1"></i> Laudo PDF
           </button>
         </div>
       </div>
       <div class="bg-slate-800 rounded-xl p-5 border border-slate-700 shadow-lg">
-        <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider mb-3 flex items-center">
-          <i class="fa-solid fa-chart-line text-amber-400 mr-2"></i> Histórico de Temperatura (°C)
-        </h3>
+        <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider mb-3">Histórico de Temperatura (°C)</h3>
         <div class="relative h-64 w-full">
           <canvas id="tempChart"></canvas>
         </div>
@@ -538,19 +359,17 @@
           <table class="w-full text-left text-xs text-slate-300">
             <thead class="bg-slate-900/80 text-slate-400 uppercase font-semibold">
               <tr>
-                <th class="p-3">Foto / Data</th>
-                <th class="p-3">Tag do Componente</th>
+                <th class="p-3">Data</th>
+                <th class="p-3">Tag</th>
                 <th class="p-3">Componente / SAP</th>
-                <th class="p-3">Carga / Pressão</th>
-                <th class="p-3">Strobo & Rotação</th>
+                <th class="p-3">Operação</th>
+                <th class="p-3">Strobo</th>
                 <th class="p-3">Temp LA/LOA</th>
-                <th class="p-3">Condição Visual (OK / NOK)</th>
                 <th class="p-3">Inspetor</th>
                 <th class="p-3 text-center">Ações</th>
               </tr>
             </thead>
-            <tbody id="records-table-body" class="divide-y divide-slate-700/50">
-            </tbody>
+            <tbody id="records-table-body" class="divide-y divide-slate-700/50"></tbody>
           </table>
         </div>
       </div>
@@ -558,13 +377,7 @@
   </main>
 
   <script>
-    const DEFAULT_ROTAS = [
-      "Sopradores Massas",
-      "Sopradores Drymix",
-      "Compressores Chocolate",
-      "Compressores Drymix",
-      "Caldeiras / Utilidades"
-    ];
+    const DEFAULT_ROTAS = ["Sopradores Massas", "Sopradores Drymix", "Compressores Chocolate", "Compressores Drymix", "Caldeiras / Utilidades"];
     const DEFAULT_TAG_MAP = {
       "Sopradores Massas": ["SP8001", "SP8002"],
       "Sopradores Drymix": ["SP8003"],
@@ -572,428 +385,15 @@
       "Compressores Drymix": ["UC02"],
       "Caldeiras / Utilidades": ["TO01", "BO01"]
     };
-
     const DEFAULT_EQUIPMENT_COMPONENTS = {
-      "SP": [
-        { nome: "Motor", sufixo: "MT" },
-        { nome: "Soprador", sufixo: "ELEM" }
-      ],
-      "UC": [
-        { nome: "Motor", sufixo: "MT" },
-        { nome: "Elemento", sufixo: "ELEM" }
-      ],
-      "COMP": [
-        { nome: "Motor", sufixo: "MT" },
-        { nome: "Elemento", sufixo: "ELEM" }
-      ],
-      "TO": [
-        { nome: "Motor", sufixo: "MT" },
-        { nome: "Redutor", sufixo: "RD" }
-      ],
-      "BO": [
-        { nome: "Motor", sufixo: "MT" },
-        { nome: "Bomba", sufixo: "BOMBA" }
-      ]
+      "SP": [{nome: "Motor", sufixo: "MT"}, {nome: "Soprador", sufixo: "ELEM"}],
+      "UC": [{nome: "Motor", sufixo: "MT"}, {nome: "Elemento", sufixo: "ELEM"}],
+      "TO": [{nome: "Motor", sufixo: "MT"}, {nome: "Redutor", sufixo: "RD"}],
+      "BO": [{nome: "Motor", sufixo: "MT"}, {nome: "Bomba", sufixo: "BOMBA"}]
     };
 
     let currentPhotoBase64 = "";
     let cloudRecords = [];
-
-    function initCloudData() {
-      const now = new Date();
-      now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-      document.getElementById("data_coleta").value = now.toISOString().slice(0,16);
-      
-      loadSavedRotas();
-      onRotaChange(document.getElementById('rota_select').value);
-      
-      fetchCloudRecords();
-    }
-
-    async function fetchCloudRecords() {
-      try {
-        const snapshot = await db.collection("inspectcbm_records").get();
-        cloudRecords = [];
-        snapshot.forEach((doc) => {
-          cloudRecords.push({ docId: doc.id, ...doc.data() });
-        });
-        cloudRecords.sort((a, b) => b.id - a.id);
-        populateTagFilter();
-        renderDashboard();
-      } catch (err) {
-        console.error("Erro ao buscar dados do Firebase:", err);
-        document.getElementById('cloud-status').innerHTML = '<i class="fa-solid fa-triangle-exclamation mr-1"></i> Erro de Conexão Nuvem';
-      }
-    }
-
-    function toggleNokObs(prefix, isNok) {
-      const box = document.getElementById(`${prefix}_obs_box`);
-      if (isNok) {
-        box.classList.remove('hidden');
-      } else {
-        box.classList.add('hidden');
-        document.getElementById(`${prefix}_obs`).value = '';
-      }
-    }
-
-    function handlePhotoUpload(e) {
-      const file = e.target.files[0];
-      if(!file) return;
-      const reader = new FileReader();
-      reader.onload = function(event) {
-        currentPhotoBase64 = event.target.result;
-        const previewImg = document.getElementById('eq_photo_preview');
-        const placeholderIcon = document.getElementById('photo-placeholder-icon');
-        const removeBtn = document.getElementById('btn-remove-photo');
-        
-        previewImg.src = currentPhotoBase64;
-        previewImg.classList.remove('hidden');
-        placeholderIcon.classList.add('hidden');
-        removeBtn.classList.remove('hidden');
-      };
-      reader.readAsDataURL(file);
-    }
-
-    function removePhoto() {
-      currentPhotoBase64 = "";
-      document.getElementById('eq_photo_input').value = "";
-      document.getElementById('eq_photo_preview').src = "";
-      document.getElementById('eq_photo_preview').classList.add('hidden');
-      document.getElementById('photo-placeholder-icon').classList.remove('hidden');
-      document.getElementById('btn-remove-photo').classList.add('hidden');
-    }
-
-    function getCustomEquipmentComponents() {
-      const saved = localStorage.getItem('inspectcbm_custom_eq_comps');
-      return saved ? JSON.parse(saved) : DEFAULT_EQUIPMENT_COMPONENTS;
-    }
-
-    function saveCustomEquipmentComponents(map) {
-      localStorage.setItem('inspectcbm_custom_eq_comps', JSON.stringify(map));
-    }
-
-    function detectPrefixFromTag(tag) {
-      if(!tag) return null;
-      const clean = tag.trim().toUpperCase();
-      const maps = getCustomEquipmentComponents();
-      const availablePrefixes = Object.keys(maps);
-      
-      for (let p of availablePrefixes) {
-        if (clean.startsWith(p)) return p;
-      }
-      const match = clean.match(/^([A-Z]+)/);
-      if(match && match[1]) return match[1];
-      return null;
-    }
-
-    function updateComponentOptions(tag, keepCurrent = false) {
-      const compSelect = document.getElementById('componente_select');
-      const currentSelectedVal = keepCurrent ? compSelect.value : null;
-      compSelect.innerHTML = '';
-      
-      const prefix = detectPrefixFromTag(tag);
-      const maps = getCustomEquipmentComponents();
-      
-      let comps = [];
-      if(prefix && maps[prefix]) {
-        comps = maps[prefix];
-      } else {
-        comps = [
-          { nome: "Motor", sufixo: "MT" },
-          { nome: "Elemento", sufixo: "ELEM" },
-          { nome: "Redutor", sufixo: "RD" },
-          { nome: "Bomba", sufixo: "BOMBA" },
-          { nome: "Geral", sufixo: "GERAL" }
-        ];
-      }
-
-      comps.forEach(c => {
-        const opt = document.createElement('option');
-        opt.value = c.nome;
-        opt.setAttribute('data-suffix', c.sufixo);
-        opt.textContent = `${c.nome} (-${c.sufixo})`;
-        compSelect.appendChild(opt);
-      });
-
-      const optAdd = document.createElement('option');
-      optAdd.value = "OUTRO_COMP";
-      optAdd.textContent = "+ Adicionar novo componente...";
-      compSelect.appendChild(optAdd);
-
-      if(currentSelectedVal && Array.from(compSelect.options).some(o => o.value === currentSelectedVal)) {
-        compSelect.value = currentSelectedVal;
-      } else {
-        compSelect.selectedIndex = 0;
-      }
-
-      onComponenteChange(compSelect.value, true);
-    }
-
-    function getActiveComponentSuffix() {
-      const compSelect = document.getElementById('componente_select');
-      if(!compSelect || compSelect.selectedIndex < 0) return 'COMP';
-      const selectedOpt = compSelect.options[compSelect.selectedIndex];
-      if(selectedOpt && selectedOpt.hasAttribute('data-suffix')) {
-        return selectedOpt.getAttribute('data-suffix');
-      }
-      return 'COMP';
-    }
-
-    function getBaseTag() {
-      const tagSelect = document.getElementById('tag_select').value;
-      const tagManual = document.getElementById('tag_manual').value.trim();
-      let baseTag = tagSelect === 'OUTRO' ? tagManual : tagSelect;
-      if (baseTag) baseTag = baseTag.split(' - ')[0].trim();
-      return baseTag;
-    }
-
-    function getFullTag() {
-      const baseTag = getBaseTag();
-      if (!baseTag) return '';
-      const comp = document.getElementById('componente_select').value;
-      if(comp === 'OUTRO_COMP') return baseTag;
-      const suffix = getActiveComponentSuffix();
-      return `${baseTag} - ${suffix}`;
-    }
-
-    function updateFullTagPreview() {
-      const fullTag = getFullTag();
-      const lbl = document.getElementById('lbl_tag_final');
-      lbl.textContent = fullTag ? fullTag : 'SELECIONE UMA TAG...';
-    }
-
-    function getSavedRotas() {
-      const saved = localStorage.getItem('inspectcbm_rotas');
-      return saved ? JSON.parse(saved) : DEFAULT_ROTAS;
-    }
-
-    function getTagMap() {
-      const saved = localStorage.getItem('inspectcbm_tag_map');
-      return saved ? JSON.parse(saved) : DEFAULT_TAG_MAP;
-    }
-
-    function saveTagMap(map) {
-      localStorage.setItem('inspectcbm_tag_map', JSON.stringify(map));
-    }
-
-    function loadSavedRotas() {
-      const rotas = getSavedRotas();
-      const select = document.getElementById('rota_select');
-      select.innerHTML = '<option value="TODAS_ROTAS">-- Exibir Todas as Tags --</option>';
-      rotas.forEach(r => {
-        const opt = document.createElement('option');
-        opt.value = r;
-        opt.textContent = r;
-        select.appendChild(opt);
-      });
-      const optNew = document.createElement('option');
-      optNew.value = 'OUTRO';
-      optNew.textContent = '+ Cadastrar Nova Rota...';
-      select.appendChild(optNew);
-      select.value = "TODAS_ROTAS";
-    }
-
-    function onRotaChange(selectedRota) {
-      const rotaManual = document.getElementById('rota_manual');
-      if (selectedRota === 'OUTRO') {
-        rotaManual.classList.remove('hidden');
-        rotaManual.required = true;
-        rotaManual.focus();
-      } else {
-        rotaManual.classList.add('hidden');
-        rotaManual.required = false;
-      }
-      loadTagsForRota(selectedRota);
-    }
-
-    function onComponenteChange(comp, skipRecursive = false) {
-      if(comp === 'OUTRO_COMP') {
-        manageCustomComponentsModal();
-        return;
-      }
-      const lblComp = document.getElementById('lbl-componente-atual');
-      const lblLa = document.getElementById('lbl_temp_la');
-      const lblLoa = document.getElementById('lbl_temp_loa');
-      if(lblComp) lblComp.textContent = comp;
-      
-      if(comp === 'Motor') {
-        lblLa.textContent = 'Temperatura LA (Acoplado Motor) - °C';
-        lblLoa.textContent = 'Temperatura LOA (Oposto Motor) - °C';
-      } else {
-        lblLa.textContent = `Temperatura Lado Acoplado (${comp}) - °C`;
-        lblLoa.textContent = `Temperatura Lado Oposto (${comp}) - °C`;
-      }
-      updateFullTagPreview();
-      if(!skipRecursive) fetchMasterDataForTag(document.getElementById('tag_select').value);
-    }
-
-    function loadTagsForRota(rota) {
-      const tagSelect = document.getElementById('tag_select');
-      tagSelect.innerHTML = '<option value="">Selecione a Tag...</option>';
-      const tagMap = getTagMap();
-      let availableTags = [];
-      if (!rota || rota === 'TODAS_ROTAS') {
-        availableTags = [...new Set(Object.values(tagMap).flat())];
-      } else if (tagMap[rota]) {
-        availableTags = [...tagMap[rota]];
-      }
-      availableTags.forEach(t => {
-        const opt = document.createElement('option');
-        opt.value = t;
-        opt.textContent = t;
-        tagSelect.appendChild(opt);
-      });
-      const optNew = document.createElement('option');
-      optNew.value = 'OUTRO';
-      optNew.textContent = '+ Cadastrar Nova Tag nesta Rota...';
-      tagSelect.appendChild(optNew);
-      
-      if(availableTags.length > 0) {
-        tagSelect.value = availableTags[0];
-        handleTagSelection(availableTags[0]);
-      } else {
-        handleTagSelection('');
-      }
-    }
-
-    function handleTagSelection(val) {
-      const manualInput = document.getElementById('tag_manual');
-      const badge = document.getElementById('auto-fill-badge');
-
-      if(val === 'OUTRO') {
-        manualInput.classList.remove('hidden');
-        manualInput.required = true;
-        manualInput.focus();
-        badge.classList.add('hidden');
-        clearFormFields();
-        updateComponentOptions('');
-      } else {
-        manualInput.classList.add('hidden');
-        manualInput.required = false;
-        updateComponentOptions(val, true);
-        fetchMasterDataForTag(val);
-      }
-    }
-
-    function fetchMasterDataForTag(val) {
-      const badge = document.getElementById('auto-fill-badge');
-      const fullTag = getFullTag();
-      if (fullTag !== '' && val !== '') {
-        const masterData = JSON.parse(localStorage.getItem('inspectcbm_master_data') || '{}');
-        let data = masterData[fullTag] || masterData[val];
-        if (!data) {
-          data = cloudRecords.find(r => r.tag === fullTag || r.tag.startsWith(val));
-        }
-        if (data) {
-          document.getElementById('sap_number').value = data.sap_number && data.sap_number !== '-' ? data.sap_number : '';
-          document.getElementById('equipamento_nome').value = data.equipamento_nome && data.equipamento_nome !== '-' ? data.equipamento_nome : '';
-          document.getElementById('setor').value = data.setor && data.setor !== '-' ? data.setor : '';
-          document.getElementById('area').value = data.area && data.area !== '-' ? data.area : '';
-          if(data.inspetor) document.getElementById('inspetor').value = data.inspetor;
-          document.getElementById('rotacao_rpm').value = data.rotacao_rpm && data.rotacao_rpm !== '-' ? data.rotacao_rpm : '';
-          document.getElementById('rolamento_la').value = data.rolamento_la && data.rolamento_la !== '-' ? data.rolamento_la : '';
-          document.getElementById('rolamento_loa').value = data.rolamento_loa && data.rolamento_loa !== '-' ? data.rolamento_loa : '';
-          document.getElementById('potencia').value = data.potencia && data.potencia !== '-' ? data.potencia : '';
-          if(data.photo) {
-            currentPhotoBase64 = data.photo;
-            const previewImg = document.getElementById('eq_photo_preview');
-            previewImg.src = currentPhotoBase64;
-            previewImg.classList.remove('hidden');
-            document.getElementById('photo-placeholder-icon').classList.add('hidden');
-            document.getElementById('btn-remove-photo').classList.remove('hidden');
-          }
-          badge.classList.remove('hidden');
-        } else {
-          badge.classList.add('hidden');
-          clearFormFields();
-        }
-      } else {
-        badge.classList.add('hidden');
-        clearFormFields();
-      }
-    }
-
-    function onTagManualInput(val) {
-      updateComponentOptions(val, true);
-      updateFullTagPreview();
-    }
-
-    function clearFormFields() {
-      document.getElementById('sap_number').value = '';
-      document.getElementById('equipamento_nome').value = '';
-      document.getElementById('setor').value = '';
-      document.getElementById('area').value = '';
-      document.getElementById('rotacao_rpm').value = '';
-      document.getElementById('rolamento_la').value = '';
-      document.getElementById('rolamento_loa').value = '';
-      document.getElementById('potencia').value = '';
-    }
-
-    function manageCustomComponentsModal() {
-      const tagVal = document.getElementById('tag_select').value === 'OUTRO' ? document.getElementById('tag_manual').value : document.getElementById('tag_select').value;
-      const prefix = detectPrefixFromTag(tagVal) || prompt("Digite o Prefixo (Ex: SP, UC, TO, BO):");
-      if(!prefix) return;
-
-      const compName = prompt(`Nome do novo componente para [${prefix.toUpperCase()}]:\nEx: Ventoinha`);
-      if(!compName) return;
-
-      const suffix = prompt(`Sufixo da Tag:\nEx: VT`);
-      if(!suffix) return;
-
-      const maps = getCustomEquipmentComponents();
-      const cleanPrefix = prefix.toUpperCase();
-      if(!maps[cleanPrefix]) maps[cleanPrefix] = [];
-      
-      maps[cleanPrefix].push({ nome: compName.trim(), sufixo: suffix.trim().toUpperCase() });
-      saveCustomEquipmentComponents(maps);
-      updateComponentOptions(tagVal, true);
-    }
-
-    function registerTagToRota(baseTag, rota) {
-      if(!baseTag || !rota || rota === 'TODAS_ROTAS' || rota === 'OUTRO') return;
-      const tagMap = getTagMap();
-      if(!tagMap[rota]) tagMap[rota] = [];
-      if(!tagMap[rota].includes(baseTag)) {
-        tagMap[rota].push(baseTag);
-        saveTagMap(tagMap);
-      }
-    }
-
-    function saveNewRotaToList(newRota) {
-      if(!newRota) return;
-      let rotas = getSavedRotas();
-      if(!rotas.includes(newRota)) {
-        rotas.push(newRota);
-        localStorage.setItem('inspectcbm_rotas', JSON.stringify(rotas));
-        loadSavedRotas();
-      }
-    }
-
-    function saveOnlyRegistration() {
-      alert("Os cadastros de equipamentos agora são sincronizados automaticamente ao salvar qualquer inspeção!");
-    }
-
-    function manageTagsModal() {
-      const selectedRota = document.getElementById('rota_select').value;
-      const tagMap = getTagMap();
-      if(!selectedRota || selectedRota === 'TODAS_ROTAS') {
-        alert("Selecione uma Rota específica para gerenciar as Tags.");
-        return;
-      }
-      const tags = tagMap[selectedRota] || [];
-      if(tags.length === 0) { alert("Nenhuma tag nesta rota."); return; }
-      const tagToDelete = prompt(`Tags em [${selectedRota}]:\n\n` + tags.map((t, i) => `${i+1}. ${t}`).join("\n") + "\n\nNúmero para remover:");
-      if(tagToDelete) {
-        const index = parseInt(tagToDelete) - 1;
-        if(!isNaN(index) && index >= 0 && index < tags.length) {
-          tags.splice(index, 1);
-          tagMap[selectedRota] = tags;
-          saveTagMap(tagMap);
-          loadTagsForRota(selectedRota);
-          populateTagFilter();
-        }
-      }
-    }
 
     function switchTab(tab) {
       const formTab = document.getElementById('tab-form');
@@ -1014,105 +414,135 @@
       }
     }
 
-    function clearDateFilter() {
-      document.getElementById('filter_date').value = '';
-      renderDashboard();
+    async function fetchCloudRecords() {
+      try {
+        const snapshot = await db.collection("inspectcbm_records").get();
+        cloudRecords = [];
+        snapshot.forEach((doc) => {
+          cloudRecords.push({ docId: doc.id, ...doc.data() });
+        });
+        cloudRecords.sort((a, b) => b.id - a.id);
+        populateTagFilter();
+        renderDashboard();
+      } catch (err) {
+        console.error("Erro ao buscar dados:", err);
+      }
     }
 
-    function getRadioValue(name) {
-      const selected = document.querySelector(`input[name="${name}"]:checked`);
-      return selected ? selected.value : 'OK';
+    function toggleNokObs(prefix, isNok) {
+      const box = document.getElementById(`${prefix}_obs_box`);
+      if (isNok) box.classList.remove('hidden');
+      else { box.classList.add('hidden'); document.getElementById(`${prefix}_obs`).value = ''; }
+    }
+
+    function handlePhotoUpload(e) {
+      const file = e.target.files[0];
+      if(!file) return;
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        currentPhotoBase64 = event.target.result;
+        document.getElementById('eq_photo_preview').src = currentPhotoBase64;
+        document.getElementById('eq_photo_preview').classList.remove('hidden');
+        document.getElementById('photo-placeholder-icon').classList.add('hidden');
+        document.getElementById('btn-remove-photo').classList.remove('hidden');
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function removePhoto() {
+      currentPhotoBase64 = "";
+      document.getElementById('eq_photo_input').value = "";
+      document.getElementById('eq_photo_preview').src = "";
+      document.getElementById('eq_photo_preview').classList.add('hidden');
+      document.getElementById('photo-placeholder-icon').classList.remove('hidden');
+      document.getElementById('btn-remove-photo').classList.add('hidden');
+    }
+
+    function loadSavedRotas() {
+      const select = document.getElementById('rota_select');
+      select.innerHTML = '<option value="TODAS_ROTAS">-- Exibir Todas as Tags --</option>';
+      DEFAULT_ROTAS.forEach(r => {
+        const opt = document.createElement('option');
+        opt.value = r;
+        opt.textContent = r;
+        select.appendChild(opt);
+      });
+      select.value = "TODAS_ROTAS";
+    }
+
+    function onRotaChange(rota) {
+      const tagSelect = document.getElementById('tag_select');
+      tagSelect.innerHTML = '<option value="">Selecione a Tag...</option>';
+      let tags = rota === 'TODAS_ROTAS' ? [...new Set(Object.values(DEFAULT_TAG_MAP).flat())] : (DEFAULT_TAG_MAP[rota] || []);
+      tags.forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t;
+        opt.textContent = t;
+        tagSelect.appendChild(opt);
+      });
+      if(tags.length > 0) { tagSelect.value = tags[0]; handleTagSelection(tags[0]); }
+    }
+
+    function handleTagSelection(val) {
+      updateComponentOptions(val);
+    }
+
+    function updateComponentOptions(tag) {
+      const compSelect = document.getElementById('componente_select');
+      compSelect.innerHTML = '<option value="Motor" data-suffix="MT">Motor (-MT)</option><option value="Elemento" data-suffix="ELEM">Elemento (-ELEM)</option>';
+      updateFullTagPreview();
+    }
+
+    function getBaseTag() {
+      return document.getElementById('tag_select').value;
+    }
+
+    function getFullTag() {
+      const base = getBaseTag();
+      if(!base) return '';
+      const comp = document.getElementById('componente_select').value;
+      const suffix = comp === 'Motor' ? 'MT' : 'ELEM';
+      return `${base} - ${suffix}`;
+    }
+
+    function updateFullTagPreview() {
+      document.getElementById('lbl_tag_final').textContent = getFullTag() || 'SELECIONE UMA TAG...';
     }
 
     async function saveInspection(e) {
       e.preventDefault();
-      const rotaSelect = document.getElementById('rota_select').value;
-      const rotaManual = document.getElementById('rota_manual').value.trim();
-      let finalRota = rotaSelect === 'OUTRO' ? rotaManual : rotaSelect;
-      if(rotaSelect === 'OUTRO') saveNewRotaToList(finalRota);
-      
-      const baseTag = getBaseTag();
       const fullTag = getFullTag();
-      if(!fullTag) { alert("Informe a Tag."); return; }
-      registerTagToRota(baseTag, finalRota);
+      if(!fullTag) { alert("Selecione a Tag."); return; }
 
       const record = {
         id: Date.now(),
         data_coleta: document.getElementById('data_coleta').value,
         tag: fullTag,
-        base_tag: baseTag,
-        rota: finalRota || '-',
+        rota: document.getElementById('rota_select').value,
         componente: document.getElementById('componente_select').value,
         sap_number: document.getElementById('sap_number').value || '-',
         equipamento_nome: document.getElementById('equipamento_nome').value || '-',
-        setor: document.getElementById('setor').value || '-',
-        area: document.getElementById('area').value || '-',
         inspetor: document.getElementById('inspetor').value,
-        rotacao_rpm: document.getElementById('rotacao_rpm').value || '-',
-        rolamento_la: document.getElementById('rolamento_la').value || '-',
-        rolamento_loa: document.getElementById('rolamento_loa').value || '-',
-        potencia: document.getElementById('potencia').value || '-',
         status_operacao: document.getElementById('status_operacao').value,
-        carga_pressao_str: (document.getElementById('carga_valor').value ? `${document.getElementById('carga_valor').value} ${document.getElementById('carga_unidade').value}` : '-'),
+        carga_pressao_str: `${document.getElementById('carga_valor').value || 0} ${document.getElementById('carga_unidade').value}`,
         rpm_real_strobo: document.getElementById('rpm_real_strobo').value || '-',
-        acoplamento_status: document.getElementById('acoplamento_status').value,
-        strobo_obs: document.getElementById('strobo_obs').value || '-',
         temp_la: parseFloat(document.getElementById('temp_la').value) || null,
         temp_loa: parseFloat(document.getElementById('temp_loa').value) || null,
-        temp_obs: document.getElementById('temp_obs').value || '-',
-        
-        ruido_status: getRadioValue('ruido_status'),
-        ruido_obs: document.getElementById('ruido_obs').value || '',
-        limpeza_status: getRadioValue('limpeza_status'),
-        limpeza_obs: document.getElementById('limpeza_obs').value || '',
-        oleo_status: getRadioValue('oleo_status'),
-        oleo_obs: document.getElementById('oleo_obs').value || '',
-        vazamento_status: getRadioValue('vazamento_status'),
-        vazamento_obs: document.getElementById('vazamento_obs').value || '',
-        fixacao_status: getRadioValue('fixacao_status'),
-        fixacao_obs: document.getElementById('fixacao_obs').value || '',
-        protecao_status: getRadioValue('protecao_status'),
-        protecao_obs: document.getElementById('protecao_obs').value || '',
-        vibracao_status: getRadioValue('vibracao_status'),
-        vibracao_obs: document.getElementById('vibracao_obs').value || '',
-        refrigeracao_status: getRadioValue('refrigeracao_status'),
-        refrigeracao_obs: document.getElementById('refrigeracao_obs').value || '',
-
         observacoes: document.getElementById('observacoes').value || '-',
         photo: currentPhotoBase64
       };
 
       try {
         await db.collection("inspectcbm_records").add(record);
-        alert(`Inspeção InspectCBM salva com sucesso na Nuvem para [${fullTag}]!`);
-        
-        document.getElementById('rpm_real_strobo').value = '';
-        document.getElementById('strobo_obs').value = '';
-        document.getElementById('temp_la').value = '';
-        document.getElementById('temp_loa').value = '';
-        document.getElementById('temp_obs').value = '';
-        document.getElementById('observacoes').value = '';
-        
-        ['ruido', 'limpeza', 'oleo', 'vazamento', 'fixacao', 'protecao', 'vibracao', 'refrigeracao'].forEach(prefix => {
-          toggleNokObs(prefix, false);
-          const radioOk = document.querySelector(`input[name="${prefix}_status"][value="OK"]`);
-          if(radioOk) radioOk.checked = true;
-        });
-
-        removePhoto();
-        loadSavedRotas();
-        onRotaChange(finalRota);
-        await fetchCloudRecords();
+        alert("Inspeção salva com sucesso na nuvem!");
         switchTab('dashboard');
       } catch (err) {
-        console.error("Erro ao salvar na nuvem:", err);
-        alert("Erro ao gravar na nuvem: " + err.message);
+        alert("Erro ao salvar: " + err.message);
       }
     }
 
     function populateTagFilter() {
       const filterSelect = document.getElementById('filter_tag');
-      const currentVal = filterSelect.value;
       const tags = [...new Set(cloudRecords.map(r => r.tag))];
       filterSelect.innerHTML = '<option value="TODAS">Todas as Tags</option>';
       tags.forEach(t => {
@@ -1121,13 +551,77 @@
         opt.textContent = t;
         filterSelect.appendChild(opt);
       });
-      filterSelect.value = currentVal || 'TODAS';
     }
 
     let chartInstance = null;
     function renderDashboard() {
       const filterTag = document.getElementById('filter_tag').value;
-      const filterDate = document.getElementById('filter_date').value;
       let filtered = cloudRecords;
       if (filterTag !== 'TODAS') filtered = filtered.filter(r => r.tag === filterTag);
-      if (filterDate) filtered = filtered.filter(r => r.data_co
+      
+      document.getElementById('record-count').textContent = `${filtered.length} registro(s)`;
+      const tbody = document.getElementById('records-table-body');
+      tbody.innerHTML = '';
+      
+      if(filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" class="p-6 text-center text-slate-500">Nenhum registro encontrado.</td></tr>`;
+      } else {
+        filtered.forEach(r => {
+          const tr = document.createElement('tr');
+          tr.className = "hover:bg-slate-800/50 transition";
+          tr.innerHTML = `
+            <td class="p-3 font-mono text-[10px]">${new Date(r.data_coleta).toLocaleString('pt-BR')}</td>
+            <td class="p-3 font-bold text-amber-400 font-mono">${r.tag}</td>
+            <td class="p-3 text-[11px]">${r.componente} / SAP: <b>${r.sap_number}</b></td>
+            <td class="p-3 text-[11px]">${r.status_operacao} (${r.carga_pressao_str})</td>
+            <td class="p-3 text-[11px]">${r.rpm_real_strobo} RPM</td>
+            <td class="p-3 text-[11px] text-rose-400">LA: ${r.temp_la || '-'}°C | LOA: ${r.temp_loa || '-'}°C</td>
+            <td class="p-3 text-[11px]">${r.inspetor}</td>
+            <td class="p-3 text-center">
+              <button onclick="deleteCloudRecord('${r.docId}')" class="text-slate-500 hover:text-rose-400 transition"><i class="fa-solid fa-trash-can"></i></button>
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+      }
+      renderChart(filtered);
+    }
+
+    async function deleteCloudRecord(docId) {
+      if(confirm('Excluir este registro?')) {
+        await db.collection("inspectcbm_records").doc(docId).delete();
+        fetchCloudRecords();
+      }
+    }
+
+    function renderChart(data) {
+      const ctx = document.getElementById('tempChart').getContext('2d');
+      const sorted = [...data].reverse();
+      const labels = sorted.map(r => r.tag);
+      const tempDataLA = sorted.map(r => r.temp_la);
+      const tempDataLOA = sorted.map(r => r.temp_loa);
+      if(chartInstance) chartInstance.destroy();
+      chartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [
+            { label: 'Temp. LA (°C)', data: tempDataLA, borderColor: '#f43f5e', borderWidth: 2, tension: 0.3 },
+            { label: 'Temp. LOA (°C)', data: tempDataLOA, borderColor: '#38bdf8', borderWidth: 2, tension: 0.3 }
+          ]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+      });
+    }
+
+    function exportTechnicalPDF() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF('l', 'mm', 'a4');
+      doc.text("LAUDO TÉCNICO INSPECTCBM", 14, 15);
+      const tableRows = cloudRecords.map(r => [r.data_coleta, r.tag, r.componente, r.status_operacao, `${r.temp_la || '-'}°C`, r.inspetor]);
+      doc.autoTable({ startY: 20, head: [['Data', 'Tag', 'Componente', 'Operação', 'Temp LA', 'Inspetor']], body: tableRows });
+      doc.save(`Laudo_InspectCBM.pdf`);
+    }
+  </script>
+</body>
+</html>
