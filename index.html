@@ -14,26 +14,24 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
   
-  <!-- Firebase SDKs (Modo Modular / CDN) -->
+  <!-- Firebase SDKs com as suas credenciais oficiais -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-    // ATENÇÃO: Substitua abaixo com as credenciais do seu projeto gratuito do Firebase (Console do Firebase -> Configurações do Projeto)
     const firebaseConfig = {
-      apiKey: "SUA_API_KEY_AQUI",
-      authDomain: "seu-projeto.firebaseapp.com",
-      projectId: "seu-projeto-id",
-      storageBucket: "seu-projeto.appspot.com",
-      messagingSenderId: "seu-sender-id",
-      appId: "seu-app-id"
+      apiKey: "AIzaSyBW0tD55afqHalda-wDh1olxH0twndIWY",
+      authDomain: "inspectcbm-db.firebaseapp.com",
+      projectId: "inspectcbm-db",
+      storageBucket: "inspectcbm-db.firebasestorage.app",
+      messagingSenderId: "675916276155",
+      appId: "1:675916276155:web:130ff1bcaa47bc21d5249e",
+      measurementId: "G-0162QJ1JQ"
     };
 
-    // Inicializa o Firebase
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    // Expõe funções globais para o app funcionar
     window.db = db;
     window.collection = collection;
     window.addDoc = addDoc;
@@ -42,7 +40,6 @@
     window.doc = doc;
     window.setDoc = setDoc;
 
-    // Dispara carregamento inicial do banco remoto ao carregar a página
     document.addEventListener("DOMContentLoaded", () => {
       if(typeof initCloudData === 'function') initCloudData();
     });
@@ -75,7 +72,7 @@
         </div>
       </div>
       <div class="flex items-center space-x-2">
-        <span id="cloud-status" class="text-[10px] bg-amber-500/20 text-amber-400 border border-amber-500/30 px-2 py-1 rounded font-mono">
+        <span id="cloud-status" class="text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-1 rounded font-mono">
           <i class="fa-solid fa-cloud mr-1"></i> Nuvem Conectada
         </span>
         <button id="btn-tab-form" onclick="switchTab('form')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500 text-slate-950 transition">
@@ -1096,11 +1093,9 @@
       };
 
       try {
-        // Envia para o Firebase Firestore
         await window.addDoc(window.collection(window.db, "inspectcbm_records"), record);
         alert(`Inspeção InspectCBM salva na Nuvem para [${fullTag}]!`);
         
-        // Limpeza do formulário
         document.getElementById('rpm_real_strobo').value = '';
         document.getElementById('strobo_obs').value = '';
         document.getElementById('temp_la').value = '';
