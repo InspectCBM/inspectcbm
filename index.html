@@ -104,8 +104,7 @@
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
             <div>
               <label class="block text-xs font-medium text-slate-300 mb-1">Rota de Inspeção *</label>
-              <select id="rota_select" onchange="onRotaChange(this.value)" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
-              </select>
+              <select id="rota_select" onchange="onRotaChange(this.value)" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500"></select>
               <input type="text" id="rota_manual" placeholder="Digite o nome da nova Rota" class="w-full mt-2 hidden bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
             </div>
             <div>
@@ -113,8 +112,7 @@
                 <label class="block text-xs font-medium text-slate-300">Tag Base do Equipamento *</label>
                 <button type="button" onclick="manageTagsModal()" class="text-[10px] text-amber-400 hover:underline"><i class="fa-solid fa-gear"></i> Gerenciar Tags</button>
               </div>
-              <select id="tag_select" onchange="handleTagSelection(this.value)" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
-              </select>
+              <select id="tag_select" onchange="handleTagSelection(this.value)" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500"></select>
               <input type="text" id="tag_manual" placeholder="Ex: SP8001, UC8014" oninput="onTagManualInput(this.value)" class="w-full mt-2 hidden bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
             </div>
             <div>
@@ -122,12 +120,11 @@
                 <label class="block text-xs font-medium text-slate-300">Componente em Inspeção *</label>
                 <button type="button" onclick="manageCustomComponentsModal()" class="text-[10px] text-amber-400 hover:underline"><i class="fa-solid fa-plus"></i> Adicionar Comp.</button>
               </div>
-              <select id="componente_select" onchange="onComponenteChange(this.value)" class="w-full bg-slate-900 border border-amber-500/50 rounded-lg px-3 py-2 text-sm text-amber-400 font-semibold focus:outline-none focus:border-amber-500">
-              </select>
+              <select id="componente_select" onchange="onComponenteChange(this.value)" class="w-full bg-slate-900 border border-amber-500/50 rounded-lg px-3 py-2 text-sm text-amber-400 font-semibold focus:outline-none focus:border-amber-500"></select>
             </div>
           </div>
 
-          <!-- CAMPO DE FOTO DO EQUIPAMENTO -->
+          <!-- FOTO DO EQUIPAMENTO -->
           <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-700/80 mb-4 flex flex-col sm:flex-row items-center gap-4">
             <div id="photo-preview-container" class="w-20 h-20 bg-slate-800 rounded-lg border border-slate-700 flex items-center justify-center overflow-hidden shrink-0 relative">
               <i id="photo-placeholder-icon" class="fa-solid fa-camera text-slate-500 text-xl"></i>
@@ -173,9 +170,14 @@
 
         <!-- BLOCO 2: PARÂMETROS MECÂNICOS -->
         <div class="bg-slate-800 rounded-xl p-5 border border-slate-700 shadow-lg">
-          <h2 class="text-sm font-bold text-amber-400 uppercase tracking-wider mb-4 flex items-center">
-            <i class="fa-solid fa-gears mr-2"></i> Parâmetros Mecânicos & Data
-          </h2>
+          <div class="flex justify-between items-center mb-4">
+            <h2 class="text-sm font-bold text-amber-400 uppercase tracking-wider flex items-center">
+              <i class="fa-solid fa-gears mr-2"></i> Parâmetros Mecânicos & Data
+            </h2>
+            <button type="button" onclick="saveOnlyRegistration()" class="bg-slate-700 hover:bg-slate-600 text-amber-400 border border-amber-500/30 text-xs px-3 py-1.5 rounded-lg transition flex items-center font-semibold">
+              <i class="fa-solid fa-bookmark mr-1.5"></i> Salvar Apenas Cadastro do Componente
+            </button>
+          </div>
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
               <label class="block text-xs font-medium text-slate-300 mb-1">Data e Hora da Medição *</label>
@@ -192,6 +194,10 @@
             <div>
               <label class="block text-xs font-medium text-slate-300 mb-1">Rolamento LOA (Oposto)</label>
               <input type="text" id="rolamento_loa" placeholder="Ex: NU 214" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-300 mb-1">Potência (kW / CV)</label>
+              <input type="text" id="potencia" placeholder="Ex: 75 CV" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
             </div>
           </div>
         </div>
@@ -222,6 +228,7 @@
                 <option value="mbar">mbar</option>
                 <option value="Kgf/cm²">Kgf/cm²</option>
                 <option value="% de Carga">% de Carga</option>
+                <option value="Outro">Outra Unidade</option>
               </select>
             </div>
           </div>
@@ -243,6 +250,8 @@
                 <option value="Normal / Sem Alteração">Normal / Sem Anomalias Visíveis</option>
                 <option value="Desgaste no Elemento Elástico">Desgaste no Elemento Elástico / Aranha</option>
                 <option value="Desalinhamento Visível">Desalinhamento Angular / Paralelo Visível</option>
+                <option value="Parafusos Soltos / Ausentes">Parafusos Soltos ou Ausentes</option>
+                <option value="Vazamento de Graxa">Vazamento / Expulsão de Graxa</option>
                 <option value="Folga / Batimento">Folga Excessiva / Batimento Dinâmico</option>
               </select>
             </div>
@@ -343,11 +352,11 @@
       <div class="bg-slate-800 rounded-xl p-5 border border-slate-700 shadow-lg flex flex-col md:flex-row justify-between items-center gap-4">
         <div>
           <h2 class="text-base font-bold text-white">Histórico em Nuvem & Tendências por Equipamento</h2>
-          <p class="text-xs text-slate-400">Selecione uma Tag abaixo para ver o histórico e a tendência isolada</p>
+          <p class="text-xs text-slate-400">Selecione "Todas as Tags" ou um ativo específico para ver o histórico e a tendência</p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
           <select id="filter_tag" onchange="renderDashboard()" class="bg-slate-900 border border-amber-500/50 rounded-lg px-3 py-2 text-xs text-amber-400 font-bold">
-            <option value="TODAS">-- Selecione uma Tag Específica --</option>
+            <option value="TODAS">-- Todas as Tags --</option>
           </select>
           <button onclick="exportTechnicalPDF()" class="bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs px-3 py-2 rounded-lg transition shadow">
             <i class="fa-solid fa-file-pdf mr-1"></i> Laudo PDF Completo
@@ -356,7 +365,7 @@
       </div>
       <div class="bg-slate-800 rounded-xl p-5 border border-slate-700 shadow-lg">
         <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider mb-3 flex items-center">
-          <i class="fa-solid fa-chart-line text-amber-400 mr-2"></i> Tendência de Temperatura (°C) - Ativo Selecionado
+          <i class="fa-solid fa-chart-line text-amber-400 mr-2"></i> Tendência de Temperatura (°C) <span id="chart-title-tag" class="ml-1 text-amber-400 font-mono"></span>
         </h3>
         <div class="relative h-64 w-full">
           <canvas id="tempChart"></canvas>
@@ -364,7 +373,7 @@
       </div>
       <div class="bg-slate-800 rounded-xl border border-slate-700 shadow-lg overflow-hidden">
         <div class="p-4 border-b border-slate-700 flex justify-between items-center">
-          <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider">Inspeções do Ativo</h3>
+          <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider">Inspeções em Nuvem</h3>
           <span id="record-count" class="text-xs bg-slate-700 px-2 py-0.5 rounded text-amber-400 font-bold">0 registros</span>
         </div>
         <div class="overflow-x-auto">
@@ -547,7 +556,7 @@
         limpeza_obs: document.getElementById('limpeza_obs').value || '',
         oleo_status: getRadioValue('oleo_status'),
         oleo_obs: document.getElementById('oleo_obs').value || '',
-        vazamento_status: document.getElementById('vazamento_status'),
+        vazamento_status: getRadioValue('vazamento_status'),
         vazamento_obs: document.getElementById('vazamento_obs').value || '',
         observacoes: document.getElementById('observacoes').value || '-',
         photo: currentPhotoBase64
@@ -567,18 +576,14 @@
       const filterSelect = document.getElementById('filter_tag');
       const currentVal = filterSelect.value;
       const tags = [...new Set(cloudRecords.map(r => r.tag))];
-      filterSelect.innerHTML = '<option value="TODAS">-- Selecione uma Tag Específica --</option>';
+      filterSelect.innerHTML = '<option value="TODAS">-- Todas as Tags --</option>';
       tags.forEach(t => {
         const opt = document.createElement('option');
         opt.value = t;
         opt.textContent = t;
         filterSelect.appendChild(opt);
       });
-      if (currentVal && currentVal !== 'TODAS' && tags.includes(currentVal)) {
-        filterSelect.value = currentVal;
-      } else if (tags.length > 0 && currentVal === 'TODAS') {
-        filterSelect.value = tags[0]; // Seleciona a primeira automaticamente por conveniência
-      }
+      filterSelect.value = currentVal || 'TODAS';
     }
 
     let chartInstance = null;
@@ -588,18 +593,17 @@
       
       if (filterTag && filterTag !== 'TODAS') {
         filtered = filtered.filter(r => r.tag === filterTag);
+        document.getElementById('chart-title-tag').textContent = `(Ativo: ${filterTag})`;
       } else {
-        filtered = []; // Se nenhuma tag for selecionada, limpa a tabela e gráfico para mostrar apenas por ativo individual
+        document.getElementById('chart-title-tag').textContent = '(Geral)';
       }
       
       document.getElementById('record-count').textContent = `${filtered.length} registro(s)`;
       const tbody = document.getElementById('records-table-body');
       tbody.innerHTML = '';
       
-      if(filterTag === 'TODAS') {
-        tbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-amber-400 font-semibold">Selecione uma Tag específica acima para visualizar o histórico e a tendência de temperatura do equipamento.</td></tr>`;
-      } else if(filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-slate-500">Nenhum registro encontrado para esta Tag.</td></tr>`;
+      if(filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-slate-500">Nenhum registro encontrado.</td></tr>`;
       } else {
         filtered.forEach(r => {
           let allObs = [];
@@ -647,12 +651,10 @@
       const ctx = document.getElementById('tempChart').getContext('2d');
       if(chartInstance) chartInstance.destroy();
 
-      if(!data || data.length === 0) {
-        return; // Gráfico vazio se nenhuma tag estiver selecionada
-      }
+      if(!data || data.length === 0) return;
 
       const sorted = [...data].reverse();
-      const labels = sorted.map(r => new Date(r.data_coleta).toLocaleString('pt-BR', {dateStyle:'short', timeStyle:'short'}));
+      const labels = sorted.map(r => `${new Date(r.data_coleta).toLocaleString('pt-BR', {dateStyle:'short', timeStyle:'short'})} (${r.tag})`);
       const tempDataLA = sorted.map(r => r.temp_la);
       const tempDataLOA = sorted.map(r => r.temp_loa);
 
@@ -680,18 +682,15 @@
     function exportTechnicalPDF() {
       const { jsPDF } = window.jspdf;
       const filterTag = document.getElementById('filter_tag').value;
-      if(!filterTag || filterTag === 'TODAS') {
-        alert('Por favor, selecione uma Tag específica no filtro antes de exportar o Laudo PDF.');
-        return;
-      }
-      const filtered = cloudRecords.filter(r => r.tag === filterTag);
-      if(filtered.length === 0) { alert('Sem registros para esta Tag.'); return; }
+      const filtered = filterTag === 'TODAS' ? cloudRecords : cloudRecords.filter(r => r.tag === filterTag);
+      
+      if(filtered.length === 0) { alert('Sem registros para exportar.'); return; }
 
       const doc = new jsPDF('l', 'mm', 'a4');
       doc.setFont("helvetica", "bold");
       doc.setFontSize(14);
       doc.setTextColor(30, 41, 59);
-      doc.text(`LAUDO TÉCNICO DE TENDÊNCIA - TAG: ${filterTag} (MONDELEZ)`, 14, 15);
+      doc.text(`LAUDO TÉCNICO DE TENDÊNCIA - ${filterTag === 'TODAS' ? 'TODAS AS TAGS' : 'TAG: ' + filterTag} (MONDELEZ)`, 14, 15);
       doc.setFontSize(9);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(100, 116, 139);
@@ -730,7 +729,7 @@
         styles: { fontSize: 7, cellPadding: 2, overflow: 'linebreak' },
         headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255], fontStyle: 'bold' }
       });
-      doc.save(`Laudo_Tendencia_${filterTag}_${new Date().toISOString().slice(0,10)}.pdf`);
+      doc.save(`Laudo_InspectCBM_${filterTag}_${new Date().toISOString().slice(0,10)}.pdf`);
     }
   </script>
 </body>
