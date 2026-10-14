@@ -41,8 +41,9 @@
       
       loadSavedRotas();
       loadSavedInspetores();
-      onRotaChange(document.getElementById('rota_select').value);
-      fetchCloudRecords();
+      fetchCloudRecords().then(() => {
+        onRotaChange(document.getElementById('rota_select').value);
+      });
     });
   </script>
 
@@ -95,7 +96,7 @@
               <i class="fa-solid fa-folder-open mr-2"></i> Informações do Equipamento & Rota
             </h2>
             <span id="auto-fill-badge" class="hidden text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded font-bold">
-              <i class="fa-solid fa-bolt mr-1"></i> Dados Cadastrais Carregados!
+              <i class="fa-solid fa-bolt mr-1"></i> Dados Cadastrais Carregados da Nuvem!
             </span>
           </div>
           
@@ -176,7 +177,7 @@
               <i class="fa-solid fa-gears mr-2"></i> Parâmetros Mecânicos & Data
             </h2>
             <button type="button" onclick="saveOnlyRegistration()" class="bg-slate-700 hover:bg-slate-600 text-amber-400 border border-amber-500/30 text-xs px-3 py-1.5 rounded-lg transition flex items-center font-semibold">
-              <i class="fa-solid fa-bookmark mr-1.5"></i> Salvar Apenas Cadastro do Componente
+              <i class="fa-solid fa-bookmark mr-1.5"></i> Salvar Cadastro na Nuvem
             </button>
           </div>
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -553,6 +554,7 @@
 
     let currentPhotoBase64 = "";
     let cloudRecords = [];
+    let cloudEquipmentRegistry = {}; // Armazena os cadastros vindos da nuvem por Tag
 
     function switchTab(tab) {
       const formTab = document.getElementById('tab-form');
@@ -575,6 +577,7 @@
 
     async function fetchCloudRecords() {
       try {
+        // Busca inspeções
         const snapshot = await db.collection("inspectcbm_records").get();
         cloudRecords = [];
         snapshot.forEach((doc) => {
@@ -583,8 +586,21 @@
         cloudRecords.sort((a, b) => b.id - a.id);
         populateFilters();
         renderDashboard();
+
+        // Busca cadastros de equipamentos na nuvem
+        const eqSnapshot = await db.collection("inspectcbm_equipment").get();
+        cloudEquipmentRegistry = {};
+        eqSnapshot.forEach((doc) => {
+          cloudEquipmentRegistry[doc.id] = doc.data();
+        });
+
+        // Atualiza os campos se já houver tag selecionada
+        const currentTag = getBaseTag();
+        if(currentTag) {
+          loadEquipmentDataForTag(currentTag);
+        }
       } catch (err) {
-        console.error("Erro ao buscar dados:", err);
+        console.error("Erro ao buscar dados da nuvem:", err);
       }
     }
 
@@ -813,12 +829,13 @@
       document.getElementById('lbl_tag_final').textContent = getFullTag() || 'SELECIONE UMA TAG...';
     }
 
+    // CARREGAR DADOS VINCULADOS À TAG DA NUVEM
     function loadEquipmentDataForTag(tag) {
       if(!tag) return;
-      const savedData = localStorage.getItem(`inspectcbm_eq_${tag}`);
       const badge = document.getElementById('auto-fill-badge');
-      if(savedData) {
-        const eq = JSON.parse(savedData);
+      const eq = cloudEquipmentRegistry[tag];
+      
+      if(eq) {
         document.getElementById('sap_number').value = eq.sap_number || '';
         document.getElementById('equipamento_nome').value = eq.equipamento_nome || '';
         document.getElementById('setor').value = eq.setor || '';
@@ -841,7 +858,8 @@
       }
     }
 
-    function saveOnlyRegistration() {
+    // SALVAR DADOS VINCULADOS À TAG NA NUVEM (FIRESTORE)
+    async function saveOnlyRegistration() {
       const baseTag = getBaseTag();
       if(!baseTag) { alert("Selecione a Tag base para salvar o cadastro."); return; }
       
@@ -856,9 +874,15 @@
         potencia: document.getElementById('potencia').value
       };
 
-      localStorage.setItem(`inspectcbm_eq_${baseTag}`, JSON.stringify(eqData));
-      alert(`Dados cadastrais vinculados à Tag ${baseTag} salvos com sucesso!`);
-      document.getElementById('auto-fill-badge').classList.remove('hidden');
+      try {
+        // Salva na coleção 'inspectcbm_equipment' usando a Tag como ID do documento
+        await db.collection("inspectcbm_equipment").doc(baseTag).set(eqData);
+        cloudEquipmentRegistry[baseTag] = eqData;
+        alert(`Dados cadastrais da Tag ${baseTag} salvos na nuvem com sucesso! Agora eles aparecerão no celular.`);
+        document.getElementById('auto-fill-badge').classList.remove('hidden');
+      } catch (err) {
+        alert("Erro ao salvar cadastro na nuvem: " + err.message);
+      }
     }
 
     function getRadioValue(name) {
@@ -872,7 +896,8 @@
       const baseTag = getBaseTag();
       if(!fullTag) { alert("Selecione a Tag."); return; }
 
-      saveOnlyRegistration();
+      // Salva o cadastro na nuvem automaticamente ao salvar a inspeção
+      await saveOnlyRegistration();
 
       const record = {
         id: Date.now(),
