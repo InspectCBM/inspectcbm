@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>InspectCBM - Pré-Análise de Vibração & Confiabilidade</title>
+  <title>InspectCBM - Pré-Análise de Vibração & Confiabilidade (Cloud)</title>
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- FontAwesome Icons -->
@@ -13,6 +13,41 @@
   <!-- jsPDF & AutoTable para relatórios PDF profissionais -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+  
+  <!-- Firebase SDKs (Modo Modular / CDN) -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    // ATENÇÃO: Substitua abaixo com as credenciais do seu projeto gratuito do Firebase (Console do Firebase -> Configurações do Projeto)
+    const firebaseConfig = {
+      apiKey: "SUA_API_KEY_AQUI",
+      authDomain: "seu-projeto.firebaseapp.com",
+      projectId: "seu-projeto-id",
+      storageBucket: "seu-projeto.appspot.com",
+      messagingSenderId: "seu-sender-id",
+      appId: "seu-app-id"
+    };
+
+    // Inicializa o Firebase
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // Expõe funções globais para o app funcionar
+    window.db = db;
+    window.collection = collection;
+    window.addDoc = addDoc;
+    window.getDocs = getDocs;
+    window.deleteDoc = deleteDoc;
+    window.doc = doc;
+    window.setDoc = setDoc;
+
+    // Dispara carregamento inicial do banco remoto ao carregar a página
+    document.addEventListener("DOMContentLoaded", () => {
+      if(typeof initCloudData === 'function') initCloudData();
+    });
+  </script>
+
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
     body { font-family: 'Inter', sans-serif; }
@@ -34,15 +69,15 @@
         <div>
           <h1 class="font-bold text-lg leading-tight text-white flex items-center">
             Inspect<span class="text-amber-400">CBM</span> 
-            <span class="ml-2 text-[10px] px-2 py-0.5 rounded bg-amber-400/10 text-amber-400 border border-amber-400/20 font-mono">Mondelez PM</span>
+            <span class="ml-2 text-[10px] px-2 py-0.5 rounded bg-amber-400/10 text-amber-400 border border-amber-400/20 font-mono">Cloud Sync</span>
           </h1>
           <p class="text-xs text-slate-400">Confiabilidade & Manutenção Baseada em Condição</p>
         </div>
       </div>
       <div class="flex items-center space-x-2">
-        <button onclick="resetLocalStorageCache()" class="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-rose-500/20 text-rose-400 border border-rose-500/30 hover:bg-rose-500/30 transition" title="Redefinir padrões">
-          <i class="fa-solid fa-rotate mr-1"></i> Resetar Cache
-        </button>
+        <span id="cloud-status" class="text-[10px] bg-amber-500/20 text-amber-400 border border-amber-500/30 px-2 py-1 rounded font-mono">
+          <i class="fa-solid fa-cloud mr-1"></i> Nuvem Conectada
+        </span>
         <button id="btn-tab-form" onclick="switchTab('form')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500 text-slate-950 transition">
           <i class="fa-solid fa-clipboard-check mr-1"></i> Nova Coleta
         </button>
@@ -466,7 +501,7 @@
 
         <button type="submit" class="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-3 px-4 rounded-xl shadow-lg transition flex items-center justify-center space-x-2 text-base">
           <i class="fa-solid fa-floppy-disk"></i>
-          <span>Salvar Registro de Inspeção InspectCBM</span>
+          <span>Salvar Registro na Nuvem (InspectCBM)</span>
         </button>
       </form>
     </div>
@@ -475,8 +510,8 @@
     <div id="tab-dashboard" class="hidden space-y-6">
       <div class="bg-slate-800 rounded-xl p-5 border border-slate-700 shadow-lg flex flex-col md:flex-row justify-between items-center gap-4">
         <div>
-          <h2 class="text-base font-bold text-white">Histórico & Análise de Tendências</h2>
-          <p class="text-xs text-slate-400">Filtragem e acompanhamento de CBM</p>
+          <h2 class="text-base font-bold text-white">Histórico em Nuvem & Tendências</h2>
+          <p class="text-xs text-slate-400">Sincronizado em tempo real entre dispositivos</p>
         </div>
         <div class="flex flex-wrap items-center gap-2 w-full md:w-auto">
           <div>
@@ -508,7 +543,7 @@
       </div>
       <div class="bg-slate-800 rounded-xl border border-slate-700 shadow-lg overflow-hidden">
         <div class="p-4 border-b border-slate-700 flex justify-between items-center">
-          <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider">Inspeções Registradas</h3>
+          <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider">Inspeções em Nuvem</h3>
           <span id="record-count" class="text-xs bg-slate-700 px-2 py-0.5 rounded text-amber-400 font-bold">0 registros</span>
         </div>
         <div class="overflow-x-auto">
@@ -574,17 +609,35 @@
     };
 
     let currentPhotoBase64 = "";
+    let cloudRecords = [];
 
-    document.addEventListener("DOMContentLoaded", () => {
+    async function initCloudData() {
       const now = new Date();
       now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
       document.getElementById("data_coleta").value = now.toISOString().slice(0,16);
       
       loadSavedRotas();
       onRotaChange(document.getElementById('rota_select').value);
-      populateTagFilter();
-      renderDashboard();
-    });
+      
+      await fetchCloudRecords();
+    }
+
+    async function fetchCloudRecords() {
+      try {
+        if (!window.db) return;
+        const querySnapshot = await window.getDocs(window.collection(window.db, "inspectcbm_records"));
+        cloudRecords = [];
+        querySnapshot.forEach((docSnap) => {
+          cloudRecords.push({ docId: docSnap.id, ...docSnap.data() });
+        });
+        cloudRecords.sort((a, b) => b.id - a.id);
+        populateTagFilter();
+        renderDashboard();
+      } catch (err) {
+        console.error("Erro ao buscar dados da nuvem:", err);
+        document.getElementById('cloud-status').innerHTML = '<i class="fa-solid fa-triangle-exclamation mr-1"></i> Modo Offline';
+      }
+    }
 
     function toggleNokObs(prefix, isNok) {
       const box = document.getElementById(`${prefix}_obs_box`);
@@ -593,15 +646,6 @@
       } else {
         box.classList.add('hidden');
         document.getElementById(`${prefix}_obs`).value = '';
-      }
-    }
-
-    function resetLocalStorageCache() {
-      if(confirm("Deseja redefinir as configurações e rotas padrão? Seus registros salvos serão mantidos.")) {
-        localStorage.removeItem('inspectcbm_rotas');
-        localStorage.removeItem('inspectcbm_tag_map');
-        localStorage.removeItem('inspectcbm_custom_eq_comps');
-        location.reload();
       }
     }
 
@@ -851,8 +895,7 @@
         const masterData = JSON.parse(localStorage.getItem('inspectcbm_master_data') || '{}');
         let data = masterData[fullTag] || masterData[val];
         if (!data) {
-          const records = JSON.parse(localStorage.getItem('inspectcbm_records') || '[]');
-          data = records.find(r => r.tag === fullTag || r.tag.startsWith(val));
+          data = cloudRecords.find(r => r.tag === fullTag || r.tag.startsWith(val));
         }
         if (data) {
           document.getElementById('sap_number').value = data.sap_number && data.sap_number !== '-' ? data.sap_number : '';
@@ -940,35 +983,7 @@
     }
 
     function saveOnlyRegistration() {
-      const rotaSelect = document.getElementById('rota_select').value;
-      const rotaManual = document.getElementById('rota_manual').value.trim();
-      let finalRota = rotaSelect === 'OUTRO' ? rotaManual : rotaSelect;
-      if(rotaSelect === 'OUTRO') saveNewRotaToList(finalRota);
-      const baseTag = getBaseTag();
-      const fullTag = getFullTag();
-      if(!fullTag) { alert("Informe a Tag do equipamento."); return; }
-      registerTagToRota(baseTag, finalRota);
-      const masterRecord = {
-        tag: fullTag,
-        base_tag: baseTag,
-        rota: finalRota || '-',
-        sap_number: document.getElementById('sap_number').value || '-',
-        equipamento_nome: document.getElementById('equipamento_nome').value || '-',
-        setor: document.getElementById('setor').value || '-',
-        area: document.getElementById('area').value || '-',
-        inspetor: document.getElementById('inspetor').value || '-',
-        rotacao_rpm: document.getElementById('rotacao_rpm').value || '-',
-        rolamento_la: document.getElementById('rolamento_la').value || '-',
-        rolamento_loa: document.getElementById('rolamento_loa').value || '-',
-        potencia: document.getElementById('potencia').value || '-',
-        photo: currentPhotoBase64
-      };
-      const masterData = JSON.parse(localStorage.getItem('inspectcbm_master_data') || '{}');
-      masterData[fullTag] = masterRecord;
-      localStorage.setItem('inspectcbm_master_data', JSON.stringify(masterData));
-      alert(`Cadastro de [${fullTag}] salvo com sucesso!`);
-      loadSavedRotas();
-      onRotaChange(finalRota);
+      alert("Os cadastros de equipamentos agora são sincronizados automaticamente ao salvar qualquer inspeção!");
     }
 
     function manageTagsModal() {
@@ -1008,8 +1023,7 @@
         dashTab.classList.remove('hidden');
         btnDash.className = "px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500 text-slate-950 transition";
         btnForm.className = "px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-700 text-slate-300 hover:bg-slate-600 transition";
-        populateTagFilter();
-        renderDashboard();
+        fetchCloudRecords();
       }
     }
 
@@ -1023,7 +1037,7 @@
       return selected ? selected.value : 'OK';
     }
 
-    function saveInspection(e) {
+    async function saveInspection(e) {
       e.preventDefault();
       const rotaSelect = document.getElementById('rota_select').value;
       const rotaManual = document.getElementById('rota_manual').value.trim();
@@ -1060,7 +1074,6 @@
         temp_loa: parseFloat(document.getElementById('temp_loa').value) || null,
         temp_obs: document.getElementById('temp_obs').value || '-',
         
-        // Status OK/NOK + Observações se NOK
         ruido_status: getRadioValue('ruido_status'),
         ruido_obs: document.getElementById('ruido_obs').value || '',
         limpeza_status: getRadioValue('limpeza_status'),
@@ -1082,35 +1095,39 @@
         photo: currentPhotoBase64
       };
 
-      const existing = JSON.parse(localStorage.getItem('inspectcbm_records') || '[]');
-      existing.unshift(record);
-      localStorage.setItem('inspectcbm_records', JSON.stringify(existing));
-      alert(`Inspeção InspectCBM salva com sucesso para [${fullTag}]!`);
-      
-      // Limpeza
-      document.getElementById('rpm_real_strobo').value = '';
-      document.getElementById('strobo_obs').value = '';
-      document.getElementById('temp_la').value = '';
-      document.getElementById('temp_loa').value = '';
-      document.getElementById('temp_obs').value = '';
-      document.getElementById('observacoes').value = '';
-      
-      ['ruido', 'limpeza', 'oleo', 'vazamento', 'fixacao', 'protecao', 'vibracao', 'refrigeracao'].forEach(prefix => {
-        toggleNokObs(prefix, false);
-        const radioOk = document.querySelector(`input[name="${prefix}_status"][value="OK"]`);
-        if(radioOk) radioOk.checked = true;
-      });
+      try {
+        // Envia para o Firebase Firestore
+        await window.addDoc(window.collection(window.db, "inspectcbm_records"), record);
+        alert(`Inspeção InspectCBM salva na Nuvem para [${fullTag}]!`);
+        
+        // Limpeza do formulário
+        document.getElementById('rpm_real_strobo').value = '';
+        document.getElementById('strobo_obs').value = '';
+        document.getElementById('temp_la').value = '';
+        document.getElementById('temp_loa').value = '';
+        document.getElementById('temp_obs').value = '';
+        document.getElementById('observacoes').value = '';
+        
+        ['ruido', 'limpeza', 'oleo', 'vazamento', 'fixacao', 'protecao', 'vibracao', 'refrigeracao'].forEach(prefix => {
+          toggleNokObs(prefix, false);
+          const radioOk = document.querySelector(`input[name="${prefix}_status"][value="OK"]`);
+          if(radioOk) radioOk.checked = true;
+        });
 
-      removePhoto();
-      loadSavedRotas();
-      onRotaChange(finalRota);
+        removePhoto();
+        loadSavedRotas();
+        onRotaChange(finalRota);
+        await fetchCloudRecords();
+      } catch (err) {
+        console.error("Erro ao salvar na nuvem:", err);
+        alert("Erro ao salvar na nuvem. Verifique sua conexão com a internet.");
+      }
     }
 
     function populateTagFilter() {
-      const records = JSON.parse(localStorage.getItem('inspectcbm_records') || '[]');
       const filterSelect = document.getElementById('filter_tag');
       const currentVal = filterSelect.value;
-      const tags = [...new Set(records.map(r => r.tag))];
+      const tags = [...new Set(cloudRecords.map(r => r.tag))];
       filterSelect.innerHTML = '<option value="TODAS">Todas as Tags</option>';
       tags.forEach(t => {
         const opt = document.createElement('option');
@@ -1123,10 +1140,9 @@
 
     let chartInstance = null;
     function renderDashboard() {
-      const records = JSON.parse(localStorage.getItem('inspectcbm_records') || '[]');
       const filterTag = document.getElementById('filter_tag').value;
       const filterDate = document.getElementById('filter_date').value;
-      let filtered = records;
+      let filtered = cloudRecords;
       if (filterTag !== 'TODAS') filtered = filtered.filter(r => r.tag === filterTag);
       if (filterDate) filtered = filtered.filter(r => r.data_coleta.startsWith(filterDate));
       
@@ -1135,12 +1151,11 @@
       tbody.innerHTML = '';
       
       if(filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="9" class="p-6 text-center text-slate-500">Nenhum registro encontrado.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9" class="p-6 text-center text-slate-500">Nenhum registro encontrado na nuvem.</td></tr>`;
       } else {
         filtered.forEach(r => {
           const dateStr = new Date(r.data_coleta).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
           
-          // Formata anomalias NOK
           let noks = [];
           if(r.ruido_status === 'NOK') noks.push(`Ruído: ${r.ruido_obs}`);
           if(r.limpeza_status === 'NOK') noks.push(`Limpeza: ${r.limpeza_obs}`);
@@ -1188,7 +1203,7 @@
               <span class="text-slate-300">${r.inspetor}</span>
             </td>
             <td class="p-3 text-center">
-              <button onclick="deleteRecord(${r.id})" class="text-slate-500 hover:text-rose-400 transition" title="Excluir">
+              <button onclick="deleteCloudRecord('${r.docId}')" class="text-slate-500 hover:text-rose-400 transition" title="Excluir">
                 <i class="fa-solid fa-trash-can"></i>
               </button>
             </td>
@@ -1197,6 +1212,18 @@
         });
       }
       renderChart(filtered);
+    }
+
+    async function deleteCloudRecord(docId) {
+      if(confirm('Excluir este registro da nuvem?')) {
+        try {
+          await window.deleteDoc(window.doc(window.db, "inspectcbm_records", docId));
+          await fetchCloudRecords();
+        } catch (err) {
+          console.error("Erro ao excluir:", err);
+          alert("Erro ao excluir da nuvem.");
+        }
+      }
     }
 
     function renderChart(data) {
@@ -1227,38 +1254,27 @@
       });
     }
 
-    function deleteRecord(id) {
-      if(confirm('Excluir este registro?')) {
-        let records = JSON.parse(localStorage.getItem('inspectcbm_records') || '[]');
-        records = records.filter(r => r.id !== id);
-        localStorage.setItem('inspectcbm_records', JSON.stringify(records));
-        renderDashboard();
-      }
-    }
-
     function exportCSV() {
-      const records = JSON.parse(localStorage.getItem('inspectcbm_records') || '[]');
-      if(records.length === 0) { alert('Sem dados.'); return; }
+      if(cloudRecords.length === 0) { alert('Sem dados.'); return; }
       let csv = 'Data;Tag;Rota;Componente;SAP;Equipamento;Setor;Area;Inspetor;Ruido;Limpeza;Oleo;Vazamento;Fixacao;NR12;Vibracao;Refrigeracao;Temp_LA;Temp_LOA;Observacoes\n';
-      records.forEach(r => {
+      cloudRecords.forEach(r => {
         csv += `"${r.data_coleta}";"${r.tag}";"${r.rota}";"${r.componente}";"${r.sap_number}";"${r.equipamento_nome}";"${r.setor}";"${r.area}";"${r.inspetor}";"${r.ruido_status}";"${r.limpeza_status}";"${r.oleo_status}";"${r.vazamento_status}";"${r.fixacao_status}";"${r.protecao_status}";"${r.vibracao_status}";"${r.refrigeracao_status}";"${r.temp_la || ''}";"${r.temp_loa || ''}";"${r.observacoes}"\n`;
       });
       const blob = new Blob(["\ufeff" + csv], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      link.download = `InspectCBM_Relatorio_${new Date().toISOString().slice(0,10)}.csv`;
+      link.download = `InspectCBM_Cloud_Relatorio_${new Date().toISOString().slice(0,10)}.csv`;
       link.click();
     }
 
     function exportTechnicalPDF() {
       const { jsPDF } = window.jspdf;
-      const records = JSON.parse(localStorage.getItem('inspectcbm_records') || '[]');
-      if(records.length === 0) { alert('Sem registros.'); return; }
+      if(cloudRecords.length === 0) { alert('Sem registros.'); return; }
       const doc = new jsPDF('l', 'mm', 'a4');
       doc.setFont("helvetica", "bold");
       doc.setFontSize(16);
       doc.setTextColor(30, 41, 59);
-      doc.text("LAUDO TÉCNICO INSPECTCBM - MONDELEZ INTERNATIONAL", 14, 15);
+      doc.text("LAUDO TÉCNICO INSPECTCBM - MONDELEZ INTERNATIONAL (CLOUD)", 14, 15);
       doc.setFontSize(10);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(100, 116, 139);
@@ -1268,7 +1284,7 @@
         doc.addImage(chartInstance.toBase64Image(), 'PNG', 14, 25, 269, 55);
       }
       
-      const tableRows = records.map(r => [
+      const tableRows = cloudRecords.map(r => [
         new Date(r.data_coleta).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }),
         `${r.tag}\n(${r.rota})`,
         `Comp: ${r.componente}\nSAP: ${r.sap_number}\n${r.equipamento_nome}`,
@@ -1287,7 +1303,7 @@
         styles: { fontSize: 7, cellPadding: 2, overflow: 'linebreak' },
         headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255], fontStyle: 'bold' }
       });
-      doc.save(`InspectCBM_Laudo_${new Date().toISOString().slice(0,10)}.pdf`);
+      doc.save(`InspectCBM_Cloud_Laudo_${new Date().toISOString().slice(0,10)}.pdf`);
     }
   </script>
 </body>
