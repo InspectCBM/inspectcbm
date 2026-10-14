@@ -118,7 +118,7 @@
               <div class="flex justify-between items-center mb-1">
                 <label class="block text-xs font-medium text-slate-300">Componente em Inspeção *</label>
               </div>
-              <select id="componente_select" onchange="onComponenteChange(this.value)" class="w-full bg-slate-900 border border-amber-500/50 rounded-lg px-3 py-2 text-sm text-amber-400 font-semibold focus:outline-none focus:border-amber-500"></select>
+              <select id="componente_select" onchange="updateFullTagPreview()" class="w-full bg-slate-900 border border-amber-500/50 rounded-lg px-3 py-2 text-sm text-amber-400 font-semibold focus:outline-none focus:border-amber-500"></select>
             </div>
           </div>
 
@@ -793,7 +793,7 @@
 
     function updateComponentOptions(tag) {
       const compSelect = document.getElementById('componente_select');
-      compSelect.innerHTML = '<option value="Motor" data-suffix="MT">Motor (-MT)</option><option value="Elemento" data-suffix="ELEM">Elemento (-ELEM)</option>';
+      compSelect.innerHTML = '<option value="Motor">Motor (-MT)</option><option value="Elemento">Elemento (-ELEM)</option>';
       updateFullTagPreview();
     }
 
