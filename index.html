@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-PT">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -42,9 +42,10 @@
 
       loadSavedRotas();
       loadSavedInspetores();
-      fetchCloudRecords().then(() => {
-        onRotaChange(document.getElementById('rota_select').value);
-      });
+      
+      // Ativa a sincronização em tempo real entre dispositivos
+      initCloudListeners();
+      
       fetchSavedLaudosHistory();
     });
   </script>
@@ -65,14 +66,14 @@
         <div>
           <h1 class="font-bold text-lg leading-tight text-white flex items-center">
             Inspect<span class="text-amber-400">CBM</span> 
-            <span class="ml-2 text-[10px] px-2 py-0.5 rounded bg-amber-400/10 text-amber-400 border border-amber-400/20 font-mono">Cloud Sync</span>
+            <span class="ml-2 text-[10px] px-2 py-0.5 rounded bg-amber-400/10 text-amber-400 border border-amber-400/20 font-mono">Cloud Sync (Real-Time)</span>
           </h1>
           <p class="text-xs text-slate-400">Confiabilidade & Manutenção Baseada em Condição</p>
         </div>
       </div>
       <div class="flex items-center space-x-2">
         <span id="cloud-status" class="text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-1 rounded font-mono">
-          <i class="fa-solid fa-cloud mr-1"></i> Nuvem Conectada
+          <i class="fa-solid fa-cloud mr-1"></i> Nuvem Sincronizada
         </span>
         <button id="btn-tab-form" onclick="switchTab('form')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-700 text-slate-300 hover:bg-slate-600 transition">
           <i class="fa-solid fa-clipboard-check mr-1"></i> Nova Coleta
@@ -156,7 +157,7 @@
                   <i class="fa-solid fa-cloud-arrow-up mr-1"></i> Salvar Foto na Nuvem
                 </button>
               </div>
-              <p class="text-[11px] text-slate-400 mb-2">Tire uma foto direto com a câmera do celular ou carregue do dispositivo.</p>
+              <p class="text-[11px] text-slate-400 mb-2">Tire uma foto direto com a câmara do telemóvel ou carregue do dispositivo.</p>
               <div class="flex items-center space-x-2">
                 <input type="file" id="eq_photo_input" accept="image/*" capture="environment" onchange="handlePhotoUpload(event)" class="text-xs text-slate-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-amber-500 file:text-slate-950 hover:file:bg-amber-400 file:cursor-pointer">
                 <button type="button" id="btn-remove-photo" onclick="removePhoto()" class="hidden text-xs text-rose-400 hover:underline"><i class="fa-solid fa-trash-can mr-1"></i> Remover Foto</button>
@@ -483,27 +484,27 @@
                   <label class="inline-flex items-center text-xs font-bold text-rose-400 cursor-pointer"><input type="radio" name="limpeza_status" value="NOK" onclick="toggleNokObs('limpeza', true)" class="text-rose-500"> NOK</label>
                 </div>
               </div>
-              <div id="limpeza_obs_box" class="hidden mt-2"><input type="text" id="limpeza_obs" placeholder="Descreva a sujeira..." class="w-full bg-slate-900 border border-rose-500/50 rounded-lg px-3 py-2 text-xs text-white"></div>
+              <div id="limpeza_obs_box" class="hidden mt-2"><input type="text" id="limpeza_obs" placeholder="Descreva a sujidade..." class="w-full bg-slate-900 border border-rose-500/50 rounded-lg px-3 py-2 text-xs text-white"></div>
             </div>
             <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-700/60">
               <div class="flex justify-between items-center mb-2">
-                <label class="text-xs font-bold text-slate-200">Nível & Condição do Óleo / Graxa</label>
+                <label class="text-xs font-bold text-slate-200">Nível & Condição do Óleo / Massa</label>
                 <div class="flex space-x-3">
                   <label class="inline-flex items-center text-xs font-bold text-emerald-400 cursor-pointer"><input type="radio" name="oleo_status" value="OK" checked onclick="toggleNokObs('oleo', false)" class="text-emerald-500"> OK</label>
                   <label class="inline-flex items-center text-xs font-bold text-rose-400 cursor-pointer"><input type="radio" name="oleo_status" value="NOK" onclick="toggleNokObs('oleo', true)" class="text-rose-500"> NOK</label>
                 </div>
               </div>
-              <div id="oleo_obs_box" class="hidden mt-2"><input type="text" id="oleo_obs" placeholder="Descreva o óleo/graxa..." class="w-full bg-slate-900 border border-rose-500/50 rounded-lg px-3 py-2 text-xs text-white"></div>
+              <div id="oleo_obs_box" class="hidden mt-2"><input type="text" id="oleo_obs" placeholder="Descreva o óleo/massa..." class="w-full bg-slate-900 border border-rose-500/50 rounded-lg px-3 py-2 text-xs text-white"></div>
             </div>
             <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-700/60">
               <div class="flex justify-between items-center mb-2">
-                <label class="text-xs font-bold text-slate-200">Vazamentos Visíveis</label>
+                <label class="text-xs font-bold text-slate-200">Fugas Visíveis</label>
                 <div class="flex space-x-3">
                   <label class="inline-flex items-center text-xs font-bold text-emerald-400 cursor-pointer"><input type="radio" name="vazamento_status" value="OK" checked onclick="toggleNokObs('vazamento', false)" class="text-emerald-500"> OK</label>
                   <label class="inline-flex items-center text-xs font-bold text-rose-400 cursor-pointer"><input type="radio" name="vazamento_status" value="NOK" onclick="toggleNokObs('vazamento', true)" class="text-rose-500"> NOK</label>
                 </div>
               </div>
-              <div id="vazamento_obs_box" class="hidden mt-2"><input type="text" id="vazamento_obs" placeholder="Descreva o vazamento..." class="w-full bg-slate-900 border border-rose-500/50 rounded-lg px-3 py-2 text-xs text-white"></div>
+              <div id="vazamento_obs_box" class="hidden mt-2"><input type="text" id="vazamento_obs" placeholder="Descreva a fuga..." class="w-full bg-slate-900 border border-rose-500/50 rounded-lg px-3 py-2 text-xs text-white"></div>
             </div>
             <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-700/60">
               <div class="flex justify-between items-center mb-2">
@@ -537,7 +538,7 @@
             </div>
             <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-700/60">
               <div class="flex justify-between items-center mb-2">
-                <label class="text-xs font-bold text-slate-200">Refrigeração / Aletagem / Ventoinha</label>
+                <label class="text-xs font-bold text-slate-200">Refrigeração / Alhetagem / Ventoinha</label>
                 <div class="flex space-x-3">
                   <label class="inline-flex items-center text-xs font-bold text-emerald-400 cursor-pointer"><input type="radio" name="refrigeracao_status" value="OK" checked onclick="toggleNokObs('refrigeracao', false)" class="text-emerald-500"> OK</label>
                   <label class="inline-flex items-center text-xs font-bold text-rose-400 cursor-pointer"><input type="radio" name="refrigeracao_status" value="NOK" onclick="toggleNokObs('refrigeracao', true)" class="text-rose-500"> NOK</label>
@@ -609,7 +610,7 @@
       <div class="bg-slate-800 rounded-xl border border-slate-700 shadow-lg overflow-hidden">
         <div class="p-4 border-b border-slate-700 flex justify-between items-center">
           <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider">Inspeções em Nuvem</h3>
-          <span id="record-count" class="text-xs bg-slate-700 px-2 py-0.5 rounded text-amber-400 font-bold">0 registros</span>
+          <span id="record-count" class="text-xs bg-slate-700 px-2 py-0.5 rounded text-amber-400 font-bold">0 registos</span>
         </div>
         <div class="overflow-x-auto">
           <table class="w-full text-left text-xs text-slate-300">
@@ -832,38 +833,42 @@
       } else if(tab === 'dashboard') {
         dashTab.classList.remove('hidden');
         btnDash.className = "px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500 text-slate-950 transition";
-        fetchCloudRecords();
       } else if(tab === 'relatorio') {
         relTab.classList.remove('hidden');
         btnRel.className = "px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500 text-slate-950 transition";
-        fetchCloudRecords();
       }
     }
 
-    async function fetchCloudRecords() {
-      try {
-        const snapshot = await db.collection("inspectcbm_records").get();
+    // OUVINTES EM TEMPO REAL (REAL-TIME SYNC) DO FIRESTORE
+    function initCloudListeners() {
+      // Sincronização em tempo real de registos
+      db.collection("inspectcbm_records").onSnapshot((snapshot) => {
         cloudRecords = [];
         snapshot.forEach((doc) => {
           cloudRecords.push({ docId: doc.id, ...doc.data() });
         });
         cloudRecords.sort((a, b) => b.id - a.id);
         
-        const tagSnapshot = await db.collection("inspectcbm_tags").get();
-        cloudTagRegistry = {};
-        tagSnapshot.forEach((doc) => {
-          cloudTagRegistry[doc.id] = doc.data();
-        });
-        
         populateFilters();
         renderDashboard();
         renderRelatorioTab();
+      }, (err) => {
+        console.error("Erro no listener de registos:", err);
+      });
+
+      // Sincronização em tempo real de tags/equipamentos
+      db.collection("inspectcbm_tags").onSnapshot((snapshot) => {
+        cloudTagRegistry = {};
+        snapshot.forEach((doc) => {
+          cloudTagRegistry[doc.id] = doc.data();
+        });
         
         const currentTag = getBaseTag();
         if(currentTag) loadTagData(currentTag);
-      } catch (err) {
-        console.error("Erro ao buscar dados da nuvem:", err);
-      }
+        renderRelatorioTab();
+      }, (err) => {
+        console.error("Erro no listener de tags:", err);
+      });
     }
 
     // FUNÇÃO DE IMPORTAÇÃO DE PLANILHA EXCEL (CSV) COM DADOS INDIVIDUAIS POR TAG
@@ -897,7 +902,6 @@
               defaultTagMap[rota].push(cleanTag);
             }
 
-            // Salva os dados individualmente atrelados à Tag no Firestore
             const tData = {
               composicao: composicao || 'motor_elemento',
               equipamento_nome: equipamento || '',
@@ -920,7 +924,7 @@
 
         loadSavedRotas();
         populateFilters();
-        alert(`Importação concluída! ${importedCount} registros por Tag processados e salvos na nuvem com sucesso.`);
+        alert(`Importação concluída! ${importedCount} registos por Tag processados e salvos na nuvem.`);
         document.getElementById('excel_file_input').value = "";
         onRotaChange(document.getElementById('rota_select').value);
       };
@@ -1539,12 +1543,12 @@
         filtered = filtered.filter(r => r.data_coleta.startsWith(filterDateSelect));
       }
       
-      document.getElementById('record-count').textContent = `${filtered.length} registro(s)`;
+      document.getElementById('record-count').textContent = `${filtered.length} registo(s)`;
       const tbody = document.getElementById('records-table-body');
       tbody.innerHTML = '';
       
       if(filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-slate-500">Nenhum registro encontrado para este filtro.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-slate-500">Nenhum registo encontrado para este filtro.</td></tr>`;
       } else {
         filtered.forEach(r => {
           let allObs = [];
@@ -1557,7 +1561,7 @@
           tr.innerHTML = `
             <td class="p-3">
               ${r.photo ? `<img src="${r.photo}" class="w-10 h-10 object-cover rounded mb-1 border border-amber-500/30">` : '<span class="text-[10px] text-slate-500">Sem foto</span>'}
-              <span class="font-mono text-[10px] text-slate-400 block">${new Date(r.data_coleta).toLocaleString('pt-BR', {dateStyle:'short', timeStyle:'short'})}</span>
+              <span class="font-mono text-[10px] text-slate-400 block">${new Date(r.data_coleta).toLocaleString('pt-PT', {dateStyle:'short', timeStyle:'short'})}</span>
             </td>
             <td class="p-3">
               <span class="font-bold text-amber-400 font-mono">${r.tag}</span><br>
@@ -1637,7 +1641,7 @@
       try {
         await db.collection("inspectcbm_laudos").add(laudoObj);
       } catch (err) {
-        console.warn("Erro ao salvar no Firestore, salvando apenas localmente...", err);
+        console.warn("Erro ao salvar no Firestore...", err);
       }
 
       let savedLaudos = JSON.parse(localStorage.getItem('inspectcbm_saved_laudos')) || [];
@@ -1843,9 +1847,8 @@
     }
 
     async function deleteCloudRecord(docId) {
-      if(confirm('Excluir este registro?')) {
+      if(confirm('Excluir este registo?')) {
         await db.collection("inspectcbm_records").doc(docId).delete();
-        fetchCloudRecords();
       }
     }
 
@@ -1854,7 +1857,7 @@
       if(chartInstance) chartInstance.destroy();
       if(!data || data.length === 0) return;
       const sorted = [...data].reverse();
-      const labels = sorted.map(r => `${new Date(r.data_coleta).toLocaleString('pt-BR', {dateStyle:'short', timeStyle:'short'})} (${r.baseTag || r.tag})`);
+      const labels = sorted.map(r => `${new Date(r.data_coleta).toLocaleString('pt-PT', {dateStyle:'short', timeStyle:'short'})} (${r.baseTag || r.tag})`);
       const tempDataLA = sorted.map(r => r.temp_la);
       const tempDataComp2 = sorted.map(r => r.temp_c2_p1 || r.temp_loa);
 
@@ -1940,7 +1943,7 @@
       }
 
       if (filtered.length === 0) {
-        alert('Nenhum registro encontrado para exportar na pré-análise com os filtros atuais.');
+        alert('Nenhum registo encontrado para exportar na pré-análise com os filtros atuais.');
         return;
       }
 
@@ -1953,13 +1956,13 @@
       doc.setFontSize(8);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(100, 116, 139);
-      doc.text(`Filtro Rota: ${filterRota} | Tag: ${filterTag} | Data Emissão: ${new Date().toLocaleDateString('pt-BR')}`, 14, 20);
+      doc.text(`Filtro Rota: ${filterRota} | Tag: ${filterTag} | Data Emissão: ${new Date().toLocaleDateString('pt-PT')}`, 14, 20);
 
       const tableRows = [];
       const imageCellStore = [];
 
       filtered.forEach((r, index) => {
-        let dataFmt = new Date(r.data_coleta).toLocaleString('pt-BR', {dateStyle:'short', timeStyle:'short'});
+        let dataFmt = new Date(r.data_coleta).toLocaleString('pt-PT', {dateStyle:'short', timeStyle:'short'});
         let blocoIdentificacao = `DATA: ${dataFmt}\nTAG: ${r.tag}\nSAP: ${r.sap_number || '-'}\nROTA: ${r.rota || '-'}\nLOCAL: ${r.equipamento_nome || '-'} (${r.setor || '-'}/${r.area || '-'})\nCONJUNTO: ${r.componente || '-'}\nINSPETOR: ${r.inspetor || '-'}`;
         let blocoOperacaoStrobo = `OPERAÇÃO: ${r.status_operacao || '-'} (${r.carga_pressao_str || '-'})\nSTROBO RPM: ${r.rpm_real_strobo || '-'}\nACOPLAMENTO: ${r.acoplamento_status || '-'}\nANOMALIAS STROBO: ${r.strobo_obs || '-'}`;
         let blocoTemperaturas = `MOTOR LA: ${r.temp_la !== null ? r.temp_la + '°C' : '-'}\nMOTOR LOA: ${r.temp_loa !== null ? r.temp_loa + '°C' : '-'}\nCOMP.2 P1: ${r.temp_c2_p1 !== null ? r.temp_c2_p1 + '°C' : '-'}\nCOMP.2 P2: ${r.temp_c2_p2 !== null ? r.temp_c2_p2 + '°C' : '-'}\nOBS TEMP: ${r.temp_obs || '-'}`;
@@ -1967,8 +1970,8 @@
         let visuaisArr = [
           `Ruído: ${r.ruido_status}${r.ruido_obs ? ' ('+r.ruido_obs+')' : ''}`,
           `Limpeza: ${r.limpeza_status}${r.limpeza_obs ? ' ('+r.limpeza_obs+')' : ''}`,
-          `Óleo/Graxa: ${r.oleo_status}${r.oleo_obs ? ' ('+r.oleo_obs+')' : ''}`,
-          `Vazamentos: ${r.vazamento_status}${r.vazamento_obs ? ' ('+r.vazamento_obs+')' : ''}`,
+          `Óleo/Massa: ${r.oleo_status}${r.oleo_obs ? ' ('+r.oleo_obs+')' : ''}`,
+          `Fugas: ${r.vazamento_status}${r.vazamento_obs ? ' ('+r.vazamento_obs+')' : ''}`,
           `Fixação: ${r.fixacao_status}${r.fixacao_obs ? ' ('+r.fixacao_obs+')' : ''}`,
           `Proteção NR12: ${r.protecao_status}${r.protecao_obs ? ' ('+r.protecao_obs+')' : ''}`,
           `Vibração Tátil: ${r.vibracao_status}${r.vibracao_obs ? ' ('+r.vibracao_obs+')' : ''}`,
@@ -2022,7 +2025,7 @@
         
         const canvas = document.getElementById('hiddenPdfChart');
         const ctx = canvas.getContext('2d');
-        const labels = tagHistory.map(r => new Date(r.data_coleta).toLocaleString('pt-BR', {dateStyle:'short', timeStyle:'short'}));
+        const labels = tagHistory.map(r => new Date(r.data_coleta).toLocaleString('pt-PT', {dateStyle:'short', timeStyle:'short'}));
         const dataLA = tagHistory.map(r => r.temp_la);
         const dataC2 = tagHistory.map(r => r.temp_c2_p1 || r.temp_loa);
 
@@ -2063,13 +2066,13 @@
       const dataColetaInput = document.getElementById('rel_data_coleta').value;
       const dataAnaliseInput = document.getElementById('rel_data_analise').value;
       
-      let dataColetaFmt = new Date().toLocaleDateString('pt-BR');
+      let dataColetaFmt = new Date().toLocaleDateString('pt-PT');
       if (dataColetaInput) {
         const parts = dataColetaInput.split('-');
         dataColetaFmt = `${parts[2]}/${parts[1]}/${parts[0]}`;
       }
 
-      let dataAnaliseFmt = new Date().toLocaleDateString('pt-BR');
+      let dataAnaliseFmt = new Date().toLocaleDateString('pt-PT');
       if (dataAnaliseInput) {
         const parts = dataAnaliseInput.split('-');
         dataAnaliseFmt = `${parts[2]}/${parts[1]}/${parts[0]}`;
