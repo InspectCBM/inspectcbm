@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>InspectCBM - Pré-Análise de Vibração & Confiabilidade (Cloud)</title>
+  <title>InspectCBM - Relatório Técnico Independente (Cloud)</title>
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- FontAwesome Icons -->
@@ -17,7 +17,6 @@
   <!-- Firebase Compat SDKs -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
-
   <script>
     const firebaseConfig = {
       apiKey: "AIzaSyBW0tD55afqHalda-wDh1olxH0twndIWY",
@@ -28,25 +27,27 @@
       appId: "1:675916276155:web:130ff1bcaa47bc21d5249e",
       measurementId: "G-0162QJ1JQ"
     };
-
     if (!firebase.apps.length) {
       firebase.initializeApp(firebaseConfig);
     }
     const db = firebase.firestore();
-
     document.addEventListener("DOMContentLoaded", () => {
       const now = new Date();
       now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-      document.getElementById("data_coleta").value = now.toISOString().slice(0,16);
+      const isoNow = now.toISOString().slice(0,16);
       
+      document.getElementById("data_coleta").value = isoNow;
+      document.getElementById("rel_data_coleta").value = isoNow.slice(0,10);
+      document.getElementById("rel_data_analise").valueAsDate = new Date();
+
       loadSavedRotas();
       loadSavedInspetores();
       fetchCloudRecords().then(() => {
         onRotaChange(document.getElementById('rota_select').value);
       });
+      fetchSavedLaudosHistory();
     });
   </script>
-
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
     body { font-family: 'Inter', sans-serif; }
@@ -73,11 +74,14 @@
         <span id="cloud-status" class="text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-1 rounded font-mono">
           <i class="fa-solid fa-cloud mr-1"></i> Nuvem Conectada
         </span>
-        <button id="btn-tab-form" onclick="switchTab('form')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500 text-slate-950 transition">
+        <button id="btn-tab-form" onclick="switchTab('form')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-700 text-slate-300 hover:bg-slate-600 transition">
           <i class="fa-solid fa-clipboard-check mr-1"></i> Nova Coleta
         </button>
         <button id="btn-tab-dashboard" onclick="switchTab('dashboard')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-700 text-slate-300 hover:bg-slate-600 transition">
-          <i class="fa-solid fa-chart-line mr-1"></i> Painel & Histórico
+          <i class="fa-solid fa-chart-line mr-1"></i> Pré-Análise
+        </button>
+        <button id="btn-tab-relatorio" onclick="switchTab('relatorio')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500 text-slate-950 transition">
+          <i class="fa-solid fa-file-lines mr-1"></i> Relatório Técnico
         </button>
       </div>
     </div>
@@ -86,18 +90,28 @@
   <!-- Main Container -->
   <main class="max-w-7xl mx-auto px-4 mt-6">
     <!-- SEÇÃO: FORMULÁRIO DE COLETA DE CAMPO -->
-    <div id="tab-form" class="max-w-5xl mx-auto space-y-6">
+    <div id="tab-form" class="hidden max-w-5xl mx-auto space-y-6">
       <form id="vibration-form" onsubmit="saveInspection(event)" class="space-y-6">
         
-        <!-- BLOCO 1: INFORMAÇÕES DO EQUIPAMENTO & FOTO -->
+        <!-- BLOCO 1: INFORMAÇÕES DA ROTA & LOCALIZAÇÃO -->
         <div class="bg-slate-800 rounded-xl p-5 border border-slate-700 shadow-lg">
-          <div class="flex justify-between items-center mb-4">
+          <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
             <h2 class="text-sm font-bold text-amber-400 uppercase tracking-wider flex items-center">
-              <i class="fa-solid fa-folder-open mr-2"></i> Informações do Equipamento & Rota
+              <i class="fa-solid fa-folder-open mr-2"></i> Informações da Rota & Localização
             </h2>
-            <span id="auto-fill-badge" class="hidden text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded font-bold">
-              <i class="fa-solid fa-bolt mr-1"></i> Dados Cadastrais Carregados da Nuvem!
-            </span>
+            <div class="flex flex-wrap items-center gap-2">
+              <span id="auto-fill-route-badge" class="hidden text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded font-bold">
+                <i class="fa-solid fa-bolt mr-1"></i> Dados da Tag Carregados!
+              </span>
+              <!-- Input oculto para importação de Excel / CSV -->
+              <input type="file" id="excel_file_input" accept=".csv, .txt" class="hidden" onchange="importExcelData(event)">
+              <button type="button" onclick="document.getElementById('excel_file_input').click()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-2.5 py-1.5 rounded-lg transition flex items-center font-semibold shadow">
+                <i class="fa-solid fa-file-excel mr-1"></i> Importar Planilha Excel (CSV)
+              </button>
+              <button type="button" onclick="saveOnlyTagRegistration()" class="bg-slate-700 hover:bg-slate-600 text-amber-400 border border-amber-500/30 text-xs px-2.5 py-1.5 rounded-lg transition flex items-center font-semibold">
+                <i class="fa-solid fa-bookmark mr-1"></i> Salvar Dados da Tag
+              </button>
+            </div>
           </div>
           
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
@@ -117,9 +131,15 @@
             </div>
             <div>
               <div class="flex justify-between items-center mb-1">
-                <label class="block text-xs font-medium text-slate-300">Componente em Inspeção *</label>
+                <label class="block text-xs font-medium text-slate-300">Composição do Conjunto *</label>
+                <button type="button" onclick="promptAddCustomComponentType()" class="text-[10px] text-amber-400 hover:underline"><i class="fa-solid fa-plus"></i> Outro</button>
               </div>
-              <select id="componente_select" onchange="updateFullTagPreview()" class="w-full bg-slate-900 border border-amber-500/50 rounded-lg px-3 py-2 text-sm text-amber-400 font-semibold focus:outline-none focus:border-amber-500"></select>
+              <select id="composicao_conjunto_select" onchange="onComposicaoChange(this.value)" class="w-full bg-slate-900 border border-amber-500/50 rounded-lg px-3 py-2 text-sm text-amber-400 font-semibold focus:outline-none focus:border-amber-500">
+                <option value="motor_elemento">Motor + Elemento</option>
+                <option value="motor_redutor">Motor + Redutor</option>
+                <option value="motor_bomba">Motor + Bomba</option>
+                <option value="motor_mancal">Motor + Mancal</option>
+              </select>
             </div>
           </div>
 
@@ -130,37 +150,43 @@
               <img id="eq_photo_preview" src="" alt="Preview" class="w-full h-full object-cover hidden">
             </div>
             <div class="flex-1 w-full">
-              <label class="block text-xs font-bold text-slate-200 mb-1"><i class="fa-solid fa-image text-amber-400 mr-1"></i> Foto do Equipamento / Ponto de Inspeção</label>
-              <p class="text-[11px] text-slate-400 mb-2">Tire uma foto ou carregue a imagem atual do ativo em campo.</p>
+              <div class="flex justify-between items-center mb-1">
+                <label class="block text-xs font-bold text-slate-200"><i class="fa-solid fa-image text-amber-400 mr-1"></i> Foto do Equipamento / Ponto de Inspeção</label>
+                <button type="button" onclick="saveOnlyTagPhoto()" class="bg-amber-500 hover:bg-amber-400 text-slate-950 text-[11px] font-bold px-2.5 py-1 rounded-lg transition flex items-center shadow">
+                  <i class="fa-solid fa-cloud-arrow-up mr-1"></i> Salvar Foto na Nuvem
+                </button>
+              </div>
+              <p class="text-[11px] text-slate-400 mb-2">Tire uma foto direto com a câmera do celular ou carregue do dispositivo.</p>
               <div class="flex items-center space-x-2">
-                <input type="file" id="eq_photo_input" accept="image/*" onchange="handlePhotoUpload(event)" class="text-xs text-slate-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-amber-500 file:text-slate-950 hover:file:bg-amber-400 file:cursor-pointer">
+                <input type="file" id="eq_photo_input" accept="image/*" capture="environment" onchange="handlePhotoUpload(event)" class="text-xs text-slate-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-amber-500 file:text-slate-950 hover:file:bg-amber-400 file:cursor-pointer">
                 <button type="button" id="btn-remove-photo" onclick="removePhoto()" class="hidden text-xs text-rose-400 hover:underline"><i class="fa-solid fa-trash-can mr-1"></i> Remover Foto</button>
               </div>
             </div>
           </div>
 
+          <!-- LINHA DE CAMPOS ALINHADOS -->
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             <div class="col-span-1 md:col-span-2 lg:col-span-5 bg-slate-900/80 p-3 rounded-lg border border-amber-500/30 flex justify-between items-center">
-              <span class="text-xs text-slate-400 font-medium">Tag Registrada para este Componente:</span>
+              <span class="text-xs text-slate-400 font-medium">Tag Registrada para este Conjunto:</span>
               <span id="lbl_tag_final" class="text-sm font-bold text-amber-400 font-mono">SELECIONE UMA TAG...</span>
             </div>
-            <div>
-              <label class="block text-xs font-medium text-slate-300 mb-1">SAP Number</label>
-              <input type="text" id="sap_number" placeholder="Ex: 10271780" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
+            <div class="flex flex-col justify-end">
+              <label class="block text-xs font-medium text-slate-300 mb-1">Equipamento (Individual da Tag)</label>
+              <input type="text" id="equipamento_nome" placeholder="Ex: SOPRADOR" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
             </div>
-            <div>
-              <label class="block text-xs font-medium text-slate-300 mb-1">Equipamento</label>
-              <input type="text" id="equipamento_nome" placeholder="Ex: COMPRESSOR 01" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
+            <div class="flex flex-col justify-end">
+              <label class="block text-xs font-medium text-slate-300 mb-1">SAP Number (Individual da Tag)</label>
+              <input type="text" id="sap_number" placeholder="Ex: 10023456" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
             </div>
-            <div>
-              <label class="block text-xs font-medium text-slate-300 mb-1">Setor</label>
-              <input type="text" id="setor" placeholder="Ex: UTILIDADES" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
+            <div class="flex flex-col justify-end">
+              <label class="block text-xs font-medium text-slate-300 mb-1">Setor (Individual da Tag)</label>
+              <input type="text" id="setor" placeholder="Ex: MEZANINO 300" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
             </div>
-            <div>
-              <label class="block text-xs font-medium text-slate-300 mb-1">Área</label>
-              <input type="text" id="area" placeholder="Ex: SALA DE COMPRESSORES" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
+            <div class="flex flex-col justify-end">
+              <label class="block text-xs font-medium text-slate-300 mb-1">Área (Individual da Tag)</label>
+              <input type="text" id="area" placeholder="Ex: MASSAS" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
             </div>
-            <div>
+            <div class="flex flex-col justify-end">
               <div class="flex justify-between items-center mb-1">
                 <label class="block text-xs font-medium text-slate-300">Responsável Técnico *</label>
                 <button type="button" onclick="manageInspetoresModal()" class="text-[10px] text-amber-400 hover:underline"><i class="fa-solid fa-gear"></i> Gerenciar</button>
@@ -170,36 +196,163 @@
           </div>
         </div>
 
-        <!-- BLOCO 2: PARÂMETROS MECÂNICOS -->
-        <div class="bg-slate-800 rounded-xl p-5 border border-slate-700 shadow-lg">
-          <div class="flex justify-between items-center mb-4">
+        <!-- BLOCO 2: PARÂMETROS MECÂNICOS DO CONJUNTO -->
+        <div class="bg-slate-800 rounded-xl p-5 border border-slate-700 shadow-lg space-y-5">
+          <div class="flex justify-between items-center border-b border-slate-700 pb-3">
             <h2 class="text-sm font-bold text-amber-400 uppercase tracking-wider flex items-center">
-              <i class="fa-solid fa-gears mr-2"></i> Parâmetros Mecânicos & Data
+              <i class="fa-solid fa-gears mr-2"></i> Parâmetros Mecânicos do Conjunto <span id="tag-mechanic-badge-label" class="ml-2 text-amber-400 font-mono text-xs"></span>
             </h2>
-            <button type="button" onclick="saveOnlyRegistration()" class="bg-slate-700 hover:bg-slate-600 text-amber-400 border border-amber-500/30 text-xs px-3 py-1.5 rounded-lg transition flex items-center font-semibold">
-              <i class="fa-solid fa-bookmark mr-1.5"></i> Salvar Cadastro na Nuvem
-            </button>
+            <div class="flex items-center space-x-2">
+              <button type="button" onclick="saveOnlyTagRegistration()" class="bg-slate-700 hover:bg-slate-600 text-amber-400 border border-amber-500/30 text-xs px-2.5 py-1 rounded-lg transition flex items-center font-semibold">
+                <i class="fa-solid fa-bookmark mr-1"></i> Salvar Dados da Tag na Nuvem
+              </button>
+            </div>
           </div>
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label class="block text-xs font-medium text-slate-300 mb-1">Data e Hora da Medição *</label>
               <input type="datetime-local" id="data_coleta" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
             </div>
-            <div>
-              <label class="block text-xs font-medium text-slate-300 mb-1">Rotação Nominal (RPM)</label>
-              <input type="number" id="rotacao_rpm" placeholder="Ex: 1780" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
+          </div>
+
+          <!-- PARÂMETROS - MOTOR -->
+          <div class="bg-slate-900/80 p-4 rounded-xl border border-amber-500/30 space-y-3">
+            <h3 class="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center">
+              <i class="fa-solid fa-bolt mr-1.5"></i> Componente 1: Motor elétrico
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div>
+                <label class="block text-[11px] text-slate-300 mb-1">Rotação Nominal (RPM)</label>
+                <input type="number" id="rotacao_rpm" placeholder="Ex: 1780" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500">
+              </div>
+              <div>
+                <label class="block text-[11px] text-slate-300 mb-1">Potência (kW / CV)</label>
+                <input type="text" id="potencia" placeholder="Ex: 75 CV" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500">
+              </div>
+              <div>
+                <label class="block text-[11px] text-slate-300 mb-1">Rolamento LA (Acoplado)</label>
+                <input type="text" id="rolamento_la" placeholder="Ex: 6210 C3" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500">
+              </div>
+              <div>
+                <label class="block text-[11px] text-slate-300 mb-1">Rolamento LOA (Oposto)</label>
+                <input type="text" id="rolamento_loa" placeholder="Ex: NU 214" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500">
+              </div>
             </div>
-            <div>
-              <label class="block text-xs font-medium text-slate-300 mb-1">Rolamento LA (Acoplado)</label>
-              <input type="text" id="rolamento_la" placeholder="Ex: 6210 C3" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
+          </div>
+
+          <!-- PARÂMETROS - SEGUNDO COMPONENTE (DINÂMICO) -->
+          <div id="container_segundo_componente" class="bg-slate-900/80 p-4 rounded-xl border border-sky-500/30 space-y-3">
+            <h3 id="titulo_segundo_componente" class="text-xs font-bold text-sky-400 uppercase tracking-wider flex items-center">
+              <i class="fa-solid fa-gear mr-1.5"></i> Componente 2: Elemento
+            </h3>
+            
+            <div id="fields_elemento" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div>
+                <label class="block text-[11px] text-slate-300 mb-1">Marca</label>
+                <input type="text" id="elem_marca" placeholder="Ex: Robuschi" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500">
+              </div>
+              <div>
+                <label class="block text-[11px] text-slate-300 mb-1">Modelo</label>
+                <input type="text" id="elem_modelo" placeholder="Ex: RBS 65" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500">
+              </div>
+              <div>
+                <label class="block text-[11px] text-slate-300 mb-1">Rotação (RPM)</label>
+                <input type="number" id="elem_rotacao" placeholder="Ex: 2400" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500">
+              </div>
+              <div>
+                <label class="block text-[11px] text-slate-300 mb-1">Rolamento 1 (Mancal P1)</label>
+                <input type="text" id="elem_rol1" placeholder="Ex: 6308" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500">
+              </div>
+              <div>
+                <label class="block text-[11px] text-slate-300 mb-1">Rolamento 2 (Mancal P2)</label>
+                <input type="text" id="elem_rol2" placeholder="Ex: 6308" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500">
+              </div>
+              <div>
+                <label class="block text-[11px] text-slate-300 mb-1">Rolamento 3 (Mancal P3)</label>
+                <input type="text" id="elem_rol3" placeholder="Ex: 7208" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500">
+              </div>
+              <div>
+                <label class="block text-[11px] text-slate-300 mb-1">Rolamento 4 (Mancal P4)</label>
+                <input type="text" id="elem_rol4" placeholder="Ex: 7208" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500">
+              </div>
             </div>
-            <div>
-              <label class="block text-xs font-medium text-slate-300 mb-1">Rolamento LOA (Oposto)</label>
-              <input type="text" id="rolamento_loa" placeholder="Ex: NU 214" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
+
+            <div id="fields_redutor" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 hidden">
+              <div>
+                <label class="block text-[11px] text-slate-300 mb-1">Marca Redutor</label>
+                <input type="text" id="red_marca" placeholder="Ex: SEW" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500">
+              </div>
+              <div>
+                <label class="block text-[11px] text-slate-300 mb-1">Modelo Redutor</label>
+                <input type="text" id="red_modelo" placeholder="Ex: K87" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500">
+              </div>
+              <div>
+                <label class="block text-[11px] text-slate-300 mb-1">Rotação Saída (RPM)</label>
+                <input type="number" id="red_rotacao" placeholder="Ex: 85" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500">
+              </div>
+              <div>
+                <label class="block text-[11px] text-slate-300 mb-1">Relação Transmissão (i)</label>
+                <input type="text" id="red_relacao" placeholder="Ex: 1:20.5" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500">
+              </div>
+              <div>
+                <label class="block text-[11px] text-slate-300 mb-1">Rolamento Eixo Ent. LA</label>
+                <input type="text" id="red_rol1" placeholder="Ex: 6205" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500">
+              </div>
+              <div>
+                <label class="block text-[11px] text-slate-300 mb-1">Rolamento Eixo Ent. LOA</label>
+                <input type="text" id="red_rol2" placeholder="Ex: 6205" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500">
+              </div>
+              <div>
+                <label class="block text-[11px] text-slate-300 mb-1">Rolamento Eixo Saída LA</label>
+                <input type="text" id="red_rol3" placeholder="Ex: 32210" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500">
+              </div>
+              <div>
+                <label class="block text-[11px] text-slate-300 mb-1">Rolamento Eixo Saída LOA</label>
+                <input type="text" id="red_rol4" placeholder="Ex: 32210" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500">
+              </div>
             </div>
-            <div>
-              <label class="block text-xs font-medium text-slate-300 mb-1">Potência (kW / CV)</label>
-              <input type="text" id="potencia" placeholder="Ex: 75 CV" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
+
+            <div id="fields_bomba" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 hidden">
+              <div>
+                <label class="block text-[11px] text-slate-300 mb-1">Marca Bomba</label>
+                <input type="text" id="bomba_marca" placeholder="Ex: KSB" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500">
+              </div>
+              <div>
+                <label class="block text-[11px] text-slate-300 mb-1">Modelo Bomba</label>
+                <input type="text" id="bomba_modelo" placeholder="Ex: Megachem" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500">
+              </div>
+              <div>
+                <label class="block text-[11px] text-slate-300 mb-1">Rotação (RPM)</label>
+                <input type="number" id="bomba_rotacao" placeholder="Ex: 1750" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500">
+              </div>
+              <div>
+                <label class="block text-[11px] text-slate-300 mb-1">Rolamento LA</label>
+                <input type="text" id="bomba_rol1" placeholder="Ex: 6309" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500">
+              </div>
+              <div>
+                <label class="block text-[11px] text-slate-300 mb-1">Rolamento LOA</label>
+                <input type="text" id="bomba_rol2" placeholder="Ex: 7309" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500">
+              </div>
+            </div>
+
+            <div id="fields_mancal" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 hidden">
+              <div>
+                <label class="block text-[11px] text-slate-300 mb-1">Modelo Mancal</label>
+                <input type="text" id="mancal_modelo" placeholder="Ex: SNT 511" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500">
+              </div>
+              <div>
+                <label class="block text-[11px] text-slate-300 mb-1">Rotação (RPM)</label>
+                <input type="number" id="mancal_rotacao" placeholder="Ex: 1200" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500">
+              </div>
+              <div>
+                <label class="block text-[11px] text-slate-300 mb-1">Rolamento Ponto A</label>
+                <input type="text" id="mancal_rol1" placeholder="Ex: 22211 EK" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500">
+              </div>
+              <div>
+                <label class="block text-[11px] text-slate-300 mb-1">Rolamento Ponto B</label>
+                <input type="text" id="mancal_rol2" placeholder="Ex: 22211 EK" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500">
+              </div>
             </div>
           </div>
         </div>
@@ -264,24 +417,45 @@
           </div>
         </div>
 
-        <!-- BLOCO 5: TEMPERATURA -->
+        <!-- BLOCO 5: TEMPERATURA POR COMPONENTE -->
         <div class="bg-slate-800 rounded-xl p-5 border border-slate-700 shadow-lg space-y-4">
           <h2 class="text-sm font-bold text-amber-400 uppercase tracking-wider mb-1 flex items-center">
             <i class="fa-solid fa-temperature-high mr-2"></i> Medição de Temperatura no Ponto
           </h2>
+          
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label id="lbl_temp_la" class="block text-xs font-medium text-slate-300 mb-1">Temperatura LA (Acoplado) - °C</label>
-              <input type="number" step="0.1" id="temp_la" placeholder="Ex: 68.5" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
+            <div class="bg-slate-900/80 p-3.5 rounded-xl border border-amber-500/30 space-y-3">
+              <span class="text-xs font-bold text-amber-400 block border-b border-slate-800 pb-1">Motor Elétrico</span>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-[11px] font-medium text-slate-300 mb-1">Temp LA (°C)</label>
+                  <input type="number" step="0.1" id="temp_la" placeholder="Ex: 68.5" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500">
+                </div>
+                <div>
+                  <label class="block text-[11px] font-medium text-slate-300 mb-1">Temp LOA (°C)</label>
+                  <input type="number" step="0.1" id="temp_loa" placeholder="Ex: 62.0" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500">
+                </div>
+              </div>
             </div>
-            <div>
-              <label id="lbl_temp_loa" class="block text-xs font-medium text-slate-300 mb-1">Temperatura LOA (Oposto) - °C</label>
-              <input type="number" step="0.1" id="temp_loa" placeholder="Ex: 62.0" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
+
+            <div class="bg-slate-900/80 p-3.5 rounded-xl border border-sky-500/30 space-y-3">
+              <span id="lbl_temp_comp2" class="text-xs font-bold text-sky-400 block border-b border-slate-800 pb-1">Componente 2 (Elemento)</span>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-[11px] font-medium text-slate-300 mb-1">Temp Ponto 1 / LA (°C)</label>
+                  <input type="number" step="0.1" id="temp_c2_p1" placeholder="Ex: 65.0" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-sky-500">
+                </div>
+                <div>
+                  <label class="block text-[11px] font-medium text-slate-300 mb-1">Temp Ponto 2 / LOA (°C)</label>
+                  <input type="number" step="0.1" id="temp_c2_p2" placeholder="Ex: 61.5" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-sky-500">
+                </div>
+              </div>
             </div>
           </div>
+
           <div>
             <label class="block text-xs font-medium text-slate-300 mb-1">Observações da Medição de Temperatura</label>
-            <input type="text" id="temp_obs" placeholder="Ex: Ponto quente detectado no mancal LA." class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500">
+            <input type="text" id="temp_obs" placeholder="Ex: Ponto quente detectado no mancal LA do Motor." class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500">
           </div>
         </div>
 
@@ -291,7 +465,6 @@
             <i class="fa-solid fa-eye mr-2"></i> Inspeção Visual e Sensorial
           </h2>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <!-- 1. Ruído Anormal -->
             <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-700/60">
               <div class="flex justify-between items-center mb-2">
                 <label class="text-xs font-bold text-slate-200">Ruído Anormal?</label>
@@ -302,7 +475,6 @@
               </div>
               <div id="ruido_obs_box" class="hidden mt-2"><input type="text" id="ruido_obs" placeholder="Descreva o ruído..." class="w-full bg-slate-900 border border-rose-500/50 rounded-lg px-3 py-2 text-xs text-white"></div>
             </div>
-            <!-- 2. Limpeza & Contaminação -->
             <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-700/60">
               <div class="flex justify-between items-center mb-2">
                 <label class="text-xs font-bold text-slate-200">Limpeza & Contaminação Visual</label>
@@ -313,7 +485,6 @@
               </div>
               <div id="limpeza_obs_box" class="hidden mt-2"><input type="text" id="limpeza_obs" placeholder="Descreva a sujeira..." class="w-full bg-slate-900 border border-rose-500/50 rounded-lg px-3 py-2 text-xs text-white"></div>
             </div>
-            <!-- 3. Nível & Condição do Óleo / Graxa -->
             <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-700/60">
               <div class="flex justify-between items-center mb-2">
                 <label class="text-xs font-bold text-slate-200">Nível & Condição do Óleo / Graxa</label>
@@ -324,7 +495,6 @@
               </div>
               <div id="oleo_obs_box" class="hidden mt-2"><input type="text" id="oleo_obs" placeholder="Descreva o óleo/graxa..." class="w-full bg-slate-900 border border-rose-500/50 rounded-lg px-3 py-2 text-xs text-white"></div>
             </div>
-            <!-- 4. Vazamentos Visíveis -->
             <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-700/60">
               <div class="flex justify-between items-center mb-2">
                 <label class="text-xs font-bold text-slate-200">Vazamentos Visíveis</label>
@@ -335,7 +505,6 @@
               </div>
               <div id="vazamento_obs_box" class="hidden mt-2"><input type="text" id="vazamento_obs" placeholder="Descreva o vazamento..." class="w-full bg-slate-900 border border-rose-500/50 rounded-lg px-3 py-2 text-xs text-white"></div>
             </div>
-            <!-- 5. Fixação & Base (Estrutura) -->
             <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-700/60">
               <div class="flex justify-between items-center mb-2">
                 <label class="text-xs font-bold text-slate-200">Fixação & Base (Estrutura)</label>
@@ -346,7 +515,6 @@
               </div>
               <div id="fixacao_obs_box" class="hidden mt-2"><input type="text" id="fixacao_obs" placeholder="Descreva a fixação..." class="w-full bg-slate-900 border border-rose-500/50 rounded-lg px-3 py-2 text-xs text-white"></div>
             </div>
-            <!-- 6. Proteção de Segurança (NR-12) -->
             <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-700/60">
               <div class="flex justify-between items-center mb-2">
                 <label class="text-xs font-bold text-slate-200">Proteção de Segurança (NR-12)</label>
@@ -357,7 +525,6 @@
               </div>
               <div id="protecao_obs_box" class="hidden mt-2"><input type="text" id="protecao_obs" placeholder="Descreva a proteção..." class="w-full bg-slate-900 border border-rose-500/50 rounded-lg px-3 py-2 text-xs text-white"></div>
             </div>
-            <!-- 7. Vibração Sensorial (Tátil) -->
             <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-700/60">
               <div class="flex justify-between items-center mb-2">
                 <label class="text-xs font-bold text-slate-200">Vibração Sensorial (Tátil)</label>
@@ -368,7 +535,6 @@
               </div>
               <div id="vibracao_obs_box" class="hidden mt-2"><input type="text" id="vibracao_obs" placeholder="Descreva a vibração tátil..." class="w-full bg-slate-900 border border-rose-500/50 rounded-lg px-3 py-2 text-xs text-white"></div>
             </div>
-            <!-- 8. Refrigeração / Aletagem -->
             <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-700/60">
               <div class="flex justify-between items-center mb-2">
                 <label class="text-xs font-bold text-slate-200">Refrigeração / Aletagem / Ventoinha</label>
@@ -393,38 +559,42 @@
       </form>
     </div>
 
-    <!-- SEÇÃO: PAINEL & HISTÓRICO -->
+    <!-- SEÇÃO: PRÉ-ANÁLISE -->
     <div id="tab-dashboard" class="hidden space-y-6">
       <div class="bg-slate-800 rounded-xl p-5 border border-slate-700 shadow-lg flex flex-col md:flex-row justify-between items-center gap-4">
         <div>
-          <h2 class="text-base font-bold text-white">Histórico em Nuvem & Tendências</h2>
-          <p class="text-xs text-slate-400">Filtre por Rota, Tag e Data de Coleta</p>
+          <h2 class="text-base font-bold text-white">Pré-Análise & Histórico em Nuvem</h2>
+          <p class="text-xs text-slate-400">Filtre por Rota, Tag e Data (ou intervalo De/Até) para gerar o resumo auxiliar de vibração</p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
-          <!-- Filtro por Rota -->
           <select id="filter_rota" onchange="onFilterRotaChange()" class="bg-slate-900 border border-amber-500/50 rounded-lg px-3 py-2 text-xs text-amber-400 font-bold">
             <option value="TODAS_ROTAS">-- Todas as Rotas --</option>
           </select>
-
-          <!-- Filtro por Tag Específica -->
           <select id="filter_tag" onchange="renderDashboard()" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white">
             <option value="TODAS">-- Todas as Tags --</option>
           </select>
 
-          <!-- Filtro por Data -->
-          <div class="flex items-center space-x-1">
-            <input type="date" id="filter_date" onchange="renderDashboard()" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500">
-            <button onclick="clearDateFilter()" title="Limpar data" class="bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs px-2 py-2 rounded-lg transition">
-              <i class="fa-solid fa-xmark"></i>
-            </button>
+          <!-- SELETORES DE DATA -->
+          <select id="filter_date_select" onchange="renderDashboard()" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white">
+            <option value="TODAS_DATAS">-- Todas as Datas --</option>
+          </select>
+          
+          <div class="flex items-center space-x-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white">
+            <span class="text-[10px] text-slate-400">De:</span>
+            <input type="date" id="filter_date_start" onchange="renderDashboard()" class="bg-transparent text-xs text-white focus:outline-none">
+            <span class="text-[10px] text-slate-400">Até:</span>
+            <input type="date" id="filter_date_end" onchange="renderDashboard()" class="bg-transparent text-xs text-white focus:outline-none">
           </div>
 
-          <button onclick="exportTechnicalPDF()" class="bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs px-3 py-2 rounded-lg transition shadow">
-            <i class="fa-solid fa-file-pdf mr-1"></i> Laudo PDF
+          <button onclick="clearDateFilter()" title="Limpar datas" class="bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs px-2.5 py-2 rounded-lg transition">
+            <i class="fa-solid fa-xmark"></i>
           </button>
           
           <button onclick="exportCSV()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs px-3 py-2 rounded-lg transition shadow">
             <i class="fa-solid fa-file-excel mr-1"></i> CSV
+          </button>
+          <button onclick="exportDashboardPreAnalisePDF()" class="bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs px-3.5 py-2 rounded-lg transition shadow flex items-center">
+            <i class="fa-solid fa-file-pdf mr-1.5 text-sm"></i> PDF Pré-Análise
           </button>
         </div>
       </div>
@@ -447,10 +617,10 @@
               <tr>
                 <th class="p-3">Foto / Data</th>
                 <th class="p-3">Rota / Tag</th>
-                <th class="p-3">Componente / SAP</th>
+                <th class="p-3">Conjunto / Local</th>
                 <th class="p-3">Operação & Strobo</th>
-                <th class="p-3">Temp LA/LOA</th>
-                <th class="p-3">Inspetor & Todas Observações</th>
+                <th class="p-3">Temp. Motor & Comp. 2</th>
+                <th class="p-3">Inspetor & Observações</th>
                 <th class="p-3 text-center">Ações</th>
               </tr>
             </thead>
@@ -459,9 +629,91 @@
         </div>
       </div>
     </div>
+
+    <!-- SEÇÃO: RELATÓRIO TÉCNICO INDEPENDENTE -->
+    <div id="tab-relatorio" class="space-y-6">
+      <div class="bg-slate-800 rounded-xl p-5 border border-slate-700 shadow-lg space-y-4">
+        <div class="flex flex-col md:flex-row justify-between items-center gap-4 border-b border-slate-700 pb-4">
+          <div>
+            <h2 class="text-base font-bold text-white flex items-center">
+              <i class="fa-solid fa-file-pdf text-rose-500 mr-2"></i> Emissão de Relatório Técnico Independente
+            </h2>
+            <p class="text-xs text-slate-400">Preencha as datas manuais, defina o status/diagnóstico por equipamento e gere o laudo</p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <button onclick="clearTechnicalAnalysisState()" class="bg-slate-700 hover:bg-slate-600 text-slate-300 border border-slate-600 font-semibold text-xs px-3.5 py-2 rounded-lg transition shadow flex items-center">
+              <i class="fa-solid fa-eraser mr-1.5"></i> Limpar Campos
+            </button>
+            <button onclick="saveTechnicalAnalysisState()" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold text-xs px-3.5 py-2 rounded-lg transition shadow flex items-center">
+              <i class="fa-solid fa-floppy-disk mr-1.5"></i> Salvar Análise
+            </button>
+            <button onclick="exportTechnicalPDF()" class="bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs px-3.5 py-2 rounded-lg transition shadow flex items-center">
+              <i class="fa-solid fa-file-pdf mr-1.5 text-sm"></i> Gerar Laudo PDF
+            </button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1">Rota de Inspeção *</label>
+            <select id="rel_filter_rota" onchange="onRelFilterRotaChange()" class="w-full bg-slate-900 border border-amber-500/50 rounded-lg px-3 py-2 text-xs text-amber-400 font-bold">
+              <option value="TODAS_ROTAS">-- Todas as Rotas --</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1">Status de Medição *</label>
+            <select id="rel_filter_status" onchange="renderRelatorioTab()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-amber-400 font-semibold">
+              <option value="TODOS">-- Todos os Status --</option>
+              <option value="MEDIDOS" selected>Medidos</option>
+              <option value="NAO_MEDIDOS">Não Medidos</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1">Data da Coleta (Manual)</label>
+            <input type="date" id="rel_data_coleta" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1">Data da Análise (Laudo)</label>
+            <input type="date" id="rel_data_analise" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500">
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-slate-800 rounded-xl border border-slate-700 shadow-lg overflow-hidden">
+        <div class="p-4 border-b border-slate-700 flex justify-between items-center">
+          <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider">Equipamentos da Rota para Análise</h3>
+          <span id="rel-record-count" class="text-xs bg-slate-700 px-2 py-0.5 rounded text-amber-400 font-bold">0 equipamentos</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs text-slate-300">
+            <thead class="bg-slate-900/80 text-slate-400 uppercase font-semibold">
+              <tr>
+                <th class="p-3 w-36">Seleção Medição / Foto</th>
+                <th class="p-3">Rota / Tag</th>
+                <th class="p-3">Conjunto / Local</th>
+                <th class="p-3">Operação & Strobo</th>
+                <th class="p-3">Temp Motor / Comp 2</th>
+                <th class="p-3 w-80">Análise do Relatório (Status, Problema, Recomendação)</th>
+              </tr>
+            </thead>
+            <tbody id="rel-records-table-body" class="divide-y divide-slate-700/50"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- SEÇÃO DE HISTÓRICO DE LAUDOS SALVOS -->
+      <div class="bg-slate-800 rounded-xl p-5 border border-slate-700 shadow-lg space-y-4">
+        <h3 class="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center">
+          <i class="fa-solid fa-clock-rotate-left mr-2"></i> Histórico de Relatórios & Laudos Salvos
+        </h3>
+        <div id="saved-laudos-list" class="space-y-2 max-h-60 overflow-y-auto">
+          <p class="text-xs text-slate-500">Nenhum laudo salvo no histórico ainda.</p>
+        </div>
+      </div>
+    </div>
   </main>
 
-  <!-- MODAL GERENCIAR ROTAS -->
+  <!-- MODAIS DE GERENCIAMENTO -->
   <div id="modal-rotas" class="hidden fixed inset-0 bg-slate-950/80 z-50 flex items-center justify-center p-4">
     <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 max-w-md w-full space-y-4 shadow-2xl">
       <h3 class="text-sm font-bold text-amber-400 uppercase tracking-wider flex items-center justify-between">
@@ -485,7 +737,6 @@
     </div>
   </div>
 
-  <!-- MODAL GERENCIAR TAGS -->
   <div id="modal-tags" class="hidden fixed inset-0 bg-slate-950/80 z-50 flex items-center justify-center p-4">
     <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 max-w-md w-full space-y-4 shadow-2xl">
       <h3 class="text-sm font-bold text-amber-400 uppercase tracking-wider flex items-center justify-between">
@@ -515,7 +766,6 @@
     </div>
   </div>
 
-  <!-- MODAL GERENCIAR INSPETORES -->
   <div id="modal-inspetores" class="hidden fixed inset-0 bg-slate-950/80 z-50 flex items-center justify-center p-4">
     <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 max-w-md w-full space-y-4 shadow-2xl">
       <h3 class="text-sm font-bold text-amber-400 uppercase tracking-wider flex items-center justify-between">
@@ -531,12 +781,16 @@
       </div>
       <div class="space-y-1">
         <label class="block text-xs text-slate-400">Inspetores Cadastrados:</label>
-        <div id="lista-inspetores-cadastrados" class="max-h-40 overflow-y-auto space-y-1 bg-slate-900 p-2 rounded-lg border border-slate-700 text-xs"></div>
+        <div id="lista-inspetores-cadastradas" class="max-h-40 overflow-y-auto space-y-1 bg-slate-900 p-2 rounded-lg border border-slate-700 text-xs"></div>
       </div>
       <div class="flex justify-end pt-2">
         <button onclick="closeInspetoresModal()" class="bg-slate-700 hover:bg-slate-600 text-white font-semibold px-4 py-2 rounded-lg text-xs">Concluído</button>
       </div>
     </div>
+  </div>
+
+  <div style="position: absolute; left: -9999px; top: -9999px;">
+    <canvas id="hiddenPdfChart" width="400" height="150"></canvas>
   </div>
 
   <script>
@@ -549,59 +803,174 @@
       "Compressores Drymix": ["UC02"],
       "Caldeiras / Utilidades": ["TO01", "BO01"]
     };
-
     let defaultInspetores = JSON.parse(localStorage.getItem('inspectcbm_inspetores')) || ["RAFAEL AUGUSTO", "Técnico Confiabilidade 1"];
-
     let currentPhotoBase64 = "";
     let cloudRecords = [];
-    let cloudEquipmentRegistry = {}; // Armazena os cadastros vindos da nuvem por Tag
+    let cloudTagRegistry = {};   
+    let relatorioAnalysisState = JSON.parse(localStorage.getItem('inspectcbm_rel_state')) || {};
 
     function switchTab(tab) {
       const formTab = document.getElementById('tab-form');
       const dashTab = document.getElementById('tab-dashboard');
+      const relTab = document.getElementById('tab-relatorio');
+      
       const btnForm = document.getElementById('btn-tab-form');
       const btnDash = document.getElementById('btn-tab-dashboard');
+      const btnRel = document.getElementById('btn-tab-relatorio');
+      
+      formTab.classList.add('hidden');
+      dashTab.classList.add('hidden');
+      relTab.classList.add('hidden');
+      
+      btnForm.className = "px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-700 text-slate-300 hover:bg-slate-600 transition";
+      btnDash.className = "px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-700 text-slate-300 hover:bg-slate-600 transition";
+      btnRel.className = "px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-700 text-slate-300 hover:bg-slate-600 transition";
+      
       if(tab === 'form') {
         formTab.classList.remove('hidden');
-        dashTab.classList.add('hidden');
         btnForm.className = "px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500 text-slate-950 transition";
-        btnDash.className = "px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-700 text-slate-300 hover:bg-slate-600 transition";
-      } else {
-        formTab.classList.add('hidden');
+      } else if(tab === 'dashboard') {
         dashTab.classList.remove('hidden');
         btnDash.className = "px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500 text-slate-950 transition";
-        btnForm.className = "px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-700 text-slate-300 hover:bg-slate-600 transition";
+        fetchCloudRecords();
+      } else if(tab === 'relatorio') {
+        relTab.classList.remove('hidden');
+        btnRel.className = "px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500 text-slate-950 transition";
         fetchCloudRecords();
       }
     }
 
     async function fetchCloudRecords() {
       try {
-        // Busca inspeções
         const snapshot = await db.collection("inspectcbm_records").get();
         cloudRecords = [];
         snapshot.forEach((doc) => {
           cloudRecords.push({ docId: doc.id, ...doc.data() });
         });
         cloudRecords.sort((a, b) => b.id - a.id);
+        
+        const tagSnapshot = await db.collection("inspectcbm_tags").get();
+        cloudTagRegistry = {};
+        tagSnapshot.forEach((doc) => {
+          cloudTagRegistry[doc.id] = doc.data();
+        });
+        
         populateFilters();
         renderDashboard();
-
-        // Busca cadastros de equipamentos na nuvem
-        const eqSnapshot = await db.collection("inspectcbm_equipment").get();
-        cloudEquipmentRegistry = {};
-        eqSnapshot.forEach((doc) => {
-          cloudEquipmentRegistry[doc.id] = doc.data();
-        });
-
-        // Atualiza os campos se já houver tag selecionada
+        renderRelatorioTab();
+        
         const currentTag = getBaseTag();
-        if(currentTag) {
-          loadEquipmentDataForTag(currentTag);
-        }
+        if(currentTag) loadTagData(currentTag);
       } catch (err) {
         console.error("Erro ao buscar dados da nuvem:", err);
       }
+    }
+
+    // FUNÇÃO DE IMPORTAÇÃO DE PLANILHA EXCEL (CSV) COM DADOS INDIVIDUAIS POR TAG
+    async function importExcelData(e) {
+      const file = e.target.files[0];
+      if(!file) return;
+      const reader = new FileReader();
+      reader.onload = async function(event) {
+        const text = event.target.result;
+        const lines = text.split(/\r\n|\n/);
+        let importedCount = 0;
+
+        const firstLine = lines[0] || "";
+        const delimiter = firstLine.includes(';') ? ';' : ',';
+
+        for (let i = 1; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if(!line) continue;
+          const cols = line.split(delimiter).map(c => c.replace(/^["']|["']$/g, '').trim());
+          if (cols.length >= 7) {
+            const [rota, tag, composicao, equipamento, sapNumber, setor, area] = cols;
+
+            if (!defaultRotas.includes(rota)) {
+              defaultRotas.push(rota);
+            }
+            if (!defaultTagMap[rota]) {
+              defaultTagMap[rota] = [];
+            }
+            const cleanTag = tag.toUpperCase();
+            if (!defaultTagMap[rota].includes(cleanTag)) {
+              defaultTagMap[rota].push(cleanTag);
+            }
+
+            // Salva os dados individualmente atrelados à Tag no Firestore
+            const tData = {
+              composicao: composicao || 'motor_elemento',
+              equipamento_nome: equipamento || '',
+              sap_number: sapNumber || '',
+              setor: setor || '',
+              area: area || ''
+            };
+            try {
+              await db.collection("inspectcbm_tags").doc(cleanTag).set(tData, { merge: true });
+              cloudTagRegistry[cleanTag] = { ...cloudTagRegistry[cleanTag], ...tData };
+              importedCount++;
+            } catch (err) {
+              console.error("Erro ao salvar item importado na nuvem:", err);
+            }
+          }
+        }
+
+        localStorage.setItem('inspectcbm_rotas', JSON.stringify(defaultRotas));
+        localStorage.setItem('inspectcbm_tag_map', JSON.stringify(defaultTagMap));
+
+        loadSavedRotas();
+        populateFilters();
+        alert(`Importação concluída! ${importedCount} registros por Tag processados e salvos na nuvem com sucesso.`);
+        document.getElementById('excel_file_input').value = "";
+        onRotaChange(document.getElementById('rota_select').value);
+      };
+      reader.readAsText(file, 'UTF-8');
+    }
+
+    function onComposicaoChange(val) {
+      const elElem = document.getElementById('fields_elemento');
+      const elRed = document.getElementById('fields_redutor');
+      const elBomba = document.getElementById('fields_bomba');
+      const elMancal = document.getElementById('fields_mancal');
+      const titulo2 = document.getElementById('titulo_segundo_componente');
+      const tempLabel = document.getElementById('lbl_temp_comp2');
+
+      elElem.classList.add('hidden');
+      elRed.classList.add('hidden');
+      elBomba.classList.add('hidden');
+      elMancal.classList.add('hidden');
+
+      if (val === 'motor_redutor') {
+        elRed.classList.remove('hidden');
+        titulo2.innerHTML = `<i class="fa-solid fa-gear mr-1.5"></i> Componente 2: Redutor de Velocidade`;
+        tempLabel.textContent = `Componente 2 (Redutor)`;
+      } else if (val === 'motor_bomba') {
+        elBomba.classList.remove('hidden');
+        titulo2.innerHTML = `<i class="fa-solid fa-water mr-1.5"></i> Componente 2: Bomba Hidráulica`;
+        tempLabel.textContent = `Componente 2 (Bomba)`;
+      } else if (val === 'motor_mancal') {
+        elMancal.classList.remove('hidden');
+        titulo2.innerHTML = `<i class="fa-solid fa-circle-dot mr-1.5"></i> Componente 2: Mancal / Rolamento`;
+        tempLabel.textContent = `Componente 2 (Mancal)`;
+      } else {
+        elElem.classList.remove('hidden');
+        titulo2.innerHTML = `<i class="fa-solid fa-fan mr-1.5"></i> Componente 2: Elemento / Rotor`;
+        tempLabel.textContent = `Componente 2 (Elemento)`;
+      }
+      updateFullTagPreview();
+    }
+
+    function promptAddCustomComponentType() {
+      const name = prompt("Digite o nome do novo componente para o conjunto:");
+      if (!name) return;
+      const key = 'motor_' + name.toLowerCase().replace(/\s+/g, '_');
+      const select = document.getElementById('composicao_conjunto_select');
+      const opt = document.createElement('option');
+      opt.value = key;
+      opt.textContent = `Motor + ${name}`;
+      select.appendChild(opt);
+      select.value = key;
+      onComposicaoChange(key);
     }
 
     function toggleNokObs(prefix, isNok) {
@@ -615,11 +984,36 @@
       if(!file) return;
       const reader = new FileReader();
       reader.onload = function(event) {
-        currentPhotoBase64 = event.target.result;
-        document.getElementById('eq_photo_preview').src = currentPhotoBase64;
-        document.getElementById('eq_photo_preview').classList.remove('hidden');
-        document.getElementById('photo-placeholder-icon').classList.add('hidden');
-        document.getElementById('btn-remove-photo').classList.remove('hidden');
+        const img = new Image();
+        img.onload = function() {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          const maxDim = 800; 
+          
+          if (width > height) {
+            if (width > maxDim) {
+              height = Math.round((height *= maxDim / width));
+              width = maxDim;
+            }
+          } else {
+            if (height > maxDim) {
+              width = Math.round((width *= maxDim / height));
+              height = maxDim;
+            }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          currentPhotoBase64 = canvas.toDataURL('image/jpeg', 0.75);
+          document.getElementById('eq_photo_preview').src = currentPhotoBase64;
+          document.getElementById('eq_photo_preview').classList.remove('hidden');
+          document.getElementById('photo-placeholder-icon').classList.add('hidden');
+          document.getElementById('btn-remove-photo').classList.remove('hidden');
+        };
+        img.src = event.target.result;
       };
       reader.readAsDataURL(file);
     }
@@ -629,7 +1023,7 @@
       document.getElementById('eq_photo_input').value = "";
       document.getElementById('eq_photo_preview').src = "";
       document.getElementById('eq_photo_preview').classList.add('hidden');
-      document.getElementById('photo-placeholder-icon').classList.remove('hidden');
+      document.getElementById('photo-placeholder-icon').classList.add('hidden');
       document.getElementById('btn-remove-photo').classList.add('hidden');
     }
 
@@ -657,7 +1051,6 @@
       });
     }
 
-    // MODAL ROTAS
     function manageRotasModal() {
       document.getElementById('modal-rotas').classList.remove('hidden');
       renderRotasList();
@@ -687,9 +1080,7 @@
         localStorage.setItem('inspectcbm_tag_map', JSON.stringify(defaultTagMap));
         document.getElementById('nova_rota_input').value = '';
         renderRotasList();
-      } else {
-        alert("Esta rota já existe.");
-      }
+      } else { alert("Esta rota já existe."); }
     }
     function removeRota(index) {
       if(defaultRotas.length <= 1) { alert("Deve manter pelo menos uma rota."); return; }
@@ -701,7 +1092,6 @@
       renderRotasList();
     }
 
-    // MODAL TAGS
     function manageTagsModal() {
       document.getElementById('modal-tags').classList.remove('hidden');
       const modalRotaSelect = document.getElementById('modal_tag_rota_select');
@@ -741,9 +1131,7 @@
         localStorage.setItem('inspectcbm_tag_map', JSON.stringify(defaultTagMap));
         document.getElementById('nova_tag_input').value = '';
         renderTagsList();
-      } else {
-        alert("Esta tag já está cadastrada nesta rota.");
-      }
+      } else { alert("Esta tag já está cadastrada nesta rota."); }
     }
     function removeTag(rota, index) {
       defaultTagMap[rota].splice(index, 1);
@@ -751,7 +1139,6 @@
       renderTagsList();
     }
 
-    // MODAL INSPETORES
     function manageInspetoresModal() {
       document.getElementById('modal-inspetores').classList.remove('hidden');
       renderInspetoresList();
@@ -761,7 +1148,7 @@
       loadSavedInspetores();
     }
     function renderInspetoresList() {
-      const container = document.getElementById('lista-inspetores-cadastrados');
+      const container = document.getElementById('lista-inspetores-cadastradas');
       container.innerHTML = '';
       defaultInspetores.forEach((insp, index) => {
         const div = document.createElement('div');
@@ -778,9 +1165,7 @@
         localStorage.setItem('inspectcbm_inspetores', JSON.stringify(defaultInspetores));
         document.getElementById('novo_inspetor_input').value = '';
         renderInspetoresList();
-      } else {
-        alert("Este inspetor já está cadastrado.");
-      }
+      } else { alert("Este inspetor já está cadastrado."); }
     }
     function removeInspetor(index) {
       if(defaultInspetores.length <= 1) { alert("Deve manter pelo menos um inspetor."); return; }
@@ -799,18 +1184,18 @@
         opt.textContent = t;
         tagSelect.appendChild(opt);
       });
-      if(tags.length > 0) { tagSelect.value = tags[0]; handleTagSelection(tags[0]); }
+      if(tags.length > 0) { 
+        tagSelect.value = tags[0]; 
+        handleTagSelection(tags[0]); 
+      } else {
+        clearTagFields();
+        removePhoto();
+      }
     }
 
     function handleTagSelection(tag) {
-      updateComponentOptions(tag);
-      loadEquipmentDataForTag(tag);
-    }
-
-    function updateComponentOptions(tag) {
-      const compSelect = document.getElementById('componente_select');
-      compSelect.innerHTML = '<option value="Motor">Motor (-MT)</option><option value="Elemento">Elemento (-ELEM)</option>';
       updateFullTagPreview();
+      loadTagData(tag);
     }
 
     function getBaseTag() {
@@ -820,69 +1205,160 @@
     function getFullTag() {
       const base = getBaseTag();
       if(!base) return '';
-      const comp = document.getElementById('componente_select').value;
-      const suffix = comp === 'Motor' ? 'MT' : 'ELEM';
-      return `${base} - ${suffix}`;
+      const compText = document.getElementById('composicao_conjunto_select').selectedOptions[0]?.text || '';
+      return `${base} (${compText})`;
     }
 
     function updateFullTagPreview() {
       document.getElementById('lbl_tag_final').textContent = getFullTag() || 'SELECIONE UMA TAG...';
     }
 
-    // CARREGAR DADOS VINCULADOS À TAG DA NUVEM
-    function loadEquipmentDataForTag(tag) {
+    function loadTagData(tag) {
       if(!tag) return;
-      const badge = document.getElementById('auto-fill-badge');
-      const eq = cloudEquipmentRegistry[tag];
+      document.getElementById('tag-mechanic-badge-label').textContent = `(Tag: ${tag})`;
+      const badge = document.getElementById('auto-fill-route-badge');
+      const tData = cloudTagRegistry[tag];
       
-      if(eq) {
-        document.getElementById('sap_number').value = eq.sap_number || '';
-        document.getElementById('equipamento_nome').value = eq.equipamento_nome || '';
-        document.getElementById('setor').value = eq.setor || '';
-        document.getElementById('area').value = eq.area || '';
-        document.getElementById('rotacao_rpm').value = eq.rotacao_rpm || '';
-        document.getElementById('rolamento_la').value = eq.rolamento_la || '';
-        document.getElementById('rolamento_loa').value = eq.rolamento_loa || '';
-        document.getElementById('potencia').value = eq.potencia || '';
+      if(tData) {
+        document.getElementById('equipamento_nome').value = tData.equipamento_nome || '';
+        document.getElementById('sap_number').value = tData.sap_number || '';
+        document.getElementById('setor').value = tData.setor || '';
+        document.getElementById('area').value = tData.area || '';
+
+        document.getElementById('rotacao_rpm').value = tData.rotacao_rpm || '';
+        document.getElementById('rolamento_la').value = tData.rolamento_la || '';
+        document.getElementById('rolamento_loa').value = tData.rolamento_loa || '';
+        document.getElementById('potencia').value = tData.potencia || '';
+        
+        if (tData.composicao) {
+          document.getElementById('composicao_conjunto_select').value = tData.composicao;
+          onComposicaoChange(tData.composicao);
+        }
+
+        if (tData.comp2) {
+          const c = tData.comp2;
+          document.getElementById('elem_marca').value = c.elem_marca || '';
+          document.getElementById('elem_modelo').value = c.elem_modelo || '';
+          document.getElementById('elem_rotacao').value = c.elem_rotacao || '';
+          document.getElementById('elem_rol1').value = c.elem_rol1 || '';
+          document.getElementById('elem_rol2').value = c.elem_rol2 || '';
+          document.getElementById('elem_rol3').value = c.elem_rol3 || '';
+          document.getElementById('elem_rol4').value = c.elem_rol4 || '';
+
+          document.getElementById('red_marca').value = c.red_marca || '';
+          document.getElementById('red_modelo').value = c.red_modelo || '';
+          document.getElementById('red_rotacao').value = c.red_rotacao || '';
+          document.getElementById('red_relacao').value = c.red_relacao || '';
+          document.getElementById('red_rol1').value = c.red_rol1 || '';
+          document.getElementById('red_rol2').value = c.red_rol2 || '';
+          document.getElementById('red_rol3').value = c.red_rol3 || '';
+          document.getElementById('red_rol4').value = c.red_rol4 || '';
+
+          document.getElementById('bomba_marca').value = c.bomba_marca || '';
+          document.getElementById('bomba_modelo').value = c.bomba_modelo || '';
+          document.getElementById('bomba_rotacao').value = c.bomba_rotacao || '';
+          document.getElementById('bomba_rol1').value = c.bomba_rol1 || '';
+          document.getElementById('bomba_rol2').value = c.bomba_rol2 || '';
+
+          document.getElementById('mancal_modelo').value = c.mancal_modelo || '';
+          document.getElementById('mancal_rotacao').value = c.mancal_rotacao || '';
+          document.getElementById('mancal_rol1').value = c.mancal_rol1 || '';
+          document.getElementById('mancal_rol2').value = c.mancal_rol2 || '';
+        }
+
         badge.classList.remove('hidden');
+        if(tData.photo) {
+          currentPhotoBase64 = tData.photo;
+          document.getElementById('eq_photo_preview').src = currentPhotoBase64;
+          document.getElementById('eq_photo_preview').classList.remove('hidden');
+          document.getElementById('photo-placeholder-icon').classList.add('hidden');
+          document.getElementById('btn-remove-photo').classList.remove('hidden');
+        } else { removePhoto(); }
       } else {
-        document.getElementById('sap_number').value = '';
-        document.getElementById('equipamento_nome').value = '';
-        document.getElementById('setor').value = '';
-        document.getElementById('area').value = '';
-        document.getElementById('rotacao_rpm').value = '';
-        document.getElementById('rolamento_la').value = '';
-        document.getElementById('rolamento_loa').value = '';
-        document.getElementById('potencia').value = '';
+        clearTagFields();
+        removePhoto();
         badge.classList.add('hidden');
       }
     }
 
-    // SALVAR DADOS VINCULADOS À TAG NA NUVEM (FIRESTORE)
-    async function saveOnlyRegistration() {
-      const baseTag = getBaseTag();
-      if(!baseTag) { alert("Selecione a Tag base para salvar o cadastro."); return; }
+    function clearTagFields() {
+      document.getElementById('equipamento_nome').value = '';
+      document.getElementById('sap_number').value = '';
+      document.getElementById('setor').value = '';
+      document.getElementById('area').value = '';
+      document.getElementById('rotacao_rpm').value = '';
+      document.getElementById('rolamento_la').value = '';
+      document.getElementById('rolamento_loa').value = '';
+      document.getElementById('potencia').value = '';
+      document.getElementById('tag-mechanic-badge-label').textContent = '';
+      document.getElementById('auto-fill-route-badge').classList.add('hidden');
+    }
+
+    async function saveOnlyTagRegistration() {
+      const tag = getBaseTag();
+      if(!tag) { alert("Selecione a Tag base para salvar."); return; }
       
-      const eqData = {
-        sap_number: document.getElementById('sap_number').value,
+      const composicao = document.getElementById('composicao_conjunto_select').value;
+      const tData = {
         equipamento_nome: document.getElementById('equipamento_nome').value,
+        sap_number: document.getElementById('sap_number').value,
         setor: document.getElementById('setor').value,
         area: document.getElementById('area').value,
         rotacao_rpm: document.getElementById('rotacao_rpm').value,
         rolamento_la: document.getElementById('rolamento_la').value,
         rolamento_loa: document.getElementById('rolamento_loa').value,
-        potencia: document.getElementById('potencia').value
+        potencia: document.getElementById('potencia').value,
+        composicao: composicao,
+        comp2: {
+          elem_marca: document.getElementById('elem_marca').value,
+          elem_modelo: document.getElementById('elem_modelo').value,
+          elem_rotacao: document.getElementById('elem_rotacao').value,
+          elem_rol1: document.getElementById('elem_rol1').value,
+          elem_rol2: document.getElementById('elem_rol2').value,
+          elem_rol3: document.getElementById('elem_rol3').value,
+          elem_rol4: document.getElementById('elem_rol4').value,
+
+          red_marca: document.getElementById('red_marca').value,
+          red_modelo: document.getElementById('red_modelo').value,
+          red_rotacao: document.getElementById('red_rotacao').value,
+          red_relacao: document.getElementById('red_relacao').value,
+          red_rol1: document.getElementById('red_rol1').value,
+          red_rol2: document.getElementById('red_rol2').value,
+          red_rol3: document.getElementById('red_rol3').value,
+          red_rol4: document.getElementById('red_rol4').value,
+
+          bomba_marca: document.getElementById('bomba_marca').value,
+          bomba_modelo: document.getElementById('bomba_modelo').value,
+          bomba_rotacao: document.getElementById('bomba_rotacao').value,
+          bomba_rol1: document.getElementById('bomba_rol1').value,
+          bomba_rol2: document.getElementById('bomba_rol2').value,
+
+          mancal_modelo: document.getElementById('mancal_modelo').value,
+          mancal_rotacao: document.getElementById('mancal_rotacao').value,
+          mancal_rol1: document.getElementById('mancal_rol1').value,
+          mancal_rol2: document.getElementById('mancal_rol2').value
+        },
+        photo: currentPhotoBase64
       };
 
       try {
-        // Salva na coleção 'inspectcbm_equipment' usando a Tag como ID do documento
-        await db.collection("inspectcbm_equipment").doc(baseTag).set(eqData);
-        cloudEquipmentRegistry[baseTag] = eqData;
-        alert(`Dados cadastrais da Tag ${baseTag} salvos na nuvem com sucesso! Agora eles aparecerão no celular.`);
-        document.getElementById('auto-fill-badge').classList.remove('hidden');
-      } catch (err) {
-        alert("Erro ao salvar cadastro na nuvem: " + err.message);
-      }
+        await db.collection("inspectcbm_tags").doc(tag).set(tData, { merge: true });
+        cloudTagRegistry[tag] = { ...cloudTagRegistry[tag], ...tData };
+        alert(`Dados individuais, parâmetros e foto da Tag "${tag}" salvos na nuvem com sucesso!`);
+        document.getElementById('auto-fill-route-badge').classList.remove('hidden');
+      } catch (err) { alert("Erro ao salvar dados da tag na nuvem: " + err.message); }
+    }
+
+    async function saveOnlyTagPhoto() {
+      const tag = getBaseTag();
+      if(!tag) { alert("Selecione uma Tag primeiro para salvar a foto."); return; }
+      if(!currentPhotoBase64) { alert("Por favor, tire ou selecione uma foto antes de salvar."); return; }
+      try {
+        await db.collection("inspectcbm_tags").doc(tag).set({ photo: currentPhotoBase64 }, { merge: true });
+        if(!cloudTagRegistry[tag]) cloudTagRegistry[tag] = {};
+        cloudTagRegistry[tag].photo = currentPhotoBase64;
+        alert(`Foto do equipamento da Tag "${tag}" salva com sucesso na nuvem!`);
+      } catch (err) { alert("Erro ao salvar a foto na nuvem: " + err.message); }
     }
 
     function getRadioValue(name) {
@@ -892,30 +1368,35 @@
 
     async function saveInspection(e) {
       e.preventDefault();
-      const fullTag = getFullTag();
       const baseTag = getBaseTag();
-      if(!fullTag) { alert("Selecione a Tag."); return; }
-
-      // Salva o cadastro na nuvem automaticamente ao salvar a inspeção
-      await saveOnlyRegistration();
-
+      if(!baseTag) { alert("Selecione a Tag do Equipamento."); return; }
+      
+      await saveOnlyTagRegistration();
+      
       const record = {
         id: Date.now(),
         data_coleta: document.getElementById('data_coleta').value,
-        tag: fullTag,
+        tag: getFullTag(),
         baseTag: baseTag,
         rota: document.getElementById('rota_select').value,
-        componente: document.getElementById('componente_select').value,
-        sap_number: document.getElementById('sap_number').value || '-',
+        componente: document.getElementById('composicao_conjunto_select').selectedOptions[0]?.text || 'Conjunto',
         equipamento_nome: document.getElementById('equipamento_nome').value || '-',
+        sap_number: document.getElementById('sap_number').value || '-',
+        setor: document.getElementById('setor').value || '-',
+        area: document.getElementById('area').value || '-',
         inspetor: document.getElementById('inspetor_select').value,
+        
         status_operacao: document.getElementById('status_operacao').value,
         carga_pressao_str: `${document.getElementById('carga_valor').value || 0} ${document.getElementById('carga_unidade').value}`,
+        
         rpm_real_strobo: document.getElementById('rpm_real_strobo').value || '-',
         acoplamento_status: document.getElementById('acoplamento_status').value,
         strobo_obs: document.getElementById('strobo_obs').value || '-',
+        
         temp_la: parseFloat(document.getElementById('temp_la').value) || null,
         temp_loa: parseFloat(document.getElementById('temp_loa').value) || null,
+        temp_c2_p1: parseFloat(document.getElementById('temp_c2_p1').value) || null,
+        temp_c2_p2: parseFloat(document.getElementById('temp_c2_p2').value) || null,
         temp_obs: document.getElementById('temp_obs').value || '-',
         
         ruido_status: getRadioValue('ruido_status'),
@@ -934,7 +1415,6 @@
         vibracao_obs: document.getElementById('vibracao_obs').value || '',
         refrigeracao_status: getRadioValue('refrigeracao_status'),
         refrigeracao_obs: document.getElementById('refrigeracao_obs').value || '',
-
         observacoes: document.getElementById('observacoes').value || '-',
         photo: currentPhotoBase64
       };
@@ -942,11 +1422,8 @@
       try {
         await db.collection("inspectcbm_records").add(record);
         alert("Inspeção salva com sucesso na nuvem!");
-        removePhoto();
         switchTab('dashboard');
-      } catch (err) {
-        alert("Erro ao salvar: " + err.message);
-      }
+      } catch (err) { alert("Erro ao salvar: " + err.message); }
     }
 
     function populateFilters() {
@@ -955,12 +1432,23 @@
       filterRota.innerHTML = '<option value="TODAS_ROTAS">-- Todas as Rotas --</option>';
       defaultRotas.forEach(r => {
         const opt = document.createElement('option');
-        opt.value = r;
-        opt.textContent = r;
+        opt.value = r; opt.textContent = r;
         filterRota.appendChild(opt);
       });
       filterRota.value = defaultRotas.includes(currentRota) ? currentRota : 'TODAS_ROTAS';
+      
       populateTagFilter();
+      populateDateFilterSelect();
+
+      const relFilterRota = document.getElementById('rel_filter_rota');
+      const currentRelRota = relFilterRota.value;
+      relFilterRota.innerHTML = '<option value="TODAS_ROTAS">-- Todas as Rotas --</option>';
+      defaultRotas.forEach(r => {
+        const opt = document.createElement('option');
+        opt.value = r; opt.textContent = r;
+        relFilterRota.appendChild(opt);
+      });
+      relFilterRota.value = defaultRotas.includes(currentRelRota) ? currentRelRota : 'TODAS_ROTAS';
     }
 
     function populateTagFilter() {
@@ -969,49 +1457,86 @@
       const currentVal = filterSelect.value;
       
       let relevantRecords = cloudRecords;
-      if(filterRota !== 'TODAS_ROTAS') {
-        relevantRecords = cloudRecords.filter(r => r.rota === filterRota);
-      }
-
-      const tags = [...new Set(relevantRecords.map(r => r.tag))];
+      if(filterRota !== 'TODAS_ROTAS') relevantRecords = cloudRecords.filter(r => r.rota === filterRota);
+      
+      const tags = [...new Set(relevantRecords.map(r => r.baseTag || r.tag))];
       filterSelect.innerHTML = '<option value="TODAS">-- Todas as Tags --</option>';
       tags.forEach(t => {
         const opt = document.createElement('option');
-        opt.value = t;
-        opt.textContent = t;
+        opt.value = t; opt.textContent = t;
         filterSelect.appendChild(opt);
       });
       filterSelect.value = tags.includes(currentVal) ? currentVal : 'TODAS';
     }
 
-    function onFilterRotaChange() {
-      populateTagFilter();
-      renderDashboard();
+    function populateDateFilterSelect() {
+      const filterRota = document.getElementById('filter_rota').value;
+      const dateSelect = document.getElementById('filter_date_select');
+      const currentVal = dateSelect.value;
+
+      let relevantRecords = cloudRecords;
+      if(filterRota !== 'TODAS_ROTAS') relevantRecords = cloudRecords.filter(r => r.rota === filterRota);
+
+      const datesSet = new Set();
+      relevantRecords.forEach(r => {
+        if(r.data_coleta) {
+          datesSet.add(r.data_coleta.slice(0, 10));
+        }
+      });
+
+      const sortedDates = Array.from(datesSet).sort().reverse();
+
+      dateSelect.innerHTML = '<option value="TODAS_DATAS">-- Todas as Datas --</option>';
+      sortedDates.forEach(d => {
+        const parts = d.split('-');
+        const fmtDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
+        const opt = document.createElement('option');
+        opt.value = d; 
+        opt.textContent = fmtDate;
+        dateSelect.appendChild(opt);
+      });
+
+      dateSelect.value = sortedDates.includes(currentVal) ? currentVal : 'TODAS_DATAS';
     }
 
-    function clearDateFilter() {
-      document.getElementById('filter_date').value = '';
-      renderDashboard();
+    function onFilterRotaChange() { 
+      populateTagFilter(); 
+      populateDateFilterSelect();
+      renderDashboard(); 
+    }
+
+    function onRelFilterRotaChange() { renderRelatorioTab(); }
+
+    function clearDateFilter() { 
+      document.getElementById('filter_date_select').value = 'TODAS_DATAS';
+      document.getElementById('filter_date_start').value = ''; 
+      document.getElementById('filter_date_end').value = ''; 
+      renderDashboard(); 
     }
 
     let chartInstance = null;
     function renderDashboard() {
       const filterRota = document.getElementById('filter_rota').value;
       const filterTag = document.getElementById('filter_tag').value;
-      const filterDate = document.getElementById('filter_date').value;
+      const filterDateSelect = document.getElementById('filter_date_select').value;
+      const dateStart = document.getElementById('filter_date_start').value;
+      const dateEnd = document.getElementById('filter_date_end').value;
       
       let filtered = cloudRecords;
-      
       if (filterRota !== 'TODAS_ROTAS') filtered = filtered.filter(r => r.rota === filterRota);
-      if (filterTag !== 'TODAS') filtered = filtered.filter(r => r.tag === filterTag);
-      if (filterDate) filtered = filtered.filter(r => r.data_coleta.startsWith(filterDate));
-
-      if (filterTag !== 'TODAS') {
-        document.getElementById('chart-title-tag').textContent = `(Ativo: ${filterTag})`;
-      } else if (filterRota !== 'TODAS_ROTAS') {
-        document.getElementById('chart-title-tag').textContent = `(Rota: ${filterRota})`;
-      } else {
-        document.getElementById('chart-title-tag').textContent = '(Geral)';
+      if (filterTag !== 'TODAS') filtered = filtered.filter(r => (r.baseTag === filterTag || r.tag.includes(filterTag)));
+      
+      if (dateStart && dateEnd) {
+        filtered = filtered.filter(r => {
+          const rDate = r.data_coleta.slice(0, 10);
+          return rDate >= dateStart && rDate <= dateEnd;
+        });
+      } else if (dateStart) {
+        filtered = filtered.filter(r => r.data_coleta.slice(0, 10) >= dateStart);
+      } else if (dateEnd) {
+        filtered = filtered.filter(r => r.data_coleta.slice(0, 10) <= dateEnd);
+      } else if (filterDateSelect !== 'TODAS_DATAS') {
+        filtered = filtered.filter(r => r.data_coleta.startsWith(filterDateSelect));
       }
       
       document.getElementById('record-count').textContent = `${filtered.length} registro(s)`;
@@ -1026,15 +1551,7 @@
           if(r.observacoes && r.observacoes !== '-') allObs.push(`Geral: ${r.observacoes}`);
           if(r.strobo_obs && r.strobo_obs !== '-') allObs.push(`Strobo: ${r.strobo_obs}`);
           if(r.temp_obs && r.temp_obs !== '-') allObs.push(`Temp: ${r.temp_obs}`);
-          if(r.ruido_obs) allObs.push(`Ruído: ${r.ruido_obs}`);
-          if(r.limpeza_obs) allObs.push(`Limpeza: ${r.limpeza_obs}`);
-          if(r.oleo_obs) allObs.push(`Óleo: ${r.oleo_obs}`);
-          if(r.vazamento_obs) allObs.push(`Vazamento: ${r.vazamento_obs}`);
-          if(r.fixacao_obs) allObs.push(`Fixação: ${r.fixacao_obs}`);
-          if(r.protecao_obs) allObs.push(`NR-12: ${r.protecao_obs}`);
-          if(r.vibracao_obs) allObs.push(`Vib. Tátil: ${r.vibracao_obs}`);
-          if(r.refrigeracao_obs) allObs.push(`Refrig: ${r.refrigeracao_obs}`);
-
+          
           const tr = document.createElement('tr');
           tr.className = "hover:bg-slate-800/50 transition";
           tr.innerHTML = `
@@ -1046,9 +1563,12 @@
               <span class="font-bold text-amber-400 font-mono">${r.tag}</span><br>
               <span class="text-[10px] text-slate-400">Rota: ${r.rota || '-'}</span>
             </td>
-            <td class="p-3 text-[11px]"><b>${r.componente}</b><br>SAP: ${r.sap_number}</td>
+            <td class="p-3 text-[11px]"><b>${r.componente || 'Conjunto'}</b><br>Equip: ${r.equipamento_nome} ${r.sap_number && r.sap_number !== '-' ? '(SAP: ' + r.sap_number + ')' : ''}<br>Setor: ${r.setor}</td>
             <td class="p-3 text-[11px]">${r.status_operacao} (${r.carga_pressao_str})<br>Strobo: <b>${r.rpm_real_strobo} RPM</b></td>
-            <td class="p-3 text-[11px] text-rose-400">LA: ${r.temp_la || '-'}°C<br>LOA: ${r.temp_loa || '-'}°C</td>
+            <td class="p-3 text-[11px] text-rose-400">
+              Motor LA/LOA: ${r.temp_la || '-'}/${r.temp_loa || '-'}°C<br>
+              Comp.2 P1/P2: ${r.temp_c2_p1 || '-'}/${r.temp_c2_p2 || '-'}°C
+            </td>
             <td class="p-3 text-[11px]">
               <span class="font-bold text-slate-200">${r.inspetor}</span>
               ${allObs.length > 0 ? `<div class="text-amber-300/90 text-[10px] mt-1 bg-slate-900/80 p-1.5 rounded border border-slate-700">${allObs.join('<br>')}</div>` : '<div class="text-slate-500 text-[10px]">Sem obs.</div>'}
@@ -1063,6 +1583,265 @@
       renderChart(filtered);
     }
 
+    function updateRelMedidoStatus(baseTag, isMedido) {
+      if (!relatorioAnalysisState[baseTag]) {
+        relatorioAnalysisState[baseTag] = { isMedido: isMedido, statusVal: 'Seguro', problema: '', recomendacao: '' };
+      } else {
+        relatorioAnalysisState[baseTag].isMedido = isMedido;
+      }
+      renderRelatorioTab();
+    }
+
+    function updateRelAnalysisField(baseTag, field, value) {
+      if (!relatorioAnalysisState[baseTag]) {
+        relatorioAnalysisState[baseTag] = { isMedido: true, statusVal: 'Seguro', problema: '', recomendacao: '' };
+      }
+      relatorioAnalysisState[baseTag][field] = value;
+      if (field === 'statusVal') {
+        const sel = document.getElementById(`rel_status_select_${baseTag}`);
+        if (sel) sel.className = `w-full border rounded px-2 py-1 text-xs font-bold focus:outline-none ${getStatusBgColor(value)}`;
+      }
+    }
+
+    function getStatusBgColor(status) {
+      switch(status) {
+        case 'Seguro': return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40';
+        case 'Alarme A1': return 'bg-amber-500/20 text-amber-400 border-amber-500/40';
+        case 'Alarme A2': return 'bg-orange-500/20 text-orange-400 border-orange-500/40';
+        case 'Perigo P1': return 'bg-rose-600/30 text-rose-400 border-rose-500/50';
+        case 'Perigo P2': return 'bg-purple-600/30 text-purple-300 border-purple-500/50';
+        default: return 'bg-slate-700 text-white border-slate-600';
+      }
+    }
+
+    function clearTechnicalAnalysisState() {
+      if (!confirm("Deseja realmente limpar todos os campos da análise preenchidos nesta tela?")) return;
+      relatorioAnalysisState = {};
+      localStorage.removeItem('inspectcbm_rel_state');
+      renderRelatorioTab();
+    }
+
+    async function saveTechnicalAnalysisState() {
+      const rota = document.getElementById('rel_filter_rota').value;
+      const dataColeta = document.getElementById('rel_data_coleta').value;
+      const dataAnalise = document.getElementById('rel_data_analise').value;
+
+      const laudoObj = {
+        id: Date.now(),
+        rota: rota,
+        dataColeta: dataColeta,
+        dataAnalise: dataAnalise,
+        state: JSON.parse(JSON.stringify(relatorioAnalysisState))
+      };
+
+      try {
+        await db.collection("inspectcbm_laudos").add(laudoObj);
+      } catch (err) {
+        console.warn("Erro ao salvar no Firestore, salvando apenas localmente...", err);
+      }
+
+      let savedLaudos = JSON.parse(localStorage.getItem('inspectcbm_saved_laudos')) || [];
+      savedLaudos.unshift(laudoObj);
+      localStorage.setItem('inspectcbm_saved_laudos', JSON.stringify(savedLaudos));
+
+      alert("Análise técnica salva com sucesso no histórico!");
+      fetchSavedLaudosHistory();
+
+      relatorioAnalysisState = {};
+      localStorage.removeItem('inspectcbm_rel_state');
+      renderRelatorioTab();
+    }
+
+    function fetchSavedLaudosHistory() {
+      const container = document.getElementById('saved-laudos-list');
+      let savedLaudos = JSON.parse(localStorage.getItem('inspectcbm_saved_laudos')) || [];
+
+      if (savedLaudos.length === 0) {
+        container.innerHTML = `<p class="text-xs text-slate-500">Nenhum laudo salvo no histórico ainda.</p>`;
+        return;
+      }
+
+      container.innerHTML = '';
+      savedLaudos.forEach((laudo, idx) => {
+        const div = document.createElement('div');
+        div.className = "flex justify-between items-center bg-slate-900 p-3 rounded-lg border border-slate-700 text-xs";
+        div.innerHTML = `
+          <div>
+            <span class="font-bold text-amber-400">Rota: ${laudo.rota}</span> | 
+            <span class="text-slate-300">Coleta: ${laudo.dataColeta || '-'}</span> | 
+            <span class="text-slate-300">Análise: ${laudo.dataAnalise || '-'}</span>
+          </div>
+          <div class="flex space-x-2">
+            <button onclick="loadSavedLaudo(${idx})" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold px-2.5 py-1 rounded transition flex items-center"><i class="fa-solid fa-arrow-rotate-left mr-1"></i> Carregar</button>
+            <button onclick="generatePDFFromSavedLaudo(${idx})" class="bg-rose-600 hover:bg-rose-500 text-white font-semibold px-2.5 py-1 rounded transition flex items-center shadow"><i class="fa-solid fa-file-pdf mr-1"></i> Gerar PDF</button>
+            <button onclick="deleteSavedLaudo(${idx})" class="text-rose-400 hover:text-rose-300 px-2 py-1 transition" title="Excluir"><i class="fa-solid fa-trash-can"></i></button>
+          </div>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function loadSavedLaudo(idx) {
+      let savedLaudos = JSON.parse(localStorage.getItem('inspectcbm_saved_laudos')) || [];
+      if(!savedLaudos[idx]) return;
+      const laudo = savedLaudos[idx];
+      
+      document.getElementById('rel_filter_rota').value = laudo.rota || 'TODAS_ROTAS';
+      if(laudo.dataColeta) document.getElementById('rel_data_coleta').value = laudo.dataColeta;
+      if(laudo.dataAnalise) document.getElementById('rel_data_analise').value = laudo.dataAnalise;
+
+      relatorioAnalysisState = laudo.state || {};
+      localStorage.setItem('inspectcbm_rel_state', JSON.stringify(relatorioAnalysisState));
+      renderRelatorioTab();
+      alert("Laudo carregado com sucesso!");
+    }
+
+    async function generatePDFFromSavedLaudo(idx) {
+      let savedLaudos = JSON.parse(localStorage.getItem('inspectcbm_saved_laudos')) || [];
+      if(!savedLaudos[idx]) return;
+      const laudo = savedLaudos[idx];
+
+      const previousState = JSON.parse(JSON.stringify(relatorioAnalysisState));
+      const previousRota = document.getElementById('rel_filter_rota').value;
+      const previousDataColeta = document.getElementById('rel_data_coleta').value;
+      const previousDataAnalise = document.getElementById('rel_data_analise').value;
+
+      document.getElementById('rel_filter_rota').value = laudo.rota || 'TODAS_ROTAS';
+      if(laudo.dataColeta) document.getElementById('rel_data_coleta').value = laudo.dataColeta;
+      if(laudo.dataAnalise) document.getElementById('rel_data_analise').value = laudo.dataAnalise;
+      relatorioAnalysisState = laudo.state || {};
+
+      await exportTechnicalPDF();
+
+      document.getElementById('rel_filter_rota').value = previousRota;
+      document.getElementById('rel_data_coleta').value = previousDataColeta;
+      document.getElementById('rel_data_analise').value = previousDataAnalise;
+      relatorioAnalysisState = previousState;
+      renderRelatorioTab();
+    }
+
+    function deleteSavedLaudo(idx) {
+      if(!confirm("Deseja excluir este laudo do histórico?")) return;
+      let savedLaudos = JSON.parse(localStorage.getItem('inspectcbm_saved_laudos')) || [];
+      savedLaudos.splice(idx, 1);
+      localStorage.setItem('inspectcbm_saved_laudos', JSON.stringify(savedLaudos));
+      fetchSavedLaudosHistory();
+    }
+
+    function renderRelatorioTab() {
+      const filterRota = document.getElementById('rel_filter_rota').value;
+      const filterStatus = document.getElementById('rel_filter_status').value;
+      const filterColetaDate = document.getElementById('rel_data_coleta').value;
+      
+      let rotasParaAnalisar = (filterRota === 'TODAS_ROTAS') ? defaultRotas : [filterRota];
+      let itemsToRender = [];
+
+      rotasParaAnalisar.forEach(rota => {
+        let tagsDaRota = defaultTagMap[rota] || [];
+        
+        tagsDaRota.forEach(baseTag => {
+          let lastRecord;
+          if (filterColetaDate) {
+            lastRecord = cloudRecords.find(r => (r.baseTag === baseTag || r.tag.startsWith(baseTag)) && r.data_coleta.startsWith(filterColetaDate));
+          } else {
+            lastRecord = cloudRecords.find(r => r.baseTag === baseTag || r.tag.startsWith(baseTag));
+          }
+          
+          if (!relatorioAnalysisState[baseTag]) {
+            relatorioAnalysisState[baseTag] = { isMedido: !!lastRecord, statusVal: 'Seguro', problema: '', recomendacao: '' };
+          }
+          let currentState = relatorioAnalysisState[baseTag];
+          if (filterStatus === 'MEDIDOS' && !currentState.isMedido) return;
+          if (filterStatus === 'NAO_MEDIDOS' && currentState.isMedido) return;
+
+          itemsToRender.push({
+            baseTag: baseTag,
+            rota: rota,
+            isMedido: currentState.isMedido,
+            statusVal: currentState.statusVal,
+            problema: currentState.problema,
+            recomendacao: currentState.recomendacao,
+            record: lastRecord
+          });
+        });
+      });
+
+      document.getElementById('rel-record-count').textContent = `${itemsToRender.length} equipamento(s)`;
+      const tbody = document.getElementById('rel-records-table-body');
+      tbody.innerHTML = '';
+      if (itemsToRender.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-slate-500">Nenhum equipamento encontrado com o filtro selecionado (verifique a data da coleta).</td></tr>`;
+        return;
+      }
+
+      itemsToRender.forEach(item => {
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-slate-800/50 transition border-b border-slate-700/40";
+        let tagData = cloudTagRegistry[item.baseTag] || {};
+        let r = item.record;
+        let photoSrc = r && r.photo ? r.photo : tagData.photo;
+        let statusBgClass = getStatusBgColor(item.statusVal);
+
+        tr.innerHTML = `
+          <td class="p-3">
+            <div class="mb-2">
+              <label class="block text-[10px] text-slate-400 font-bold mb-1">Status Coleta:</label>
+              <select onchange="updateRelMedidoStatus('${item.baseTag}', this.value === 'true')" class="w-full border rounded px-2 py-1 text-xs font-bold focus:outline-none ${item.isMedido ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40' : 'bg-rose-500/20 text-rose-400 border-rose-500/40'}">
+                <option value="true" ${item.isMedido ? 'selected' : ''}>✅ MEDIDO</option>
+                <option value="false" ${!item.isMedido ? 'selected' : ''}>❌ NÃO MEDIDO</option>
+              </select>
+            </div>
+            ${photoSrc ? `<img src="${photoSrc}" class="w-12 h-12 object-cover rounded border border-amber-500/30">` : '<span class="text-[10px] text-slate-500 block">Sem foto</span>'}
+          </td>
+          <td class="p-3">
+            <span class="font-bold text-amber-400 font-mono">${r ? r.tag : item.baseTag}</span><br>
+            <span class="text-[10px] text-slate-400">Rota: ${item.rota}</span>
+          </td>
+          <td class="p-3 text-[11px]">
+            <b>${r ? r.componente : 'Conjunto'}</b><br>
+            Equip: ${r ? r.equipamento_nome : (tagData.equipamento_nome || '-')} ${r && r.sap_number && r.sap_number !== '-' ? '(SAP: ' + r.sap_number + ')' : (tagData.sap_number ? '(SAP: ' + tagData.sap_number + ')' : '')}<br>
+            Setor: ${r ? r.setor : (tagData.setor || '-')}
+          </td>
+          <td class="p-3 text-[11px]">
+            ${item.isMedido && r ? `${r.status_operacao} (${r.carga_pressao_str})<br>Strobo: <b>${r.rpm_real_strobo} RPM</b>` : '<span class="text-slate-500">Pendente de Medição</span>'}
+          </td>
+          <td class="p-3 text-[11px] ${item.isMedido && r ? 'text-rose-400' : 'text-slate-500'}">
+            Motor: ${item.isMedido && r && r.temp_la ? `${r.temp_la}°C` : '-'}<br>
+            Comp. 2: ${item.isMedido && r && r.temp_c2_p1 ? `${r.temp_c2_p1}°C` : '-'}
+          </td>
+          <td class="p-3">
+            ${item.isMedido ? `
+              <div class="space-y-2 bg-slate-900/90 p-2.5 rounded-lg border border-slate-700">
+                <div>
+                  <label class="block text-[10px] text-slate-400 font-bold mb-1"><i class="fa-solid fa-triangle-exclamation mr-1"></i> STATUS DE SEVERIDADE:</label>
+                  <select id="rel_status_select_${item.baseTag}" onchange="updateRelAnalysisField('${item.baseTag}', 'statusVal', this.value)" class="w-full border rounded px-2 py-1 text-xs font-bold focus:outline-none ${statusBgClass}">
+                    <option value="Seguro" ${item.statusVal === 'Seguro' ? 'selected' : ''}>🟩 Seguro</option>
+                    <option value="Alarme A1" ${item.statusVal === 'Alarme A1' ? 'selected' : ''}>🟨 Alarme A1</option>
+                    <option value="Alarme A2" ${item.statusVal === 'Alarme A2' ? 'selected' : ''}>🟧 Alarme A2</option>
+                    <option value="Perigo P1" ${item.statusVal === 'Perigo P1' ? 'selected' : ''}>🟥 Perigo P1</option>
+                    <option value="Perigo P2" ${item.statusVal === 'Perigo P2' ? 'selected' : ''}>🟣 Perigo P2</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-[10px] text-slate-400 font-bold mb-0.5">PROBLEMA ENCONTRADO:</label>
+                  <input type="text" value="${item.problema}" oninput="updateRelAnalysisField('${item.baseTag}', 'problema', this.value)" placeholder="Descreva o problema/diagnóstico..." class="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-amber-300 focus:outline-none focus:border-amber-500">
+                </div>
+                <div>
+                  <label class="block text-[10px] text-slate-400 font-bold mb-0.5">RECOMENDAÇÃO TÉCNICA:</label>
+                  <input type="text" value="${item.recomendacao}" oninput="updateRelAnalysisField('${item.baseTag}', 'recomendacao', this.value)" placeholder="Descreva a ação/recomendação..." class="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-emerald-300 focus:outline-none focus:border-emerald-500">
+                </div>
+              </div>
+            ` : `
+              <div class="text-slate-500 text-xs italic bg-slate-900/40 p-2 rounded border border-slate-800">
+                Equipamento marcado como não medido.
+              </div>
+            `}
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
     async function deleteCloudRecord(docId) {
       if(confirm('Excluir este registro?')) {
         await db.collection("inspectcbm_records").doc(docId).delete();
@@ -1073,21 +1852,19 @@
     function renderChart(data) {
       const ctx = document.getElementById('tempChart').getContext('2d');
       if(chartInstance) chartInstance.destroy();
-
       if(!data || data.length === 0) return;
-
       const sorted = [...data].reverse();
-      const labels = sorted.map(r => `${new Date(r.data_coleta).toLocaleString('pt-BR', {dateStyle:'short', timeStyle:'short'})} (${r.tag})`);
+      const labels = sorted.map(r => `${new Date(r.data_coleta).toLocaleString('pt-BR', {dateStyle:'short', timeStyle:'short'})} (${r.baseTag || r.tag})`);
       const tempDataLA = sorted.map(r => r.temp_la);
-      const tempDataLOA = sorted.map(r => r.temp_loa);
+      const tempDataComp2 = sorted.map(r => r.temp_c2_p1 || r.temp_loa);
 
       chartInstance = new Chart(ctx, {
         type: 'line',
         data: {
           labels: labels,
           datasets: [
-            { label: 'Temp. LA (°C)', data: tempDataLA, borderColor: '#f43f5e', backgroundColor: 'rgba(244, 63, 94, 0.1)', borderWidth: 2, tension: 0.3, fill: true },
-            { label: 'Temp. LOA (°C)', data: tempDataLOA, borderColor: '#38bdf8', backgroundColor: 'rgba(56, 189, 248, 0.1)', borderWidth: 2, tension: 0.3, fill: true }
+            { label: 'Temp. Motor (°C)', data: tempDataLA, borderColor: '#f43f5e', backgroundColor: 'rgba(244, 63, 94, 0.1)', borderWidth: 2, tension: 0.3, fill: true },
+            { label: 'Temp. Comp. 2 (°C)', data: tempDataComp2, borderColor: '#38bdf8', backgroundColor: 'rgba(56, 189, 248, 0.1)', borderWidth: 2, tension: 0.3, fill: true }
           ]
         },
         options: { 
@@ -1105,18 +1882,31 @@
     function exportCSV() {
       const filterRota = document.getElementById('filter_rota').value;
       const filterTag = document.getElementById('filter_tag').value;
-      const filterDate = document.getElementById('filter_date').value;
+      const filterDateSelect = document.getElementById('filter_date_select').value;
+      const dateStart = document.getElementById('filter_date_start').value;
+      const dateEnd = document.getElementById('filter_date_end').value;
       
       let filtered = cloudRecords;
       if (filterRota !== 'TODAS_ROTAS') filtered = filtered.filter(r => r.rota === filterRota);
-      if (filterTag !== 'TODAS') filtered = filtered.filter(r => r.tag === filterTag);
-      if (filterDate) filtered = filtered.filter(r => r.data_coleta.startsWith(filterDate));
+      if (filterTag !== 'TODAS') filtered = filtered.filter(r => r.baseTag === filterTag || r.tag.includes(filterTag));
+      if (dateStart && dateEnd) {
+        filtered = filtered.filter(r => {
+          const rDate = r.data_coleta.slice(0, 10);
+          return rDate >= dateStart && rDate <= dateEnd;
+        });
+      } else if (dateStart) {
+        filtered = filtered.filter(r => r.data_coleta.slice(0, 10) >= dateStart);
+      } else if (dateEnd) {
+        filtered = filtered.filter(r => r.data_coleta.slice(0, 10) <= dateEnd);
+      } else if (filterDateSelect !== 'TODAS_DATAS') {
+        filtered = filtered.filter(r => r.data_coleta.startsWith(filterDateSelect));
+      }
 
       if(filtered.length === 0) { alert('Sem dados para exportar com este filtro.'); return; }
       
-      let csv = 'Data;Rota;Tag;Componente;SAP;Equipamento;Inspetor;Temp_LA;Temp_LOA;Operacao;Observacoes\n';
+      let csv = 'Data;Rota;Tag;SAP_Number;Componente;Equipamento;Setor;Area;Inspetor;Temp_Motor_LA;Temp_Comp2_P1;Operacao;Observacoes\n';
       filtered.forEach(r => {
-        csv += `"${r.data_coleta}";"${r.rota}";"${r.tag}";"${r.componente}";"${r.sap_number}";"${r.equipamento_nome}";"${r.inspetor}";"${r.temp_la || ''}";"${r.temp_loa || ''}";"${r.status_operacao}";"${r.observacoes}"\n`;
+        csv += `"${r.data_coleta}";"${r.rota}";"${r.tag}";"${r.sap_number || ''}";"${r.componente}";"${r.equipamento_nome}";"${r.setor}";"${r.area}";"${r.inspetor}";"${r.temp_la || ''}";"${r.temp_c2_p1 || ''}";"${r.status_operacao}";"${r.observacoes}"\n`;
       });
       const blob = new Blob(["\ufeff" + csv], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
@@ -1125,67 +1915,285 @@
       link.click();
     }
 
-    function exportTechnicalPDF() {
+    async function exportDashboardPreAnalisePDF() {
       const { jsPDF } = window.jspdf;
       const filterRota = document.getElementById('filter_rota').value;
       const filterTag = document.getElementById('filter_tag').value;
-      const filterDate = document.getElementById('filter_date').value;
+      const filterDateSelect = document.getElementById('filter_date_select').value;
+      const dateStart = document.getElementById('filter_date_start').value;
+      const dateEnd = document.getElementById('filter_date_end').value;
       
       let filtered = cloudRecords;
       if (filterRota !== 'TODAS_ROTAS') filtered = filtered.filter(r => r.rota === filterRota);
-      if (filterTag !== 'TODAS') filtered = filtered.filter(r => r.tag === filterTag);
-      if (filterDate) filtered = filtered.filter(r => r.data_coleta.startsWith(filterDate));
-      
-      if(filtered.length === 0) { alert('Sem registros para exportar com este filtro.'); return; }
+      if (filterTag !== 'TODAS') filtered = filtered.filter(r => r.baseTag === filterTag || r.tag.includes(filterTag));
+      if (dateStart && dateEnd) {
+        filtered = filtered.filter(r => {
+          const rDate = r.data_coleta.slice(0, 10);
+          return rDate >= dateStart && rDate <= dateEnd;
+        });
+      } else if (dateStart) {
+        filtered = filtered.filter(r => r.data_coleta.slice(0, 10) >= dateStart);
+      } else if (dateEnd) {
+        filtered = filtered.filter(r => r.data_coleta.slice(0, 10) <= dateEnd);
+      } else if (filterDateSelect !== 'TODAS_DATAS') {
+        filtered = filtered.filter(r => r.data_coleta.startsWith(filterDateSelect));
+      }
 
-      const doc = new jsPDF('l', 'mm', 'a4');
+      if (filtered.length === 0) {
+        alert('Nenhum registro encontrado para exportar na pré-análise com os filtros atuais.');
+        return;
+      }
+
+      const doc = new jsPDF('p', 'mm', 'a4');
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(14);
+      doc.setFontSize(13);
       doc.setTextColor(30, 41, 59);
-      doc.text(`LAUDO TÉCNICO INSPECTCBM - Rota: ${filterRota} | Tag: ${filterTag}`, 14, 15);
-      doc.setFontSize(9);
+      doc.text(`PRÉ-ANÁLISE DE VIBRAÇÃO & HISTÓRICO - INSPECTCBM`, 14, 15);
+      
+      doc.setFontSize(8);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(100, 116, 139);
-      doc.text(`Emissão: ${new Date().toLocaleDateString('pt-BR')} ${new Date().toLocaleTimeString('pt-BR')}`, 14, 21);
-      
-      if (chartInstance) {
-        doc.addImage(chartInstance.toBase64Image(), 'PNG', 14, 24, 269, 50);
-      }
-      
-      const tableRows = filtered.map(r => {
-        let allObs = [];
-        if(r.observacoes && r.observacoes !== '-') allObs.push(`Geral: ${r.observacoes}`);
-        if(r.strobo_obs && r.strobo_obs !== '-') allObs.push(`Strobo: ${r.strobo_obs}`);
-        if(r.temp_obs && r.temp_obs !== '-') allObs.push(`Temp: ${r.temp_obs}`);
-        if(r.ruido_obs) allObs.push(`Ruído: ${r.ruido_obs}`);
-        if(r.limpeza_obs) allObs.push(`Limpeza: ${r.limpeza_obs}`);
-        if(r.oleo_obs) allObs.push(`Óleo: ${r.oleo_obs}`);
-        if(r.vazamento_obs) allObs.push(`Vazamento: ${r.vazamento_obs}`);
-        if(r.fixacao_obs) allObs.push(`Fixação: ${r.fixacao_obs}`);
-        if(r.protecao_obs) allObs.push(`NR-12: ${r.protecao_obs}`);
-        if(r.vibracao_obs) allObs.push(`Vib. Tátil: ${r.vibracao_obs}`);
-        if(r.refrigeracao_obs) allObs.push(`Refrig: ${r.refrigeracao_obs}`);
+      doc.text(`Filtro Rota: ${filterRota} | Tag: ${filterTag} | Data Emissão: ${new Date().toLocaleDateString('pt-BR')}`, 14, 20);
 
-        return [
-          new Date(r.data_coleta).toLocaleString('pt-BR', {dateStyle:'short', timeStyle:'short'}),
-          `${r.tag}\n(Rota: ${r.rota})`,
-          `${r.componente} (SAP: ${r.sap_number})`,
-          `${r.status_operacao} (${r.carga_pressao_str})`,
-          `Strobo: ${r.rpm_real_strobo} RPM`,
-          `LA: ${r.temp_la || '-'}°C\nLOA: ${r.temp_loa || '-'}°C`,
-          `${r.inspetor}\nObs: ${allObs.join(' | ')}`
+      const tableRows = [];
+      const imageCellStore = [];
+
+      filtered.forEach((r, index) => {
+        let dataFmt = new Date(r.data_coleta).toLocaleString('pt-BR', {dateStyle:'short', timeStyle:'short'});
+        let blocoIdentificacao = `DATA: ${dataFmt}\nTAG: ${r.tag}\nSAP: ${r.sap_number || '-'}\nROTA: ${r.rota || '-'}\nLOCAL: ${r.equipamento_nome || '-'} (${r.setor || '-'}/${r.area || '-'})\nCONJUNTO: ${r.componente || '-'}\nINSPETOR: ${r.inspetor || '-'}`;
+        let blocoOperacaoStrobo = `OPERAÇÃO: ${r.status_operacao || '-'} (${r.carga_pressao_str || '-'})\nSTROBO RPM: ${r.rpm_real_strobo || '-'}\nACOPLAMENTO: ${r.acoplamento_status || '-'}\nANOMALIAS STROBO: ${r.strobo_obs || '-'}`;
+        let blocoTemperaturas = `MOTOR LA: ${r.temp_la !== null ? r.temp_la + '°C' : '-'}\nMOTOR LOA: ${r.temp_loa !== null ? r.temp_loa + '°C' : '-'}\nCOMP.2 P1: ${r.temp_c2_p1 !== null ? r.temp_c2_p1 + '°C' : '-'}\nCOMP.2 P2: ${r.temp_c2_p2 !== null ? r.temp_c2_p2 + '°C' : '-'}\nOBS TEMP: ${r.temp_obs || '-'}`;
+
+        let visuaisArr = [
+          `Ruído: ${r.ruido_status}${r.ruido_obs ? ' ('+r.ruido_obs+')' : ''}`,
+          `Limpeza: ${r.limpeza_status}${r.limpeza_obs ? ' ('+r.limpeza_obs+')' : ''}`,
+          `Óleo/Graxa: ${r.oleo_status}${r.oleo_obs ? ' ('+r.oleo_obs+')' : ''}`,
+          `Vazamentos: ${r.vazamento_status}${r.vazamento_obs ? ' ('+r.vazamento_obs+')' : ''}`,
+          `Fixação: ${r.fixacao_status}${r.fixacao_obs ? ' ('+r.fixacao_obs+')' : ''}`,
+          `Proteção NR12: ${r.protecao_status}${r.protecao_obs ? ' ('+r.protecao_obs+')' : ''}`,
+          `Vibração Tátil: ${r.vibracao_status}${r.vibracao_obs ? ' ('+r.vibracao_obs+')' : ''}`,
+          `Refrigeração: ${r.refrigeracao_status}${r.refrigeracao_obs ? ' ('+r.refrigeracao_obs+')' : ''}`
         ];
+        let blocoVisual = `INSPEÇÃO VISUAL (OK/NOK):\n` + visuaisArr.join('\n') + `\nOBS GERAL: ${r.observacoes || '-'}`;
+
+        tableRows.push(['', blocoIdentificacao, blocoOperacaoStrobo, blocoTemperaturas, blocoVisual]);
+        imageCellStore.push({ rowIndex: index, src: r.photo });
       });
 
       doc.autoTable({
-        startY: chartInstance ? 78 : 26,
-        head: [['Data/Hora', 'Rota & Tag', 'Componente / SAP', 'Operação', 'Strobo', 'Temperaturas', 'Inspetor & Todas Observações']],
+        startY: 24,
+        head: [['FOTO', 'Identificação', 'Operação & Strobo', 'Temperaturas', 'Inspeção Visual & Obs']],
         body: tableRows,
         theme: 'grid',
-        styles: { fontSize: 7, cellPadding: 2, overflow: 'linebreak' },
-        headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255], fontStyle: 'bold' }
+        styles: { fontSize: 7, cellPadding: 2.5, valign: 'top', overflow: 'linebreak' },
+        headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255], fontStyle: 'bold', halign: 'center' },
+        columnStyles: {
+          0: { cellWidth: 32, halign: 'center' },
+          1: { cellWidth: 35 },
+          2: { cellWidth: 38 },
+          3: { cellWidth: 34 },
+          4: { cellWidth: 65 }
+        },
+        didDrawCell: function(data) {
+          if (data.section === 'body' && data.column.index === 0) {
+            const item = imageCellStore[data.row.index];
+            if (item && item.src) {
+              try {
+                doc.addImage(item.src, 'JPEG', data.cell.x + 2, data.cell.y + 2, 28, 28);
+              } catch(e) { console.error("Erro ao desenhar foto no PDF", e); }
+            } else if (data.section === 'body' && data.column.index === 0) {
+              doc.setFontSize(7);
+              doc.setTextColor(150, 150, 150);
+              doc.text("Sem Foto", data.cell.x + 8, data.cell.y + 15);
+            }
+          }
+        }
       });
-      doc.save(`Laudo_InspectCBM_${filterRota}_${new Date().toISOString().slice(0,10)}.pdf`);
+
+      doc.save(`PreAnalise_Vibracao_Completa_${filterRota}_${new Date().toISOString().slice(0,10)}.pdf`);
+    }
+
+    function generateMiniChartBase64(tagBase) {
+      return new Promise((resolve) => {
+        const tagHistory = cloudRecords
+          .filter(r => r.baseTag === tagBase || r.tag.includes(tagBase))
+          .sort((a, b) => new Date(a.data_coleta) - new Date(b.data_coleta));
+        if(tagHistory.length < 2) { resolve(null); return; }
+        
+        const canvas = document.getElementById('hiddenPdfChart');
+        const ctx = canvas.getContext('2d');
+        const labels = tagHistory.map(r => new Date(r.data_coleta).toLocaleString('pt-BR', {dateStyle:'short', timeStyle:'short'}));
+        const dataLA = tagHistory.map(r => r.temp_la);
+        const dataC2 = tagHistory.map(r => r.temp_c2_p1 || r.temp_loa);
+
+        const tempChart = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: [
+              { label: 'Motor (°C)', data: dataLA, borderColor: '#f43f5e', backgroundColor: 'rgba(244,63,94,0.1)', borderWidth: 1.5, tension: 0.2, fill: true },
+              { label: 'Comp. 2 (°C)', data: dataC2, borderColor: '#38bdf8', backgroundColor: 'rgba(56,189,248,0.1)', borderWidth: 1.5, tension: 0.2, fill: true }
+            ]
+          },
+          options: {
+            animation: false,
+            responsive: false,
+            plugins: {
+              title: { display: true, text: `Tendência Térmica - Tag: ${tagBase}`, color: '#1e293b', font: { size: 10 } },
+              legend: { labels: { color: '#1e293b', font: { size: 8 } } }
+            },
+            scales: {
+              x: { ticks: { color: '#64748b', font: { size: 7 } }, grid: { color: '#e2e8f0' } },
+              y: { ticks: { color: '#64748b', font: { size: 7 } }, grid: { color: '#e2e8f0' } }
+            }
+          }
+        });
+        setTimeout(() => {
+          const base64Img = canvas.toDataURL('image/png');
+          tempChart.destroy();
+          resolve(base64Img);
+        }, 150);
+      });
+    }
+
+    async function exportTechnicalPDF() {
+      const { jsPDF } = window.jspdf;
+      const filterRota = document.getElementById('rel_filter_rota').value;
+      const filterStatus = document.getElementById('rel_filter_status').value;
+      const dataColetaInput = document.getElementById('rel_data_coleta').value;
+      const dataAnaliseInput = document.getElementById('rel_data_analise').value;
+      
+      let dataColetaFmt = new Date().toLocaleDateString('pt-BR');
+      if (dataColetaInput) {
+        const parts = dataColetaInput.split('-');
+        dataColetaFmt = `${parts[2]}/${parts[1]}/${parts[0]}`;
+      }
+
+      let dataAnaliseFmt = new Date().toLocaleDateString('pt-BR');
+      if (dataAnaliseInput) {
+        const parts = dataAnaliseInput.split('-');
+        dataAnaliseFmt = `${parts[2]}/${parts[1]}/${parts[0]}`;
+      }
+      
+      let rotasParaAnalisar = (filterRota === 'TODAS_ROTAS') ? defaultRotas : [filterRota];
+      let filtered = [];
+
+      rotasParaAnalisar.forEach(rota => {
+        let tagsDaRota = defaultTagMap[rota] || [];
+        
+        tagsDaRota.forEach(baseTag => {
+          let lastRecord = cloudRecords.find(r => (r.baseTag === baseTag || r.tag.startsWith(baseTag)) && (!dataColetaInput || r.data_coleta.startsWith(dataColetaInput)));
+          let state = relatorioAnalysisState[baseTag] || { isMedido: !!lastRecord, statusVal: 'Seguro', problema: '', recomendacao: '' };
+          
+          if (filterStatus === 'MEDIDOS' && !state.isMedido) return;
+          if (filterStatus === 'NAO_MEDIDOS' && state.isMedido) return;
+
+          let tagData = cloudTagRegistry[baseTag] || {};
+
+          if (state.isMedido && lastRecord) {
+            filtered.push({ ...lastRecord, analysisState: state });
+          } else {
+            filtered.push({
+              tag: `${baseTag}`,
+              baseTag: baseTag,
+              rota: rota,
+              componente: 'Conjunto',
+              equipamento_nome: tagData.equipamento_nome || '-',
+              sap_number: tagData.sap_number || '-',
+              setor: tagData.setor || '-',
+              area: tagData.area || '-',
+              inspetor: 'PENDENTE',
+              photo: tagData.photo || null,
+              analysisState: state
+            });
+          }
+        });
+      });
+
+      if(filtered.length === 0) { alert('Sem itens para exportar no relatório com este filtro.'); return; }
+      
+      const doc = new jsPDF('p', 'mm', 'a4');
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(14);
+      doc.setTextColor(30, 41, 59);
+      doc.text(`LAUDO TÉCNICO INSPECTCBM`, 14, 15);
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(100, 116, 139);
+      doc.text(`Rota: ${filterRota} | Data da Coleta: ${dataColetaFmt} | Data da Análise: ${dataAnaliseFmt}`, 14, 21);
+      
+      let currentY = 26;
+      const tableRows = [];
+      const imageCellStore = [];
+
+      for (let index = 0; index < filtered.length; index++) {
+        const r = filtered[index];
+        const state = r.analysisState;
+        
+        let secaoTagData = [`TAG: ${r.tag}`, `SAP: ${r.sap_number || '-'}`, `COLETA: ${dataColetaFmt}  |  ANÁLISE: ${dataAnaliseFmt}`].join('  |  ');
+        let secaoStatus = `STATUS DO EQUIPAMENTO: ${state.isMedido ? state.statusVal.toUpperCase() : 'NÃO MEDIDO'}`;
+        let secaoInfo = [
+          `• Rota: ${r.rota || '-'}`,
+          `• Equipamento: ${r.equipamento_nome || '-'} (SAP: ${r.sap_number || '-'})`,
+          `• Setor: ${r.setor || '-'} (Área: ${r.area || '-'})`,
+          `• Conjunto: ${r.componente || '-'}`
+        ].join('\n');
+        
+        let secaoProblema = `PROBLEMA:\n${state.isMedido && state.problema ? state.problema : 'Nenhum problema reportado'}`;
+        let secaoRecomendacao = `RECOMENDAÇÃO:\n${state.isMedido && state.recomendacao ? state.recomendacao : 'Nenhuma recomendação registrada'}`;
+        let secaoInspetor = `RESPONSÁVEL TÉCNICO: ${r.inspetor || '-'}`;
+
+        let combinedContent = [
+          secaoTagData, '',
+          secaoStatus, '',
+          'INFORMAÇÕES DO EQUIPAMENTO:', secaoInfo, '',
+          secaoProblema, '',
+          secaoRecomendacao, '',
+          secaoInspetor
+        ].join('\n');
+
+        tableRows.push(['', combinedContent]);
+        let photoSrc = r.photo || (cloudTagRegistry[r.baseTag] ? cloudTagRegistry[r.baseTag].photo : null);
+        let chartBase64 = await generateMiniChartBase64(r.baseTag || r.tag.split(' ')[0]);
+
+        imageCellStore.push({ rowIndex: index, src: photoSrc, chart: chartBase64 });
+      }
+
+      doc.autoTable({
+        startY: currentY,
+        head: [['FOTO DO EQUIPAMENTO', 'LAUDO TÉCNICO DA INSPEÇÃO']],
+        body: tableRows,
+        theme: 'grid',
+        styles: { fontSize: 8, cellPadding: 3.5, overflow: 'linebreak', valign: 'top' },
+        headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255], fontStyle: 'bold', halign: 'center' },
+        columnStyles: { 0: { cellWidth: 70, halign: 'center' }, 1: { cellWidth: 112 } },
+        didDrawCell: function(data) {
+          if (data.section === 'body' && data.column.index === 0) {
+            const item = imageCellStore[data.row.index];
+            if (item) {
+              let currentCellY = data.cell.y + 4;
+              if (item.src) {
+                try {
+                  doc.addImage(item.src, 'JPEG', data.cell.x + 3, currentCellY, 64, 42);
+                  currentCellY += 46;
+                } catch(e) { console.error("Erro ao desenhar imagem", e); }
+              } else {
+                doc.setFontSize(8);
+                doc.setTextColor(150, 150, 150);
+                doc.text("Sem Foto", data.cell.x + 25, currentCellY + 20);
+                currentCellY += 46;
+              }
+              if (item.chart) {
+                try {
+                  doc.addImage(item.chart, 'PNG', data.cell.x + 3, currentCellY, 64, 25);
+                } catch(e) { console.error("Erro ao desenhar gráfico miniatura", e); }
+              }
+            }
+          }
+        }
+      });
+
+      doc.save(`Relatorio_Tecnico_Independente_${filterRota}_${dataAnaliseFmt.replace(/\//g, '-')}.pdf`);
     }
   </script>
 </body>
