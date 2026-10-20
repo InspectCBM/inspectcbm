@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>InspectCBM - Relatório Técnico Independente (Cloud)</title>
+  <title>InspectCBM - Relatório Técnico Independente (Cloud 100%)</title>
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- FontAwesome Icons -->
@@ -31,6 +31,7 @@
       firebase.initializeApp(firebaseConfig);
     }
     const db = firebase.firestore();
+    
     document.addEventListener("DOMContentLoaded", () => {
       const now = new Date();
       now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
@@ -40,12 +41,8 @@
       if(document.getElementById("rel_data_coleta")) document.getElementById("rel_data_coleta").value = isoNow.slice(0,10);
       if(document.getElementById("rel_data_analise")) document.getElementById("rel_data_analise").valueAsDate = new Date();
       
-      loadSavedRotas();
-      loadSavedInspetores();
-      
-      // Ativa a sincronização em tempo real entre dispositivos
+      // Ativa a sincronização em tempo real de toda a base de dados
       initCloudListeners();
-      fetchSavedLaudosHistory();
     });
   </script>
   <style>
@@ -65,14 +62,14 @@
         <div>
           <h1 class="font-bold text-lg leading-tight text-white flex items-center">
             Inspect<span class="text-amber-400">CBM</span> 
-            <span class="ml-2 text-[10px] px-2 py-0.5 rounded bg-amber-400/10 text-amber-400 border border-amber-400/20 font-mono">Cloud Sync (Real-Time)</span>
+            <span class="ml-2 text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-mono">100% Nuvem (Real-Time)</span>
           </h1>
           <p class="text-xs text-slate-400">Confiabilidade & Manutenção Baseada em Condição</p>
         </div>
       </div>
       <div class="flex items-center space-x-2">
         <span id="cloud-status" class="text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-1 rounded font-mono">
-          <i class="fa-solid fa-cloud mr-1"></i> Nuvem Sincronizada
+          <i class="fa-solid fa-cloud mr-1"></i> Totalmente Sincronizado
         </span>
         <button id="btn-tab-form" onclick="switchTab('form')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-700 text-slate-300 hover:bg-slate-600 transition">
           <i class="fa-solid fa-clipboard-check mr-1"></i> Nova Coleta
@@ -86,6 +83,7 @@
       </div>
     </div>
   </header>
+
   <!-- Main Container -->
   <main class="max-w-7xl mx-auto px-4 mt-6">
     <!-- SEÇÃO: FORMULÁRIO DE COLETA DE CAMPO -->
@@ -102,7 +100,6 @@
               <span id="auto-fill-route-badge" class="hidden text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded font-bold">
                 <i class="fa-solid fa-bolt mr-1"></i> Dados da Tag Carregados!
               </span>
-              <!-- Input oculto para importação de Excel / CSV -->
               <input type="file" id="excel_file_input" accept=".csv, .txt" class="hidden" onchange="importExcelData(event)">
               <button type="button" onclick="document.getElementById('excel_file_input').click()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-2.5 py-1.5 rounded-lg transition flex items-center font-semibold shadow">
                 <i class="fa-solid fa-file-excel mr-1"></i> Importar Planilha Excel (CSV)
@@ -141,6 +138,7 @@
               </select>
             </div>
           </div>
+
           <!-- FOTO DO EQUIPAMENTO -->
           <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-700/80 mb-4 flex flex-col sm:flex-row items-center gap-4">
             <div id="photo-preview-container" class="w-20 h-20 bg-slate-800 rounded-lg border border-slate-700 flex items-center justify-center overflow-hidden shrink-0 relative">
@@ -161,6 +159,7 @@
               </div>
             </div>
           </div>
+
           <!-- LINHA DE CAMPOS ALINHADOS -->
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             <div class="col-span-1 md:col-span-2 lg:col-span-5 bg-slate-900/80 p-3 rounded-lg border border-amber-500/30 flex justify-between items-center">
@@ -192,6 +191,7 @@
             </div>
           </div>
         </div>
+
         <!-- BLOCO 2: PARÂMETROS MECÂNICOS DO CONJUNTO -->
         <div class="bg-slate-800 rounded-xl p-5 border border-slate-700 shadow-lg space-y-5">
           <div class="flex justify-between items-center border-b border-slate-700 pb-3">
@@ -239,7 +239,6 @@
             <h3 id="titulo_segundo_componente" class="text-xs font-bold text-sky-400 uppercase tracking-wider flex items-center">
               <i class="fa-solid fa-gear mr-1.5"></i> Componente 2: Elemento
             </h3>
-            
             <div id="fields_elemento" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
               <div>
                 <label class="block text-[11px] text-slate-300 mb-1">Marca</label>
@@ -346,6 +345,7 @@
             </div>
           </div>
         </div>
+
         <!-- BLOCO 3: CARGA -->
         <div class="bg-slate-800 rounded-xl p-5 border border-slate-700 shadow-lg">
           <h2 class="text-sm font-bold text-amber-400 uppercase tracking-wider mb-4 flex items-center">
@@ -377,6 +377,7 @@
             </div>
           </div>
         </div>
+
         <!-- BLOCO 4: STROBO -->
         <div class="bg-slate-800 rounded-xl p-5 border border-amber-500/40 shadow-lg">
           <h2 class="text-sm font-bold text-amber-400 uppercase tracking-wider mb-4 flex items-center">
@@ -404,12 +405,12 @@
             <input type="text" id="strobo_obs" placeholder="Ex: Desgaste no elemento elástico do acoplamento." class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500">
           </div>
         </div>
+
         <!-- BLOCO 5: TEMPERATURA POR COMPONENTE -->
         <div class="bg-slate-800 rounded-xl p-5 border border-slate-700 shadow-lg space-y-4">
           <h2 class="text-sm font-bold text-amber-400 uppercase tracking-wider mb-1 flex items-center">
             <i class="fa-solid fa-temperature-high mr-2"></i> Medição de Temperatura no Ponto
           </h2>
-          
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div class="bg-slate-900/80 p-3.5 rounded-xl border border-amber-500/30 space-y-3">
               <span class="text-xs font-bold text-amber-400 block border-b border-slate-800 pb-1">Motor Elétrico</span>
@@ -443,6 +444,7 @@
             <input type="text" id="temp_obs" placeholder="Ex: Ponto quente detectado no mancal LA do Motor." class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500">
           </div>
         </div>
+
         <!-- BLOCO 6: VISUAL OK / NOK (8 ITENS) -->
         <div class="bg-slate-800 rounded-xl p-5 border border-slate-700 shadow-lg space-y-4">
           <h2 class="text-sm font-bold text-amber-400 uppercase tracking-wider mb-2 flex items-center">
@@ -541,6 +543,7 @@
         </button>
       </form>
     </div>
+
     <!-- SEÇÃO: PRÉ-ANÁLISE -->
     <div id="tab-dashboard" class="hidden space-y-6">
       <div class="bg-slate-800 rounded-xl p-5 border border-slate-700 shadow-lg flex flex-col md:flex-row justify-between items-center gap-4">
@@ -555,11 +558,9 @@
           <select id="filter_tag" onchange="renderDashboard()" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white">
             <option value="TODAS">-- Todas as Tags --</option>
           </select>
-          <!-- SELETORES DE DATA -->
           <select id="filter_date_select" onchange="renderDashboard()" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white">
             <option value="TODAS_DATAS">-- Todas as Datas --</option>
           </select>
-          
           <div class="flex items-center space-x-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white">
             <span class="text-[10px] text-slate-400">De:</span>
             <input type="date" id="filter_date_start" onchange="renderDashboard()" class="bg-transparent text-xs text-white focus:outline-none">
@@ -569,7 +570,6 @@
           <button onclick="clearDateFilter()" title="Limpar datas" class="bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs px-2.5 py-2 rounded-lg transition">
             <i class="fa-solid fa-xmark"></i>
           </button>
-          
           <button onclick="exportCSV()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs px-3 py-2 rounded-lg transition shadow">
             <i class="fa-solid fa-file-excel mr-1"></i> CSV
           </button>
@@ -609,6 +609,7 @@
         </div>
       </div>
     </div>
+
     <!-- SEÇÃO: RELATÓRIO TÉCNICO INDEPENDENTE -->
     <div id="tab-relatorio" class="space-y-6">
       <div class="bg-slate-800 rounded-xl p-5 border border-slate-700 shadow-lg space-y-4">
@@ -624,7 +625,7 @@
               <i class="fa-solid fa-eraser mr-1.5"></i> Limpar Campos
             </button>
             <button onclick="saveTechnicalAnalysisState()" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold text-xs px-3.5 py-2 rounded-lg transition shadow flex items-center">
-              <i class="fa-solid fa-floppy-disk mr-1.5"></i> Salvar Análise
+              <i class="fa-solid fa-floppy-disk mr-1.5"></i> Salvar Análise na Nuvem
             </button>
             <button onclick="exportTechnicalPDF()" class="bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs px-3.5 py-2 rounded-lg transition shadow flex items-center">
               <i class="fa-solid fa-file-pdf mr-1.5 text-sm"></i> Gerar Laudo PDF
@@ -680,7 +681,7 @@
       <!-- SEÇÃO DE HISTÓRICO DE LAUDOS SALVOS -->
       <div class="bg-slate-800 rounded-xl p-5 border border-slate-700 shadow-lg space-y-4">
         <h3 class="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center">
-          <i class="fa-solid fa-clock-rotate-left mr-2"></i> Histórico de Relatórios & Laudos Salvos
+          <i class="fa-solid fa-clock-rotate-left mr-2"></i> Histórico de Relatórios & Laudos Salvos (Nuvem)
         </h3>
         <div id="saved-laudos-list" class="space-y-2 max-h-60 overflow-y-auto">
           <p class="text-xs text-slate-500">Nenhum laudo salvo no histórico ainda.</p>
@@ -688,11 +689,12 @@
       </div>
     </div>
   </main>
+
   <!-- MODAIS DE GERENCIAMENTO -->
   <div id="modal-rotas" class="hidden fixed inset-0 bg-slate-950/80 z-50 flex items-center justify-center p-4">
     <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 max-w-md w-full space-y-4 shadow-2xl">
       <h3 class="text-sm font-bold text-amber-400 uppercase tracking-wider flex items-center justify-between">
-        <span><i class="fa-solid fa-route mr-2"></i> Gerenciar Rotas</span>
+        <span><i class="fa-solid fa-route mr-2"></i> Gerenciar Rotas (Nuvem)</span>
         <button onclick="closeRotasModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-base"></i></button>
       </h3>
       <div class="space-y-2">
@@ -703,7 +705,7 @@
         </div>
       </div>
       <div class="space-y-1">
-        <label class="block text-xs text-slate-400">Rotas Cadastradas:</label>
+        <label class="block text-xs text-slate-400">Rotas Cadastradas na Nuvem:</label>
         <div id="lista-rotas-cadastradas" class="max-h-40 overflow-y-auto space-y-1 bg-slate-900 p-2 rounded-lg border border-slate-700 text-xs"></div>
       </div>
       <div class="flex justify-end pt-2">
@@ -711,10 +713,11 @@
       </div>
     </div>
   </div>
+
   <div id="modal-tags" class="hidden fixed inset-0 bg-slate-950/80 z-50 flex items-center justify-center p-4">
     <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 max-w-md w-full space-y-4 shadow-2xl">
       <h3 class="text-sm font-bold text-amber-400 uppercase tracking-wider flex items-center justify-between">
-        <span><i class="fa-solid fa-tags mr-2"></i> Gerenciar Tags por Rota</span>
+        <span><i class="fa-solid fa-tags mr-2"></i> Gerenciar Tags por Rota (Nuvem)</span>
         <button onclick="closeTagsModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-base"></i></button>
       </h3>
       <div class="space-y-3">
@@ -739,10 +742,11 @@
       </div>
     </div>
   </div>
+
   <div id="modal-inspetores" class="hidden fixed inset-0 bg-slate-950/80 z-50 flex items-center justify-center p-4">
     <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 max-w-md w-full space-y-4 shadow-2xl">
       <h3 class="text-sm font-bold text-amber-400 uppercase tracking-wider flex items-center justify-between">
-        <span><i class="fa-solid fa-user-gear mr-2"></i> Gerenciar Inspetores</span>
+        <span><i class="fa-solid fa-user-gear mr-2"></i> Gerenciar Inspetores (Nuvem)</span>
         <button onclick="closeInspetoresModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-base"></i></button>
       </h3>
       <div class="space-y-2">
@@ -753,7 +757,7 @@
         </div>
       </div>
       <div class="space-y-1">
-        <label class="block text-xs text-slate-400">Inspetores Cadastrados:</label>
+        <label class="block text-xs text-slate-400">Inspetores Cadastrados na Nuvem:</label>
         <div id="lista-inspetores-cadastradas" class="max-h-40 overflow-y-auto space-y-1 bg-slate-900 p-2 rounded-lg border border-slate-700 text-xs"></div>
       </div>
       <div class="flex justify-end pt-2">
@@ -761,24 +765,27 @@
       </div>
     </div>
   </div>
+
   <div style="position: absolute; left: -9999px; top: -9999px;">
     <canvas id="hiddenPdfChart" width="400" height="150"></canvas>
   </div>
+
   <script>
-    let defaultRotas = JSON.parse(localStorage.getItem('inspectcbm_rotas')) || ["Sopradores Massas", "Sopradores Drymix", "Compressores Chocolate", "Compressores Drymix", "Caldeiras / Utilidades"];
-    
-    let defaultTagMap = JSON.parse(localStorage.getItem('inspectcbm_tag_map')) || {
+    let defaultRotas = ["Sopradores Massas", "Sopradores Drymix", "Compressores Chocolate", "Compressores Drymix", "Caldeiras / Utilidades"];
+    let defaultTagMap = {
       "Sopradores Massas": ["SP8001", "SP8002"],
       "Sopradores Drymix": ["SP8003"],
       "Compressores Chocolate": ["UC8014", "UC01"],
       "Compressores Drymix": ["UC02"],
       "Caldeiras / Utilidades": ["TO01", "BO01"]
     };
-    let defaultInspetores = JSON.parse(localStorage.getItem('inspectcbm_inspetores')) || ["RAFAEL AUGUSTO", "Técnico Confiabilidade 1"];
+    let defaultInspetores = ["RAFAEL AUGUSTO", "Técnico Confiabilidade 1"];
+    let cloudLaudos = [];
+    
     let currentPhotoBase64 = "";
     let cloudRecords = [];
     let cloudTagRegistry = {};   
-    let relatorioAnalysisState = JSON.parse(localStorage.getItem('inspectcbm_rel_state')) || {};
+    let relatorioAnalysisState = {};
     
     function switchTab(tab) {
       const formTab = document.getElementById('tab-form');
@@ -808,36 +815,74 @@
         btnRel.className = "px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500 text-slate-950 transition";
       }
     }
-    // OUVINTES EM TEMPO REAL (REAL-TIME SYNC) DO FIRESTORE
+
+    // OUVINTES EM TEMPO REAL (100% FIRESTORE CLOUD SYNC)
     function initCloudListeners() {
+      // 1. Configurações de Rotas, Tags e Inspetores
+      db.collection("inspectcbm_config").doc("rotas_tags").onSnapshot((doc) => {
+        if (doc.exists) {
+          const data = doc.data();
+          if (data.rotas && data.rotas.length > 0) defaultRotas = data.rotas;
+          if (data.tagMap) defaultTagMap = data.tagMap;
+          if (data.inspetores && data.inspetores.length > 0) defaultInspetores = data.inspetores;
+        } else {
+          db.collection("inspectcbm_config").doc("rotas_tags").set({
+            rotas: defaultRotas,
+            tagMap: defaultTagMap,
+            inspetores: defaultInspetores
+          });
+        }
+        loadSavedRotas();
+        loadSavedInspetores();
+        populateFilters();
+      });
+
+      // 2. Registos de Inspeções de Campo
       db.collection("inspectcbm_records").onSnapshot((snapshot) => {
         cloudRecords = [];
         snapshot.forEach((doc) => {
           cloudRecords.push({ docId: doc.id, ...doc.data() });
         });
         cloudRecords.sort((a, b) => b.id - a.id);
-        
         populateFilters();
         renderDashboard();
         renderRelatorioTab();
-      }, (err) => {
-        console.error("Erro no listener de registos:", err);
       });
       
+      // 3. Registo Individual das Tags / Equipamentos
       db.collection("inspectcbm_tags").onSnapshot((snapshot) => {
         cloudTagRegistry = {};
         snapshot.forEach((doc) => {
           cloudTagRegistry[doc.id] = doc.data();
         });
-        
         const currentTag = getBaseTag();
         if(currentTag) loadTagData(currentTag);
         renderRelatorioTab();
-      }, (err) => {
-        console.error("Erro no listener de tags:", err);
+      });
+
+      // 4. Histórico de Laudos Técnicos Salvos
+      db.collection("inspectcbm_laudos").onSnapshot((snapshot) => {
+        cloudLaudos = [];
+        snapshot.forEach((doc) => {
+          cloudLaudos.push({ docId: doc.id, ...doc.data() });
+        });
+        cloudLaudos.sort((a, b) => b.id - a.id);
+        fetchSavedLaudosHistory();
       });
     }
-    
+
+    async function saveConfigToCloud() {
+      try {
+        await db.collection("inspectcbm_config").doc("rotas_tags").set({
+          rotas: defaultRotas,
+          tagMap: defaultTagMap,
+          inspetores: defaultInspetores
+        });
+      } catch (err) {
+        console.error("Erro ao salvar configuração na nuvem:", err);
+      }
+    }
+
     async function importExcelData(e) {
       const file = e.target.files[0];
       if(!file) return;
@@ -874,16 +919,16 @@
             }
           }
         }
-        localStorage.setItem('inspectcbm_rotas', JSON.stringify(defaultRotas));
-        localStorage.setItem('inspectcbm_tag_map', JSON.stringify(defaultTagMap));
+        await saveConfigToCloud();
         loadSavedRotas();
         populateFilters();
-        alert(`Importação concluída! ${importedCount} registos por Tag processados e salvos na nuvem.`);
+        alert(`Importação concluída! ${importedCount} registos por Tag salvos na nuvem.`);
         document.getElementById('excel_file_input').value = "";
         onRotaChange(document.getElementById('rota_select').value);
       };
       reader.readAsText(file, 'UTF-8');
     }
+
     function onComposicaoChange(val) {
       const elElem = document.getElementById('fields_elemento');
       const elRed = document.getElementById('fields_redutor');
@@ -914,6 +959,7 @@
       }
       updateFullTagPreview();
     }
+
     function promptAddCustomComponentType() {
       const name = prompt("Digite o nome do novo componente para o conjunto:");
       if (!name) return;
@@ -926,11 +972,13 @@
       select.value = key;
       onComposicaoChange(key);
     }
+
     function toggleNokObs(prefix, isNok) {
       const box = document.getElementById(`${prefix}_obs_box`);
       if (isNok) box.classList.remove('hidden');
       else { box.classList.add('hidden'); document.getElementById(`${prefix}_obs`).value = ''; }
     }
+
     function handlePhotoUpload(e) {
       const file = e.target.files[0];
       if(!file) return;
@@ -961,6 +1009,7 @@
       };
       reader.readAsDataURL(file);
     }
+
     function removePhoto() {
       currentPhotoBase64 = "";
       document.getElementById('eq_photo_input').value = "";
@@ -969,8 +1018,10 @@
       document.getElementById('photo-placeholder-icon').classList.add('hidden');
       document.getElementById('btn-remove-photo').classList.add('hidden');
     }
+
     function loadSavedRotas() {
       const select = document.getElementById('rota_select');
+      if(!select) return;
       const currentVal = select.value;
       select.innerHTML = '';
       defaultRotas.forEach(r => {
@@ -979,16 +1030,22 @@
         select.appendChild(opt);
       });
       if(defaultRotas.includes(currentVal)) select.value = currentVal;
+      else if(defaultRotas.length > 0) onRotaChange(defaultRotas[0]);
     }
+
     function loadSavedInspetores() {
       const select = document.getElementById('inspetor_select');
+      if(!select) return;
+      const currentVal = select.value;
       select.innerHTML = '';
       defaultInspetores.forEach(insp => {
         const opt = document.createElement('option');
         opt.value = insp; opt.textContent = insp;
         select.appendChild(opt);
       });
+      if(defaultInspetores.includes(currentVal)) select.value = currentVal;
     }
+
     function manageRotasModal() {
       document.getElementById('modal-rotas').classList.remove('hidden');
       renderRotasList();
@@ -1008,27 +1065,26 @@
         container.appendChild(div);
       });
     }
-    function addNewRota() {
+    async function addNewRota() {
       const val = document.getElementById('nova_rota_input').value.trim();
       if(!val) return;
       if(!defaultRotas.includes(val)) {
         defaultRotas.push(val);
         if(!defaultTagMap[val]) defaultTagMap[val] = [];
-        localStorage.setItem('inspectcbm_rotas', JSON.stringify(defaultRotas));
-        localStorage.setItem('inspectcbm_tag_map', JSON.stringify(defaultTagMap));
+        await saveConfigToCloud();
         document.getElementById('nova_rota_input').value = '';
         renderRotasList();
       } else { alert("Esta rota já existe."); }
     }
-    function removeRota(index) {
+    async function removeRota(index) {
       if(defaultRotas.length <= 1) { alert("Deve manter pelo menos uma rota."); return; }
       const rotaName = defaultRotas[index];
       defaultRotas.splice(index, 1);
       delete defaultTagMap[rotaName];
-      localStorage.setItem('inspectcbm_rotas', JSON.stringify(defaultRotas));
-      localStorage.setItem('inspectcbm_tag_map', JSON.stringify(defaultTagMap));
+      await saveConfigToCloud();
       renderRotasList();
     }
+
     function manageTagsModal() {
       document.getElementById('modal-tags').classList.remove('hidden');
       const modalRotaSelect = document.getElementById('modal_tag_rota_select');
@@ -1057,23 +1113,24 @@
         container.appendChild(div);
       });
     }
-    function addNewTag() {
+    async function addNewTag() {
       const rota = document.getElementById('modal_tag_rota_select').value;
       const tagVal = document.getElementById('nova_tag_input').value.trim().toUpperCase();
       if(!tagVal) return;
       if(!defaultTagMap[rota]) defaultTagMap[rota] = [];
       if(!defaultTagMap[rota].includes(tagVal)) {
         defaultTagMap[rota].push(tagVal);
-        localStorage.setItem('inspectcbm_tag_map', JSON.stringify(defaultTagMap));
+        await saveConfigToCloud();
         document.getElementById('nova_tag_input').value = '';
         renderTagsList();
-      } else { alert("Esta tag já está cadastrada nesta rota."); }
+      } else { alert(" Esta tag já está cadastrada nesta rota."); }
     }
-    function removeTag(rota, index) {
+    async function removeTag(rota, index) {
       defaultTagMap[rota].splice(index, 1);
-      localStorage.setItem('inspectcbm_tag_map', JSON.stringify(defaultTagMap));
+      await saveConfigToCloud();
       renderTagsList();
     }
+
     function manageInspetoresModal() {
       document.getElementById('modal-inspetores').classList.remove('hidden');
       renderInspetoresList();
@@ -1092,24 +1149,26 @@
         container.appendChild(div);
       });
     }
-    function addNewInspetor() {
+    async function addNewInspetor() {
       const val = document.getElementById('novo_inspetor_input').value.trim().toUpperCase();
       if(!val) return;
       if(!defaultInspetores.includes(val)) {
         defaultInspetores.push(val);
-        localStorage.setItem('inspectcbm_inspetores', JSON.stringify(defaultInspetores));
+        await saveConfigToCloud();
         document.getElementById('novo_inspetor_input').value = '';
         renderInspetoresList();
       } else { alert("Este inspetor já está cadastrado."); }
     }
-    function removeInspetor(index) {
+    async function removeInspetor(index) {
       if(defaultInspetores.length <= 1) { alert("Deve manter pelo menos um inspetor."); return; }
       defaultInspetores.splice(index, 1);
-      localStorage.setItem('inspectcbm_inspetores', JSON.stringify(defaultInspetores));
+      await saveConfigToCloud();
       renderInspetoresList();
     }
+
     function onRotaChange(rota) {
       const tagSelect = document.getElementById('tag_select');
+      if(!tagSelect) return;
       tagSelect.innerHTML = '<option value="">Selecione a Tag...</option>';
       let tags = defaultTagMap[rota] || [];
       tags.forEach(t => {
@@ -1125,12 +1184,14 @@
         removePhoto();
       }
     }
+
     function handleTagSelection(tag) {
       updateFullTagPreview();
       loadTagData(tag);
     }
     function getBaseTag() {
-      return document.getElementById('tag_select').value;
+      const el = document.getElementById('tag_select');
+      return el ? el.value : '';
     }
     function getFullTag() {
       const base = getBaseTag();
@@ -1139,8 +1200,10 @@
       return `${base} (${compText})`;
     }
     function updateFullTagPreview() {
-      document.getElementById('lbl_tag_final').textContent = getFullTag() || 'SELECIONE UMA TAG...';
+      const el = document.getElementById('lbl_tag_final');
+      if(el) el.textContent = getFullTag() || 'SELECIONE UMA TAG...';
     }
+
     function loadTagData(tag) {
       if(!tag) return;
       document.getElementById('tag-mechanic-badge-label').textContent = `(Tag: ${tag})`;
@@ -1214,10 +1277,10 @@
       document.getElementById('tag-mechanic-badge-label').textContent = '';
       document.getElementById('auto-fill-route-badge').classList.add('hidden');
     }
+
     async function saveOnlyTagRegistration() {
       const tag = getBaseTag();
       if(!tag) { alert("Selecione a Tag base para salvar."); return; }
-      
       const composicao = document.getElementById('composicao_conjunto_select').value;
       const tData = {
         equipamento_nome: document.getElementById('equipamento_nome').value,
@@ -1264,6 +1327,7 @@
         document.getElementById('auto-fill-route-badge').classList.remove('hidden');
       } catch (err) { alert("Erro ao salvar dados da tag na nuvem: " + err.message); }
     }
+
     async function saveOnlyTagPhoto() {
       const tag = getBaseTag();
       if(!tag) { alert("Selecione uma Tag primeiro para salvar a foto."); return; }
@@ -1275,10 +1339,12 @@
         alert(`Foto do equipamento da Tag "${tag}" salva com sucesso na nuvem!`);
       } catch (err) { alert("Erro ao salvar a foto na nuvem: " + err.message); }
     }
+
     function getRadioValue(name) {
       const selected = document.querySelector(`input[name="${name}"]:checked`);
       return selected ? selected.value : 'OK';
     }
+
     async function saveInspection(e) {
       e.preventDefault();
       const baseTag = getBaseTag();
@@ -1298,20 +1364,16 @@
         setor: document.getElementById('setor').value || '-',
         area: document.getElementById('area').value || '-',
         inspetor: document.getElementById('inspetor_select').value,
-        
         status_operacao: document.getElementById('status_operacao').value,
         carga_pressao_str: `${document.getElementById('carga_valor').value || 0} ${document.getElementById('carga_unidade').value}`,
-        
         rpm_real_strobo: document.getElementById('rpm_real_strobo').value || '-',
         acoplamento_status: document.getElementById('acoplamento_status').value,
         strobo_obs: document.getElementById('strobo_obs').value || '-',
-        
         temp_la: parseFloat(document.getElementById('temp_la').value) || null,
         temp_loa: parseFloat(document.getElementById('temp_loa').value) || null,
         temp_c2_p1: parseFloat(document.getElementById('temp_c2_p1').value) || null,
         temp_c2_p2: parseFloat(document.getElementById('temp_c2_p2').value) || null,
         temp_obs: document.getElementById('temp_obs').value || '-',
-        
         ruido_status: getRadioValue('ruido_status'),
         ruido_obs: document.getElementById('ruido_obs').value || '',
         limpeza_status: getRadioValue('limpeza_status'),
@@ -1337,8 +1399,10 @@
         switchTab('dashboard');
       } catch (err) { alert("Erro ao salvar: " + err.message); }
     }
+
     function populateFilters() {
       const filterRota = document.getElementById('filter_rota');
+      if(!filterRota) return;
       const currentRota = filterRota.value;
       filterRota.innerHTML = '<option value="TODAS_ROTAS">-- Todas as Rotas --</option>';
       defaultRotas.forEach(r => {
@@ -1352,23 +1416,24 @@
       populateDateFilterSelect();
       
       const relFilterRota = document.getElementById('rel_filter_rota');
-      const currentRelRota = relFilterRota.value;
-      relFilterRota.innerHTML = '<option value="TODAS_ROTAS">-- Todas as Rotas --</option>';
-      defaultRotas.forEach(r => {
-        const opt = document.createElement('option');
-        opt.value = r; opt.textContent = r;
-        relFilterRota.appendChild(opt);
-      });
-      relFilterRota.value = defaultRotas.includes(currentRelRota) ? currentRelRota : 'TODAS_ROTAS';
+      if(relFilterRota) {
+        const currentRelRota = relFilterRota.value;
+        relFilterRota.innerHTML = '<option value="TODAS_ROTAS">-- Todas as Rotas --</option>';
+        defaultRotas.forEach(r => {
+          const opt = document.createElement('option');
+          opt.value = r; opt.textContent = r;
+          relFilterRota.appendChild(opt);
+        });
+        relFilterRota.value = defaultRotas.includes(currentRelRota) ? currentRelRota : 'TODAS_ROTAS';
+      }
     }
+
     function populateTagFilter() {
       const filterRota = document.getElementById('filter_rota').value;
       const filterSelect = document.getElementById('filter_tag');
       const currentVal = filterSelect.value;
-      
       let relevantRecords = cloudRecords;
       if(filterRota !== 'TODAS_ROTAS') relevantRecords = cloudRecords.filter(r => r.rota === filterRota);
-      
       const tags = [...new Set(relevantRecords.map(r => r.baseTag || r.tag))];
       filterSelect.innerHTML = '<option value="TODAS">-- Todas as Tags --</option>';
       tags.forEach(t => {
@@ -1378,6 +1443,7 @@
       });
       filterSelect.value = tags.includes(currentVal) ? currentVal : 'TODAS';
     }
+
     function populateDateFilterSelect() {
       const filterRota = document.getElementById('filter_rota').value;
       const dateSelect = document.getElementById('filter_date_select');
@@ -1399,6 +1465,7 @@
       });
       dateSelect.value = sortedDates.includes(currentVal) ? currentVal : 'TODAS_DATAS';
     }
+
     function onFilterRotaChange() { 
       populateTagFilter(); 
       populateDateFilterSelect();
@@ -1411,6 +1478,7 @@
       document.getElementById('filter_date_end').value = ''; 
       renderDashboard(); 
     }
+
     let chartInstance = null;
     function renderDashboard() {
       const filterRota = document.getElementById('filter_rota').value;
@@ -1422,7 +1490,6 @@
       let filtered = cloudRecords;
       if (filterRota !== 'TODAS_ROTAS') filtered = filtered.filter(r => r.rota === filterRota);
       if (filterTag !== 'TODAS') filtered = filtered.filter(r => (r.baseTag === filterTag || r.tag.includes(filterTag)));
-      
       if (dateStart && dateEnd) {
         filtered = filtered.filter(r => {
           const rDate = r.data_coleta.slice(0, 10);
@@ -1479,6 +1546,7 @@
       }
       renderChart(filtered);
     }
+
     function updateRelMedidoStatus(baseTag, isMedido) {
       if (!relatorioAnalysisState[baseTag]) {
         relatorioAnalysisState[baseTag] = { isMedido: isMedido, statusVal: 'Seguro', problema: '', recomendacao: '' };
@@ -1510,7 +1578,6 @@
     function clearTechnicalAnalysisState() {
       if (!confirm("Deseja realmente limpar todos os campos da análise preenchidos nesta tela?")) return;
       relatorioAnalysisState = {};
-      localStorage.removeItem('inspectcbm_rel_state');
       renderRelatorioTab();
     }
     async function saveTechnicalAnalysisState() {
@@ -1526,27 +1593,20 @@
       };
       try {
         await db.collection("inspectcbm_laudos").add(laudoObj);
+        alert("Análise técnica salva com sucesso na nuvem!");
       } catch (err) {
-        console.warn("Erro ao salvar no Firestore...", err);
+        alert("Erro ao salvar na nuvem: " + err.message);
       }
-      let savedLaudos = JSON.parse(localStorage.getItem('inspectcbm_saved_laudos')) || [];
-      savedLaudos.unshift(laudoObj);
-      localStorage.setItem('inspectcbm_saved_laudos', JSON.stringify(savedLaudos));
-      alert("Análise técnica salva com sucesso no histórico!");
-      fetchSavedLaudosHistory();
-      relatorioAnalysisState = {};
-      localStorage.removeItem('inspectcbm_rel_state');
-      renderRelatorioTab();
     }
     function fetchSavedLaudosHistory() {
       const container = document.getElementById('saved-laudos-list');
-      let savedLaudos = JSON.parse(localStorage.getItem('inspectcbm_saved_laudos')) || [];
-      if (savedLaudos.length === 0) {
+      if(!container) return;
+      if (cloudLaudos.length === 0) {
         container.innerHTML = `<p class="text-xs text-slate-500">Nenhum laudo salvo no histórico ainda.</p>`;
         return;
       }
       container.innerHTML = '';
-      savedLaudos.forEach((laudo, idx) => {
+      cloudLaudos.forEach((laudo, idx) => {
         const div = document.createElement('div');
         div.className = "flex justify-between items-center bg-slate-900 p-3 rounded-lg border border-slate-700 text-xs";
         div.innerHTML = `
@@ -1558,28 +1618,25 @@
           <div class="flex space-x-2">
             <button onclick="loadSavedLaudo(${idx})" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold px-2.5 py-1 rounded transition flex items-center"><i class="fa-solid fa-arrow-rotate-left mr-1"></i> Carregar</button>
             <button onclick="generatePDFFromSavedLaudo(${idx})" class="bg-rose-600 hover:bg-rose-500 text-white font-semibold px-2.5 py-1 rounded transition flex items-center shadow"><i class="fa-solid fa-file-pdf mr-1"></i> Gerar PDF</button>
-            <button onclick="deleteSavedLaudo(${idx})" class="text-rose-400 hover:text-rose-300 px-2 py-1 transition" title="Excluir"><i class="fa-solid fa-trash-can"></i></button>
+            <button onclick="deleteSavedLaudo('${laudo.docId}')" class="text-rose-400 hover:text-rose-300 px-2 py-1 transition" title="Excluir"><i class="fa-solid fa-trash-can"></i></button>
           </div>
         `;
         container.appendChild(div);
       });
     }
     function loadSavedLaudo(idx) {
-      let savedLaudos = JSON.parse(localStorage.getItem('inspectcbm_saved_laudos')) || [];
-      if(!savedLaudos[idx]) return;
-      const laudo = savedLaudos[idx];
+      const laudo = cloudLaudos[idx];
+      if(!laudo) return;
       document.getElementById('rel_filter_rota').value = laudo.rota || 'TODAS_ROTAS';
       if(laudo.dataColeta) document.getElementById('rel_data_coleta').value = laudo.dataColeta;
       if(laudo.dataAnalise) document.getElementById('rel_data_analise').value = laudo.dataAnalise;
       relatorioAnalysisState = laudo.state || {};
-      localStorage.setItem('inspectcbm_rel_state', JSON.stringify(relatorioAnalysisState));
       renderRelatorioTab();
       alert("Laudo carregado com sucesso!");
     }
     async function generatePDFFromSavedLaudo(idx) {
-      let savedLaudos = JSON.parse(localStorage.getItem('inspectcbm_saved_laudos')) || [];
-      if(!savedLaudos[idx]) return;
-      const laudo = savedLaudos[idx];
+      const laudo = cloudLaudos[idx];
+      if(!laudo) return;
       const previousState = JSON.parse(JSON.stringify(relatorioAnalysisState));
       const previousRota = document.getElementById('rel_filter_rota').value;
       const previousDataColeta = document.getElementById('rel_data_coleta').value;
@@ -1595,13 +1652,15 @@
       relatorioAnalysisState = previousState;
       renderRelatorioTab();
     }
-    function deleteSavedLaudo(idx) {
-      if(!confirm("Deseja excluir este laudo do histórico?")) return;
-      let savedLaudos = JSON.parse(localStorage.getItem('inspectcbm_saved_laudos')) || [];
-      savedLaudos.splice(idx, 1);
-      localStorage.setItem('inspectcbm_saved_laudos', JSON.stringify(savedLaudos));
-      fetchSavedLaudosHistory();
+    async function deleteSavedLaudo(docId) {
+      if(!confirm("Deseja excluir este laudo da nuvem?")) return;
+      try {
+        await db.collection("inspectcbm_laudos").doc(docId).delete();
+      } catch (err) {
+        alert("Erro ao excluir: " + err.message);
+      }
     }
+
     function renderRelatorioTab() {
       const filterRota = document.getElementById('rel_filter_rota').value;
       const filterStatus = document.getElementById('rel_filter_status').value;
@@ -1635,8 +1694,10 @@
           });
         });
       });
-      document.getElementById('rel-record-count').textContent = `${itemsToRender.length} equipamento(s)`;
+      const countEl = document.getElementById('rel-record-count');
+      if(countEl) countEl.textContent = `${itemsToRender.length} equipamento(s)`;
       const tbody = document.getElementById('rel-records-table-body');
+      if(!tbody) return;
       tbody.innerHTML = '';
       if (itemsToRender.length === 0) {
         tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-slate-500">Nenhum equipamento encontrado com o filtro selecionado (verifique a data da coleta).</td></tr>`;
@@ -1708,11 +1769,13 @@
         tbody.appendChild(tr);
       });
     }
+
     async function deleteCloudRecord(docId) {
       if(confirm('Excluir este registo?')) {
         await db.collection("inspectcbm_records").doc(docId).delete();
       }
     }
+
     function renderChart(data) {
       const ctx = document.getElementById('tempChart').getContext('2d');
       if(chartInstance) chartInstance.destroy();
@@ -1741,6 +1804,7 @@
         }
       });
     }
+
     function exportCSV() {
       const filterRota = document.getElementById('filter_rota').value;
       const filterTag = document.getElementById('filter_tag').value;
@@ -1775,6 +1839,7 @@
       link.download = `InspectCBM_Relatorio_${new Date().toISOString().slice(0,10)}.csv`;
       link.click();
     }
+
     async function exportDashboardPreAnalisePDF() {
       const { jsPDF } = window.jspdf;
       const filterRota = document.getElementById('filter_rota').value;
@@ -1864,13 +1929,13 @@
       });
       doc.save(`PreAnalise_Vibracao_Completa_${filterRota}_${new Date().toISOString().slice(0,10)}.pdf`);
     }
+
     function generateMiniChartBase64(tagBase) {
       return new Promise((resolve) => {
         const tagHistory = cloudRecords
           .filter(r => r.baseTag === tagBase || r.tag.includes(tagBase))
           .sort((a, b) => new Date(a.data_coleta) - new Date(b.data_coleta));
         if(tagHistory.length < 2) { resolve(null); return; }
-        
         const canvas = document.getElementById('hiddenPdfChart');
         const ctx = canvas.getContext('2d');
         const labels = tagHistory.map(r => new Date(r.data_coleta).toLocaleString('pt-PT', {dateStyle:'short', timeStyle:'short'}));
@@ -1905,6 +1970,7 @@
         }, 150);
       });
     }
+
     async function exportTechnicalPDF() {
       const { jsPDF } = window.jspdf;
       const filterRota = document.getElementById('rel_filter_rota').value;
@@ -1930,7 +1996,6 @@
         tagsDaRota.forEach(baseTag => {
           let lastRecord = cloudRecords.find(r => (r.baseTag === baseTag || r.tag.startsWith(baseTag)) && (!dataColetaInput || r.data_coleta.startsWith(dataColetaInput)));
           let state = relatorioAnalysisState[baseTag] || { isMedido: !!lastRecord, statusVal: 'Seguro', problema: '', recomendacao: '' };
-          
           if (filterStatus === 'MEDIDOS' && !state.isMedido) return;
           if (filterStatus === 'NAO_MEDIDOS' && state.isMedido) return;
           let tagData = cloudTagRegistry[baseTag] || {};
@@ -1971,7 +2036,6 @@
       for (let index = 0; index < filtered.length; index++) {
         const r = filtered[index];
         const state = r.analysisState;
-        
         let secaoTagData = [`TAG: ${r.tag}`, `SAP: ${r.sap_number || '-'}`, `COLETA: ${dataColetaFmt}  |  ANÁLISE: ${dataAnaliseFmt}`].join('  |  ');
         let secaoStatus = `STATUS DO EQUIPAMENTO: ${state.isMedido ? state.statusVal.toUpperCase() : 'NÃO MEDIDO'}`;
         let secaoInfo = [
@@ -1980,7 +2044,6 @@
           `• Setor: ${r.setor || '-'} (Área: ${r.area || '-'})`,
           `• Conjunto: ${r.componente || '-'}`
         ].join('\n');
-        
         let secaoProblema = `PROBLEMA:\n${state.isMedido && state.problema ? state.problema : 'Nenhum problema reportado'}`;
         let secaoRecomendacao = `RECOMENDAÇÃO:\n${state.isMedido && state.recomendacao ? state.recomendacao : 'Nenhuma recomendação registrada'}`;
         let secaoInspetor = `RESPONSÁVEL TÉCNICO: ${r.inspetor || '-'}`;
