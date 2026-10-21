@@ -41,6 +41,7 @@
       if(document.getElementById("rel_data_coleta")) document.getElementById("rel_data_coleta").value = isoNow.slice(0,10);
       if(document.getElementById("rel_data_analise")) document.getElementById("rel_data_analise").valueAsDate = new Date();
       if(document.getElementById("sup_data_coleta")) document.getElementById("sup_data_coleta").value = isoNow.slice(0,10);
+      if(document.getElementById("sup_mes_filtro")) document.getElementById("sup_mes_filtro").value = isoNow.slice(0,7);
       
       initCloudListeners();
     });
@@ -83,11 +84,8 @@
         <span class="text-slate-800">|</span>
         <div><span class="text-slate-500">STATUS:</span> <span class="text-emerald-400 font-bold">ONLINE</span></div>
       </div>
-      <!-- Navegação por Abas -->
+      <!-- Navegação por Abas (Supervisório ao lado do Laudo Técnico) -->
       <div class="flex items-center space-x-2 flex-wrap">
-        <button id="btn-tab-supervisorio" onclick="switchTab('supervisorio')" class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition flex items-center border border-slate-700/50 shadow-inner">
-          <i class="fa-solid fa-network-wired mr-1.5 text-emerald-400"></i> Supervisório
-        </button>
         <button id="btn-tab-form" onclick="switchTab('form')" class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition flex items-center border border-slate-700/50 shadow-inner">
           <i class="fa-solid fa-clipboard-check mr-1.5 text-amber-400"></i> Coleta
         </button>
@@ -97,14 +95,17 @@
         <button id="btn-tab-relatorio" onclick="switchTab('relatorio')" class="px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 hover:from-amber-400 hover:to-amber-500 transition flex items-center shadow-lg shadow-amber-500/20">
           <i class="fa-solid fa-file-pdf mr-1.5"></i> Laudo Técnico
         </button>
+        <button id="btn-tab-supervisorio" onclick="switchTab('supervisorio')" class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition flex items-center border border-slate-700/50 shadow-inner">
+          <i class="fa-solid fa-network-wired mr-1.5 text-emerald-400"></i> Supervisório
+        </button>
       </div>
     </div>
   </header>
   <!-- Main Container -->
   <main class="max-w-7xl mx-auto px-4 mt-6">
     
-    <!-- SEÇÃO 4: TELA DO SUPERVISÓRIO DE CBM -->
-    <div id="tab-supervisorio" class="space-y-6">
+    <!-- SEÇÃO: TELA DO SUPERVISÓRIO DE CBM -->
+    <div id="tab-supervisorio" class="hidden space-y-6">
       <div class="bg-slate-900/90 backdrop-blur-md rounded-2xl p-5 border border-slate-800 shadow-2xl flex flex-col md:flex-row justify-between items-center gap-4">
         <div>
           <h2 class="text-sm font-bold text-white uppercase tracking-wider font-mono flex items-center">
@@ -209,6 +210,7 @@
             <thead class="bg-slate-950/80 text-slate-400 uppercase font-semibold font-mono tracking-wider">
               <tr>
                 <th class="p-3">Status / Criticidade</th>
+                <th class="p-3">Alterar Status Manual</th>
                 <th class="p-3">Rota / Tag</th>
                 <th class="p-3">Equipamento & Setor</th>
                 <th class="p-3">Falhas Apontadas</th>
@@ -221,7 +223,7 @@
       </div>
     </div>
     <!-- SEÇÃO: FORMULÁRIO DE COLETA DE CAMPO -->
-    <div id="tab-form" class="hidden max-w-5xl mx-auto space-y-6">
+    <div id="tab-form" class="max-w-5xl mx-auto space-y-6">
       <form id="vibration-form" onsubmit="saveInspection(event)" class="space-y-6">
         
         <div class="bg-slate-900/90 backdrop-blur-md rounded-2xl p-6 border border-slate-800 shadow-2xl relative overflow-hidden">
@@ -1186,9 +1188,18 @@
       } else { alert("Esta tag já está cadastrada nesta rota."); }
     }
     async function removeTag(rota, index) {
-      defaultTagMap[rota].splice(index, 1);
-      await saveConfigToCloud();
-      renderTagsList();
+      const tagToRemove = defaultTagMap[rota][index];
+      if (confirm(`Deseja realmente EXCLUIR permanentemente a Tag ${tagToRemove} e todos os seus parâmetros salvos?`)) {
+        defaultTagMap[rota].splice(index, 1);
+        await saveConfigToCloud();
+        try {
+          await db.collection("inspectcbm_tags").doc(tagToRemove).delete();
+          delete cloudTagRegistry[tagToRemove];
+        } catch(e) {
+          console.error("Erro ao remover tag da nuvem:", e);
+        }
+        renderTagsList();
+      }
     }
     function manageInspetoresModal() {
       document.getElementById('modal-inspetores').classList.remove('hidden');
@@ -1573,6 +1584,39 @@
       }
       renderSupervisorioTab();
     }
+
+    // Função para alterar o status diretamente pelo Supervisório
+    async function changeSupervisorioStatus(baseTag, newStatus, docId) {
+      if (!relatorioAnalysisState[baseTag]) {
+        relatorioAnalysisState[baseTag] = { isMedido: true, statusVal: newStatus, falhas: [], deteccao: '', problema: '', recomendacao: '' };
+      } else {
+        relatorioAnalysisState[baseTag].statusVal = newStatus;
+      }
+
+      // Se for alterado para "Seguro", zera as falhas e problemas associados
+      if (newStatus === 'Seguro') {
+        relatorioAnalysisState[baseTag].falhas = [];
+        relatorioAnalysisState[baseTag].problema = '-';
+      }
+
+      // Se existir um laudo salvo correspondente, atualiza no Firestore
+      if (docId) {
+        try {
+          let laudo = cloudLaudos.find(l => l.docId === docId);
+          if (laudo) {
+            let updatedState = laudo.state || {};
+            updatedState[baseTag] = relatorioAnalysisState[baseTag];
+            await db.collection("inspectcbm_laudos").doc(docId).set({ state: updatedState }, { merge: true });
+          }
+        } catch (e) {
+          console.error("Erro ao atualizar status na nuvem:", e);
+        }
+      }
+
+      renderRelatorioTab();
+      renderSupervisorioTab();
+    }
+
     function renderSupervisorioTab() {
       const supFilterRotaEl = document.getElementById('sup_filter_rota');
       if(!supFilterRotaEl) return;
@@ -1586,7 +1630,6 @@
       } else {
         rotasParaAnalisar = selectedRotas;
       }
-
       let targetLaudo = null;
       if (cloudLaudos && cloudLaudos.length > 0) {
         targetLaudo = cloudLaudos.find(l => {
@@ -1596,10 +1639,21 @@
           return matchRota && matchData && matchMes;
         }) || cloudLaudos[0];
       }
-
       let laudoState = targetLaudo ? (targetLaudo.state || {}) : {};
+      
+      // Desduplicar tags por baseTag para evitar duplicações na estratificação
+      let tagToRotaMap = {};
+      rotasParaAnalisar.forEach(rota => {
+        let tagsDaRota = defaultTagMap[rota] || [];
+        tagsDaRota.forEach(baseTag => {
+          if (!tagToRotaMap[baseTag]) {
+            tagToRotaMap[baseTag] = rota;
+          }
+        });
+      });
+      let uniqueBaseTags = Object.keys(tagToRotaMap);
 
-      let totalAtivos = 0;
+      let totalAtivos = uniqueBaseTags.length;
       let countSeguro = 0;
       let countA1 = 0;
       let countA2 = 0;
@@ -1610,48 +1664,50 @@
       availableFalhaTypes.forEach(f => falhasEstratificacaoCount[f] = 0);
       
       let tableItems = [];
-      rotasParaAnalisar.forEach(rota => {
-        let tagsDaRota = defaultTagMap[rota] || [];
-        tagsDaRota.forEach(baseTag => {
-          totalAtivos++;
-          let assetState = laudoState[baseTag];
-          
-          let isMedido = assetState ? (assetState.isMedido !== undefined ? assetState.isMedido : false) : false;
-          let statusVal = assetState ? (assetState.statusVal || 'Seguro') : 'Seguro';
-          let problemaDesc = assetState ? (assetState.problema || '-') : '-';
-          let falhasList = assetState ? (assetState.falhas || []) : [];
+      uniqueBaseTags.forEach(baseTag => {
+        let rota = tagToRotaMap[baseTag];
+        let assetState = relatorioAnalysisState[baseTag] || laudoState[baseTag];
+        
+        let isMedido = assetState ? (assetState.isMedido !== undefined ? assetState.isMedido : false) : false;
+        let statusVal = assetState ? (assetState.statusVal || 'Seguro') : 'Seguro';
+        let problemaDesc = assetState ? (assetState.problema || '-') : '-';
+        let falhasList = assetState ? (assetState.falhas || []) : [];
 
-          if (!isMedido) {
-            countNaoMedido++;
-          } else {
-            if (statusVal === 'Seguro') countSeguro++;
-            else if (statusVal === 'Alarme A1') countA1++;
-            else if (statusVal === 'Alarme A2') countA2++;
-            else if (statusVal === 'Perigo P1' || statusVal === 'Perigo P2') countPerigo++;
-            else countSeguro++;
+        // Se o status for alterado para "Seguro", zera as falhas contabilizadas
+        if (statusVal === 'Seguro') {
+          falhasList = [];
+        }
 
-            falhasList.forEach(falha => {
-              if (falhasEstratificacaoCount[falha] !== undefined) {
-                falhasEstratificacaoCount[falha]++;
-              }
-            });
-          }
+        if (!isMedido) {
+          countNaoMedido++;
+        } else {
+          if (statusVal === 'Seguro') countSeguro++;
+          else if (statusVal === 'Alarme A1') countA1++;
+          else if (statusVal === 'Alarme A2') countA2++;
+          else if (statusVal === 'Perigo P1' || statusVal === 'Perigo P2') countPerigo++;
+          else countSeguro++;
 
-          let tagData = cloudTagRegistry[baseTag] || {};
-          tableItems.push({
-            baseTag: baseTag,
-            rota: rota,
-            equipamento: tagData.equipamento_nome || '-',
-            setor: tagData.setor || '-',
-            isMedido: isMedido,
-            statusVal: isMedido ? statusVal : 'Não Medido',
-            dataColeta: targetLaudo ? targetLaudo.dataColeta : null,
-            problema: problemaDesc,
-            falhas: falhasList
+          falhasList.forEach(falha => {
+            if (falhasEstratificacaoCount[falha] !== undefined) {
+              falhasEstratificacaoCount[falha]++;
+            }
           });
+        }
+        let tagData = cloudTagRegistry[baseTag] || {};
+        tableItems.push({
+          baseTag: baseTag,
+          rota: rota,
+          equipamento: tagData.equipamento_nome || '-',
+          setor: tagData.setor || '-',
+          isMedido: isMedido,
+          statusVal: isMedido ? statusVal : 'Não Medido',
+          dataColeta: targetLaudo ? targetLaudo.dataColeta : null,
+          problema: problemaDesc,
+          falhas: falhasList,
+          laudoDocId: targetLaudo ? targetLaudo.docId : null
         });
       });
-
+      
       document.getElementById('sup-kpi-total').textContent = totalAtivos;
       document.getElementById('sup-kpi-seguro').textContent = countSeguro;
       document.getElementById('sup-kpi-a1').textContent = countA1;
@@ -1659,11 +1715,11 @@
       document.getElementById('sup-kpi-perigo').textContent = countPerigo;
       document.getElementById('sup-kpi-naomedido').textContent = countNaoMedido;
       document.getElementById('sup-table-count').textContent = `${tableItems.length} ativos`;
-
+      
       const tbody = document.getElementById('sup-table-body');
       tbody.innerHTML = '';
       if(tableItems.length === 0 || !targetLaudo) {
-        tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-slate-500 italic">Nenhum laudo salvo encontrado na nuvem para alimentar o supervisório.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-slate-500 italic">Nenhum laudo salvo encontrado na nuvem para alimentar o supervisório.</td></tr>`;
       } else {
         tableItems.forEach(item => {
           const tr = document.createElement('tr');
@@ -1673,11 +1729,20 @@
           
           let falhasBadges = item.falhas.length > 0 
             ? item.falhas.map(f => `<span class="inline-block bg-amber-500/10 text-amber-300 border border-amber-500/30 text-[10px] px-2 py-0.5 rounded-md mr-1 mb-1 font-mono">${f}</span>`).join('')
-            : '<span class="text-[10px] text-slate-500 italic">Nenhuma falha selecionada</span>';
+            : '<span class="text-[10px] text-slate-500 italic">Nenhuma falha ativa</span>';
 
           tr.innerHTML = `
             <td class="p-3">
               <span class="px-2.5 py-1 rounded-lg text-[11px] font-bold border font-mono ${badgeClass}">${item.statusVal}</span>
+            </td>
+            <td class="p-3">
+              <select onchange="changeSupervisorioStatus('${item.baseTag}', this.value, '${item.laudoDocId || ''}')" class="bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg px-2 py-1 font-mono focus:border-emerald-500">
+                <option value="Seguro" ${item.statusVal === 'Seguro' ? 'selected' : ''}>🟩 Seguro (Zerar)</option>
+                <option value="Alarme A1" ${item.statusVal === 'Alarme A1' ? 'selected' : ''}>🟨 Alarme A1</option>
+                <option value="Alarme A2" ${item.statusVal === 'Alarme A2' ? 'selected' : ''}>🟧 Alarme A2</option>
+                <option value="Perigo P1" ${item.statusVal === 'Perigo P1' ? 'selected' : ''}>🟥 Perigo P1</option>
+                <option value="Perigo P2" ${item.statusVal === 'Perigo P2' ? 'selected' : ''}>🟣 Perigo P2</option>
+              </select>
             </td>
             <td class="p-3">
               <span class="font-bold text-amber-400 font-mono">${item.baseTag}</span><br>
@@ -1699,6 +1764,7 @@
       }
       renderSupervisorioCharts(countSeguro, countA1, countA2, countPerigo, countNaoMedido, falhasEstratificacaoCount);
     }
+
     function renderSupervisorioCharts(seg, a1, a2, perigo, naomedido, falhasCounts) {
       const ctxDoughnut = document.getElementById('supDoughnutChart').getContext('2d');
       if (supDoughnutInstance) supDoughnutInstance.destroy();
@@ -1770,6 +1836,7 @@
         }
       });
     }
+
     let chartInstance = null;
     function renderDashboard() {
       const filterRota = document.getElementById('filter_rota').value;
@@ -1883,7 +1950,6 @@
       }
     }
     function clearTechnicalAnalysisState() {
-      if (!confirm("Deseja realmente limpar todos os campos da análise preenchidos nesta tela?")) return;
       relatorioAnalysisState = {};
       renderRelatorioTab();
       renderSupervisorioTab();
@@ -1904,6 +1970,9 @@
       try {
         await db.collection("inspectcbm_laudos").add(laudoObj);
         alert("Análise técnica salva com sucesso na nuvem!");
+        
+        // Zera e limpa todos os campos da aba de laudos técnicos após salvar
+        clearTechnicalAnalysisState();
       } catch (err) {
         alert("Erro ao salvar na nuvem: " + err.message);
       }
@@ -1945,7 +2014,7 @@
       }
       if(laudo.dataColeta) document.getElementById('rel_data_coleta').value = laudo.dataColeta;
       if(laudo.dataAnalise) document.getElementById('rel_data_analise').value = laudo.dataAnalise;
-      relatorioAnalysisState = laudo.state || {};
+      relatorioAnalysisState = JSON.parse(JSON.stringify(laudo.state || {}));
       renderRelatorioTab();
       renderSupervisorioTab();
       alert("Laudo carregado com sucesso!");
