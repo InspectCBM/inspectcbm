@@ -702,8 +702,8 @@
           <div>
             <label class="block text-xs font-semibold text-slate-300 mb-1">Status de Medição *</label>
             <select id="rel_filter_status" onchange="renderRelatorioTab()" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-amber-400 font-semibold shadow-inner">
-              <option value="TODOS">-- Todos os Status --</option>
-              <option value="MEDIDOS" selected>Medidos</option>
+              <option value="TODOS" selected>-- Todos os Status (Cadastradas & Coletadas) --</option>
+              <option value="MEDIDOS">Medidos</option>
               <option value="NAO_MEDIDOS">Não Medidos</option>
             </select>
           </div>
@@ -1607,7 +1607,6 @@
       renderSupervisorioTab();
     }
 
-    // Função para salvar a pré-análise da rota atual e limpar/zerar a área imediatamente
     async function savePreAnaliseRouteState() {
       const filterRota = document.getElementById('filter_rota').value;
       if (filterRota === 'TODAS_ROTAS') {
@@ -1619,7 +1618,6 @@
       const dateStart = document.getElementById('filter_date_start').value;
       const dateEnd = document.getElementById('filter_date_end').value;
 
-      // Recolher os registos visíveis atualmente na tabela de pré-análise
       let filtered = cloudRecords;
       if (filterRota !== 'TODAS_ROTAS') filtered = filtered.filter(r => r.rota === filterRota);
       if (filterTag !== 'TODAS') filtered = filtered.filter(r => (r.baseTag === filterTag || r.tag.includes(filterTag)));
@@ -1653,14 +1651,12 @@
         await db.collection("inspectcbm_prelaudos").add(preLaudoObj);
         alert(`Pré-análise da rota "${filterRota}" salva com sucesso na nuvem!`);
 
-        // LIMPEZA E RESET AUTOMÁTICO DA ÁREA DA PRÉ-ANÁLISE APÓS SALVAR
         document.getElementById('filter_rota').value = 'TODAS_ROTAS';
         document.getElementById('filter_tag').value = 'TODAS';
         document.getElementById('filter_date_select').value = 'TODAS_DATAS';
         document.getElementById('filter_date_start').value = '';
         document.getElementById('filter_date_end').value = '';
         
-        // Atualiza a visualização com os filtros limpos (voltando ao estado padrão/vazio)
         onFilterRotaChange();
       } catch (err) {
         alert("Erro ao salvar pré-análise na nuvem: " + err.message);
@@ -1827,7 +1823,6 @@
       }
     }
 
-    // Função para alterar o status diretamente pelo Supervisório
     async function changeSupervisorioStatus(baseTag, newStatus, docId) {
       if (!relatorioAnalysisState[baseTag]) {
         relatorioAnalysisState[baseTag] = { isMedido: true, statusVal: newStatus, falhas: [], deteccao: '', problema: '', recomendacao: '' };
@@ -1835,13 +1830,11 @@
         relatorioAnalysisState[baseTag].statusVal = newStatus;
       }
 
-      // Se for alterado para "Seguro", zera as falhas e problemas associados
       if (newStatus === 'Seguro') {
         relatorioAnalysisState[baseTag].falhas = [];
         relatorioAnalysisState[baseTag].problema = '-';
       }
 
-      // Se existir um laudo salvo correspondente, atualiza no Firestore
       if (docId) {
         try {
           let laudo = cloudLaudos.find(l => l.docId === docId);
@@ -2383,7 +2376,7 @@
             <span class="text-slate-400">Setor: ${r ? r.setor : (tagData.setor || '-')}</span>
           </td>
           <td class="p-3 text-[11px]">
-            ${item.isMedido && r ? `${r.status_operacao} (${r.carga_pressao_str})<br>Strobo: <b class="text-amber-400 font-mono">${r.rpm_real_strobo} RPM</b>` : '<span class="text-slate-500 italic">Pendente</span>'}
+            ${item.isMedido && r ? `${r.status_operacao} (${r.carga_pressao_str})<br>Strobo: <b class="text-amber-400 font-mono">${r.rpm_real_strobo} RPM</b>` : '<span class="text-slate-500 italic">Pendente / Coleta Externa</span>'}
           </td>
           <td class="p-3 text-[11px] font-mono ${item.isMedido && r ? 'text-rose-400' : 'text-slate-500'}">
             Motor: ${item.isMedido && r && r.temp_la !== null ? `${r.temp_la}°C` : '-'}<br>
