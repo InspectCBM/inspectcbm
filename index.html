@@ -84,7 +84,7 @@
         <span class="text-slate-800">|</span>
         <div><span class="text-slate-500">STATUS:</span> <span class="text-emerald-400 font-bold">ONLINE</span></div>
       </div>
-      <!-- Navegação por Abas (Supervisório ao lado do Laudo Técnico) -->
+      <!-- Navegação por Abas -->
       <div class="flex items-center space-x-2 flex-wrap">
         <button id="btn-tab-form" onclick="switchTab('form')" class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition flex items-center border border-slate-700/50 shadow-inner">
           <i class="fa-solid fa-clipboard-check mr-1.5 text-amber-400"></i> Coleta
@@ -92,8 +92,8 @@
         <button id="btn-tab-dashboard" onclick="switchTab('dashboard')" class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition flex items-center border border-slate-700/50 shadow-inner">
           <i class="fa-solid fa-chart-line mr-1.5 text-cyan-400"></i> Pré-Análise
         </button>
-        <button id="btn-tab-relatorio" onclick="switchTab('relatorio')" class="px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 hover:from-amber-400 hover:to-amber-500 transition flex items-center shadow-lg shadow-amber-500/20">
-          <i class="fa-solid fa-file-pdf mr-1.5"></i> Laudo Técnico
+        <button id="btn-tab-relatorio" onclick="switchTab('relatorio')" class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition flex items-center border border-slate-700/50 shadow-inner">
+          <i class="fa-solid fa-file-pdf mr-1.5 text-amber-400"></i> Laudo Técnico
         </button>
         <button id="btn-tab-supervisorio" onclick="switchTab('supervisorio')" class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition flex items-center border border-slate-700/50 shadow-inner">
           <i class="fa-solid fa-network-wired mr-1.5 text-emerald-400"></i> Supervisório
@@ -616,6 +616,9 @@
           <button onclick="clearDateFilter()" title="Limpar datas" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-2.5 py-2 rounded-xl transition border border-slate-700">
             <i class="fa-solid fa-xmark"></i>
           </button>
+          <button onclick="savePreAnaliseRouteState()" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs px-3.5 py-2 rounded-xl transition shadow flex items-center">
+            <i class="fa-solid fa-floppy-disk mr-1.5"></i> Salvar Pré-Análise
+          </button>
           <button onclick="exportCSV()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs px-3.5 py-2 rounded-xl transition shadow flex items-center">
             <i class="fa-solid fa-file-excel mr-1"></i> CSV
           </button>
@@ -653,6 +656,16 @@
             </thead>
             <tbody id="records-table-body" class="divide-y divide-slate-800/60"></tbody>
           </table>
+        </div>
+      </div>
+      <!-- HISTÓRICO DE PRÉ-ANÁLISES SALVAS -->
+      <div class="bg-slate-900/90 backdrop-blur-md rounded-2xl p-6 border border-slate-800 shadow-2xl space-y-4 relative overflow-hidden">
+        <div class="absolute top-0 left-0 w-1 h-full bg-amber-500"></div>
+        <h3 class="text-xs font-bold text-amber-400 uppercase tracking-widest flex items-center font-mono">
+          <i class="fa-solid fa-clock-rotate-left mr-2 text-sm"></i> Histórico de Pré-Análises Salvas na Nuvem
+        </h3>
+        <div id="saved-prelaudos-list" class="space-y-2.5 max-h-60 overflow-y-auto">
+          <p class="text-xs text-slate-500 italic">Nenhuma pré-análise salva no histórico ainda.</p>
         </div>
       </div>
     </div>
@@ -823,6 +836,7 @@
     };
     let defaultInspetores = ["RAFAEL AUGUSTO", "Técnico Confiabilidade 1"];
     let cloudLaudos = [];
+    let cloudPreLaudos = [];
     
     let currentPhotoBase64 = "";
     let cloudRecords = [];
@@ -875,7 +889,7 @@
         btnDash.className = "px-3.5 py-2 rounded-xl text-xs font-semibold bg-cyan-500 text-slate-950 transition flex items-center shadow-md font-bold";
       } else if(tab === 'relatorio') {
         relTab.classList.remove('hidden');
-        btnRel.className = "px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 transition flex items-center shadow-lg shadow-amber-500/20";
+        btnRel.className = "px-4 py-2 rounded-xl text-xs font-bold bg-amber-500 text-slate-950 transition flex items-center shadow-md font-bold";
       }
     }
     function initCloudListeners() {
@@ -930,6 +944,14 @@
         cloudLaudos.sort((a, b) => b.id - a.id);
         fetchSavedLaudosHistory();
         renderSupervisorioTab();
+      });
+      db.collection("inspectcbm_prelaudos").onSnapshot((snapshot) => {
+        cloudPreLaudos = [];
+        snapshot.forEach((doc) => {
+          cloudPreLaudos.push({ docId: doc.id, ...doc.data() });
+        });
+        cloudPreLaudos.sort((a, b) => b.id - a.id);
+        fetchSavedPreLaudosHistory();
       });
     }
     function updateSupervisoryKPIs() {
@@ -1585,6 +1607,226 @@
       renderSupervisorioTab();
     }
 
+    // Função para salvar a pré-análise da rota atual e limpar/zerar a área imediatamente
+    async function savePreAnaliseRouteState() {
+      const filterRota = document.getElementById('filter_rota').value;
+      if (filterRota === 'TODAS_ROTAS') {
+        alert("Por favor, selecione uma rota específica na Pré-Análise antes de salvar.");
+        return;
+      }
+      const filterTag = document.getElementById('filter_tag').value;
+      const filterDateSelect = document.getElementById('filter_date_select').value;
+      const dateStart = document.getElementById('filter_date_start').value;
+      const dateEnd = document.getElementById('filter_date_end').value;
+
+      // Recolher os registos visíveis atualmente na tabela de pré-análise
+      let filtered = cloudRecords;
+      if (filterRota !== 'TODAS_ROTAS') filtered = filtered.filter(r => r.rota === filterRota);
+      if (filterTag !== 'TODAS') filtered = filtered.filter(r => (r.baseTag === filterTag || r.tag.includes(filterTag)));
+      if (dateStart && dateEnd) {
+        filtered = filtered.filter(r => {
+          const rDate = r.data_coleta.slice(0, 10);
+          return rDate >= dateStart && rDate <= dateEnd;
+        });
+      } else if (dateStart) {
+        filtered = filtered.filter(r => r.data_coleta.slice(0, 10) >= dateStart);
+      } else if (dateEnd) {
+        filtered = filtered.filter(r => r.data_coleta.slice(0, 10) <= dateEnd);
+      } else if (filterDateSelect !== 'TODAS_DATAS') {
+        filtered = filtered.filter(r => r.data_coleta.startsWith(filterDateSelect));
+      }
+
+      if (filtered.length === 0) {
+        alert("Não existem registos visíveis na pré-análise para salvar nesta rota.");
+        return;
+      }
+
+      const preLaudoObj = {
+        id: Date.now(),
+        rota: filterRota,
+        tagFiltro: filterTag,
+        dataSalvar: new Date().toISOString(),
+        registros: filtered
+      };
+
+      try {
+        await db.collection("inspectcbm_prelaudos").add(preLaudoObj);
+        alert(`Pré-análise da rota "${filterRota}" salva com sucesso na nuvem!`);
+
+        // LIMPEZA E RESET AUTOMÁTICO DA ÁREA DA PRÉ-ANÁLISE APÓS SALVAR
+        document.getElementById('filter_rota').value = 'TODAS_ROTAS';
+        document.getElementById('filter_tag').value = 'TODAS';
+        document.getElementById('filter_date_select').value = 'TODAS_DATAS';
+        document.getElementById('filter_date_start').value = '';
+        document.getElementById('filter_date_end').value = '';
+        
+        // Atualiza a visualização com os filtros limpos (voltando ao estado padrão/vazio)
+        onFilterRotaChange();
+      } catch (err) {
+        alert("Erro ao salvar pré-análise na nuvem: " + err.message);
+      }
+    }
+
+    function fetchSavedPreLaudosHistory() {
+      const container = document.getElementById('saved-prelaudos-list');
+      if(!container) return;
+      if (cloudPreLaudos.length === 0) {
+        container.innerHTML = `<p class="text-xs text-slate-500 italic">Nenhuma pré-análise salva no histórico ainda.</p>`;
+        return;
+      }
+      container.innerHTML = '';
+      cloudPreLaudos.forEach((pl, idx) => {
+        const dataFmt = new Date(pl.dataSalvar).toLocaleString('pt-PT', {dateStyle:'short', timeStyle:'short'});
+        const div = document.createElement('div');
+        div.className = "flex flex-col sm:flex-row justify-between items-start sm:items-center bg-slate-950 p-3.5 rounded-xl border border-slate-800 text-xs gap-3";
+        div.innerHTML = `
+          <div>
+            <span class="font-bold text-amber-400 font-mono">Rota: ${pl.rota}</span> | 
+            <span class="text-slate-300">Itens: ${pl.registros?.length || 0}</span> | 
+            <span class="text-slate-400">Salvo em: ${dataFmt}</span>
+          </div>
+          <div class="flex items-center space-x-2">
+            <button onclick="loadSavedPreLaudo(${idx})" class="bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/30 font-semibold px-2.5 py-1.5 rounded-lg transition flex items-center"><i class="fa-solid fa-arrow-rotate-left mr-1"></i> Carregar</button>
+            <button onclick="exportSavedPreLaudoPDF(${idx})" class="bg-rose-600 hover:bg-rose-500 text-white font-semibold px-2.5 py-1.5 rounded-lg transition flex items-center shadow"><i class="fa-solid fa-file-pdf mr-1"></i> PDF</button>
+            <button onclick="deleteSavedPreLaudo('${pl.docId}')" class="text-rose-400 hover:text-rose-300 px-2 py-1.5 transition" title="Excluir"><i class="fa-solid fa-trash-can"></i></button>
+          </div>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function loadSavedPreLaudo(idx) {
+      const pl = cloudPreLaudos[idx];
+      if(!pl) return;
+      document.getElementById('filter_rota').value = pl.rota;
+      onFilterRotaChange();
+      renderDashboardWithCustomData(pl.registros);
+      alert(`Pré-análise da rota "${pl.rota}" carregada com sucesso!`);
+    }
+
+    function renderDashboardWithCustomData(customRecords) {
+      document.getElementById('record-count').textContent = `${customRecords.length} registo(s) (Pré-Análise Salva)`;
+      const tbody = document.getElementById('records-table-body');
+      tbody.innerHTML = '';
+      
+      if(customRecords.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-slate-500 italic">Nenhum registo nesta pré-análise.</td></tr>`;
+      } else {
+        customRecords.forEach(r => {
+          let allObs = [];
+          if(r.observacoes && r.observacoes !== '-') allObs.push(`Geral: ${r.observacoes}`);
+          if(r.strobo_obs && r.strobo_obs !== '-') allObs.push(`Strobo: ${r.strobo_obs}`);
+          if(r.temp_obs && r.temp_obs !== '-') allObs.push(`Temp: ${r.temp_obs}`);
+          
+          const tr = document.createElement('tr');
+          tr.className = "hover:bg-slate-800/40 transition";
+          tr.innerHTML = `
+            <td class="p-3">
+              ${r.photo ? `<img src="${r.photo}" class="w-10 h-10 object-cover rounded-lg mb-1 border border-amber-500/30 shadow">` : '<span class="text-[10px] text-slate-500">Sem foto</span>'}
+              <span class="font-mono text-[10px] text-slate-400 block">${new Date(r.data_coleta).toLocaleString('pt-PT', {dateStyle:'short', timeStyle:'short'})}</span>
+            </td>
+            <td class="p-3">
+              <span class="font-bold text-amber-400 font-mono text-xs">${r.tag}</span><br>
+              <span class="text-[10px] text-slate-400">Rota: ${r.rota || '-'}</span>
+            </td>
+            <td class="p-3 text-[11px]"><b class="text-white">${r.componente || 'Conjunto'}</b><br>Equip: ${r.equipamento_nome} ${r.sap_number && r.sap_number !== '-' ? '(SAP: ' + r.sap_number + ')' : ''}<br><span class="text-slate-400">Setor: ${r.setor}</span></td>
+            <td class="p-3 text-[11px]">${r.status_operacao} (${r.carga_pressao_str})<br>Strobo: <b class="text-amber-400 font-mono">${r.rpm_real_strobo} RPM</b></td>
+            <td class="p-3 text-[11px] font-mono text-rose-400">
+              Motor LA/LOA: ${r.temp_la !== null ? r.temp_la + '°C' : '-'}/${r.temp_loa !== null ? r.temp_loa + '°C' : '-'}<br>
+              Comp.2 P1/P2: ${r.temp_c2_p1 !== null ? r.temp_c2_p1 + '°C' : '-'}/${r.temp_c2_p2 !== null ? r.temp_c2_p2 + '°C' : '-'}
+            </td>
+            <td class="p-3 text-[11px]">
+              <span class="font-bold text-slate-200">${r.inspetor}</span>
+              ${allObs.length > 0 ? `<div class="text-amber-300/90 text-[10px] mt-1 bg-slate-950 p-2 rounded-lg border border-slate-800">${allObs.join('<br>')}</div>` : '<div class="text-slate-500 text-[10px]">Sem obs.</div>'}
+            </td>
+            <td class="p-3 text-center">
+              <span class="text-xs text-emerald-400 font-mono font-bold">Salvo</span>
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+      }
+      renderChart(customRecords);
+    }
+
+    async function exportSavedPreLaudoPDF(idx) {
+      const pl = cloudPreLaudos[idx];
+      if(!pl) return;
+      
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF('p', 'mm', 'a4');
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(13);
+      doc.setTextColor(30, 41, 59);
+      doc.text(`PRÉ-ANÁLISE SALVA (ROTA: ${pl.rota.toUpperCase()})`, 14, 15);
+      
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(100, 116, 139);
+      doc.text(`Data Salvamento: ${new Date(pl.dataSalvar).toLocaleString('pt-PT')} | Total Itens: ${pl.registros.length}`, 14, 20);
+      
+      const tableRows = [];
+      const imageCellStore = [];
+      pl.registros.forEach((r, index) => {
+        let dataFmt = new Date(r.data_coleta).toLocaleString('pt-PT', {dateStyle:'short', timeStyle:'short'});
+        let blocoIdentificacao = `DATA: ${dataFmt}\nTAG: ${r.tag}\nSAP: ${r.sap_number || '-'}\nROTA: ${r.rota || '-'}\nLOCAL: ${r.equipamento_nome || '-'} (${r.setor || '-'}/${r.area || '-'})\nCONJUNTO: ${r.componente || '-'}\nINSPETOR: ${r.inspetor || '-'}`;
+        let blocoOperacaoStrobo = `OPERAÇÃO: ${r.status_operacao || '-'} (${r.carga_pressao_str || '-'})\nSTROBO RPM: ${r.rpm_real_strobo || '-'}\nACOPLAMENTO: ${r.acoplamento_status || '-'}\nANOMALIAS STROBO: ${r.strobo_obs || '-'}`;
+        let blocoTemperaturas = `MOTOR LA: ${r.temp_la !== null ? r.temp_la + '°C' : '-'}\nMOTOR LOA: ${r.temp_loa !== null ? r.temp_loa + '°C' : '-'}\nCOMP.2 P1: ${r.temp_c2_p1 !== null ? r.temp_c2_p1 + '°C' : '-'}\nCOMP.2 P2: ${r.temp_c2_p2 !== null ? r.temp_c2_p2 + '°C' : '-'}\nOBS TEMP: ${r.temp_obs || '-'}`;
+        let visuaisArr = [
+          `Ruído: ${r.ruido_status}${r.ruido_obs ? ' ('+r.ruido_obs+')' : ''}`,
+          `Limpeza: ${r.limpeza_status}${r.limpeza_obs ? ' ('+r.limpeza_obs+')' : ''}`,
+          `Óleo/Massa: ${r.oleo_status}${r.oleo_obs ? ' ('+r.oleo_obs+')' : ''}`,
+          `Fugas: ${r.vazamento_status}${r.vazamento_obs ? ' ('+r.vazamento_obs+')' : ''}`,
+          `Fixação: ${r.fixacao_status}${r.fixacao_obs ? ' ('+r.fixacao_obs+')' : ''}`,
+          `Proteção NR12: ${r.protecao_status}${r.protecao_obs ? ' ('+r.protecao_obs+')' : ''}`,
+          `Vibração Tátil: ${r.vibracao_status}${r.vibracao_obs ? ' ('+r.vibracao_obs+')' : ''}`,
+          `Refrigeração: ${r.refrigeracao_status}${r.refrigeracao_obs ? ' ('+r.refrigeracao_obs+')' : ''}`
+        ];
+        let blocoVisual = `INSPEÇÃO VISUAL (OK/NOK):\n` + visuaisArr.join('\n') + `\nOBS GERAL: ${r.observacoes || '-'}`;
+        tableRows.push(['', blocoIdentificacao, blocoOperacaoStrobo, blocoTemperaturas, blocoVisual]);
+        imageCellStore.push({ rowIndex: index, src: r.photo });
+      });
+      doc.autoTable({
+        startY: 24,
+        head: [['FOTO', 'Identificação', 'Operação & Strobo', 'Temperaturas', 'Inspeção Visual & Obs']],
+        body: tableRows,
+        theme: 'grid',
+        styles: { fontSize: 7, cellPadding: 2.5, valign: 'top', overflow: 'linebreak' },
+        headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255], fontStyle: 'bold', halign: 'center' },
+        columnStyles: {
+          0: { cellWidth: 32, halign: 'center' },
+          1: { cellWidth: 35 },
+          2: { cellWidth: 38 },
+          3: { cellWidth: 34 },
+          4: { cellWidth: 65 }
+        },
+        didDrawCell: function(data) {
+          if (data.section === 'body' && data.column.index === 0) {
+            const item = imageCellStore[data.row.index];
+            if (item && item.src) {
+              try {
+                doc.addImage(item.src, 'JPEG', data.cell.x + 2, data.cell.y + 2, 28, 28);
+              } catch(e) { console.error("Erro ao desenhar foto no PDF", e); }
+            } else if (data.section === 'body' && data.column.index === 0) {
+              doc.setFontSize(7);
+              doc.setTextColor(150, 150, 150);
+              doc.text("Sem Foto", data.cell.x + 8, data.cell.y + 15);
+            }
+          }
+        }
+      });
+      doc.save(`PreAnaliseSalva_${pl.rota.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0,10)}.pdf`);
+    }
+
+    async function deleteSavedPreLaudo(docId) {
+      if(!confirm("Deseja excluir esta pré-análise salva da nuvem?")) return;
+      try {
+        await db.collection("inspectcbm_prelaudos").doc(docId).delete();
+      } catch (err) {
+        alert("Erro ao excluir: " + err.message);
+      }
+    }
+
     // Função para alterar o status diretamente pelo Supervisório
     async function changeSupervisorioStatus(baseTag, newStatus, docId) {
       if (!relatorioAnalysisState[baseTag]) {
@@ -1641,7 +1883,6 @@
       }
       let laudoState = targetLaudo ? (targetLaudo.state || {}) : {};
       
-      // Desduplicar tags por baseTag para evitar duplicações na estratificação
       let tagToRotaMap = {};
       rotasParaAnalisar.forEach(rota => {
         let tagsDaRota = defaultTagMap[rota] || [];
@@ -1673,7 +1914,6 @@
         let problemaDesc = assetState ? (assetState.problema || '-') : '-';
         let falhasList = assetState ? (assetState.falhas || []) : [];
 
-        // Se o status for alterado para "Seguro", zera as falhas contabilizadas
         if (statusVal === 'Seguro') {
           falhasList = [];
         }
@@ -1970,8 +2210,6 @@
       try {
         await db.collection("inspectcbm_laudos").add(laudoObj);
         alert("Análise técnica salva com sucesso na nuvem!");
-        
-        // Zera e limpa todos os campos da aba de laudos técnicos após salvar
         clearTechnicalAnalysisState();
       } catch (err) {
         alert("Erro ao salvar na nuvem: " + err.message);
