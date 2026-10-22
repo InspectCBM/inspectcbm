@@ -111,7 +111,7 @@
           <h2 class="text-sm font-bold text-white uppercase tracking-wider font-mono flex items-center">
             <i class="fa-solid fa-gauge text-emerald-400 mr-2 text-base"></i> Supervisório Executivo de Saúde de Ativos (CBM)
           </h2>
-          <p class="text-xs text-slate-400">Monitoramento online da frota e estratificação de criticidade baseada nos laudos e inspeções</p>
+          <p class="text-xs text-slate-400">Monitoramento online da frota e estratificação baseada estritamente nos Laudos Técnicos Salvos</p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
           <select id="sup_filter_rota" multiple onchange="renderSupervisorioTab()" class="bg-slate-950 border border-emerald-500/40 rounded-xl px-3 py-2 text-xs text-emerald-400 font-bold shadow-inner h-16 w-48">
@@ -202,7 +202,7 @@
       <!-- TABELA DO SUPERVISÓRIO -->
       <div class="bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-800 shadow-2xl overflow-hidden">
         <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-950/40">
-          <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider font-mono">Matriz Executiva de Ativos Monitorados</h3>
+          <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider font-mono">Matriz Executiva de Ativos Monitorados (Baseada no Laudo Salvo)</h3>
           <span id="sup-table-count" class="text-xs bg-slate-800 px-3 py-1 rounded-full text-emerald-400 font-bold font-mono border border-slate-700">0 ativos</span>
         </div>
         <div class="overflow-x-auto">
@@ -210,11 +210,10 @@
             <thead class="bg-slate-950/80 text-slate-400 uppercase font-semibold font-mono tracking-wider">
               <tr>
                 <th class="p-3">Status / Criticidade</th>
-                <th class="p-3">Alterar Status Manual</th>
                 <th class="p-3">Rota / Tag</th>
                 <th class="p-3">Equipamento & Setor</th>
                 <th class="p-3">Falhas Apontadas</th>
-                <th class="p-3">Diagnóstico Principal (Laudo)</th>
+                <th class="p-3">Diagnóstico Principal (Laudo Salvo)</th>
               </tr>
             </thead>
             <tbody id="sup-table-body" class="divide-y divide-slate-800/60"></tbody>
@@ -454,7 +453,7 @@
         <!-- BLOCO 5 -->
         <div class="bg-slate-900/90 backdrop-blur-md rounded-2xl p-6 border border-slate-800 shadow-2xl space-y-4 relative overflow-hidden">
           <div class="absolute top-0 left-0 w-1 h-full bg-rose-500"></div>
-          <h2 class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-1 flex items-center font-mono">
+          <h2 class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-2 flex items-center font-mono">
             <i class="fa-solid fa-temperature-high mr-2 text-sm"></i> 5. Termografia & Temperatura nos Pontos
           </h2>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -821,9 +820,6 @@
         <button onclick="closeInspetoresModal()" class="bg-slate-800 hover:bg-slate-700 text-white font-semibold px-4 py-2 rounded-xl text-xs border border-slate-700">Concluído</button>
       </div>
     </div>
-  </div>
-  <div style="position: absolute; left: -9999px; top: -9999px;">
-    <canvas id="hiddenPdfChart" width="400" height="150"></canvas>
   </div>
   <script>
     let defaultRotas = [];
@@ -1875,32 +1871,6 @@
       }
     }
 
-    async function changeSupervisorioStatus(baseTag, newStatus, docId) {
-      if (!relatorioAnalysisState[baseTag]) {
-        relatorioAnalysisState[baseTag] = { isMedido: true, statusVal: newStatus, falhas: [], deteccao: '', problema: '', recomendacao: '' };
-      } else {
-        relatorioAnalysisState[baseTag].statusVal = newStatus;
-      }
-      if (newStatus === 'Seguro') {
-        relatorioAnalysisState[baseTag].falhas = [];
-        relatorioAnalysisState[baseTag].problema = '-';
-      }
-      if (docId) {
-        try {
-          let laudo = cloudLaudos.find(l => l.docId === docId);
-          if (laudo) {
-            let updatedState = laudo.state || {};
-            updatedState[baseTag] = relatorioAnalysisState[baseTag];
-            await db.collection("inspectcbm_laudos").doc(docId).set({ state: updatedState }, { merge: true });
-          }
-        } catch (e) {
-          console.error("Erro ao atualizar status na nuvem:", e);
-        }
-      }
-      renderRelatorioTab();
-      renderSupervisorioTab();
-    }
-
     function renderSupervisorioTab() {
       const supFilterRotaEl = document.getElementById('sup_filter_rota');
       if(!supFilterRotaEl) return;
@@ -1914,6 +1884,8 @@
       } else {
         rotasParaAnalisar = selectedRotas;
       }
+
+      // EXCLUSIVO: O Supervisório lê ESTRICTAMENTE do último laudo salvo na nuvem (cloudLaudos)
       let targetLaudo = null;
       if (cloudLaudos && cloudLaudos.length > 0) {
         targetLaudo = cloudLaudos.find(l => {
@@ -1948,7 +1920,7 @@
       let tableItems = [];
       uniqueBaseTags.forEach(baseTag => {
         let rota = tagToRotaMap[baseTag];
-        let assetState = relatorioAnalysisState[baseTag] || laudoState[baseTag];
+        let assetState = laudoState[baseTag]; // Lê do laudo salvo
         
         let isMedido = assetState ? (assetState.isMedido !== undefined ? assetState.isMedido : false) : false;
         let statusVal = assetState ? (assetState.statusVal || 'Seguro') : 'Seguro';
@@ -1957,8 +1929,9 @@
         if (statusVal === 'Seguro') {
           falhasList = [];
         }
-        if (!isMedido) {
+        if (!isMedido || !targetLaudo || !laudoState[baseTag]) {
           countNaoMedido++;
+          isMedido = false;
         } else {
           if (statusVal === 'Seguro') countSeguro++;
           else if (statusVal === 'Alarme A1') countA1++;
@@ -1979,10 +1952,8 @@
           setor: tagData.setor || '-',
           isMedido: isMedido,
           statusVal: isMedido ? statusVal : 'Não Medido',
-          dataColeta: targetLaudo ? targetLaudo.dataColeta : null,
           problema: problemaDesc,
-          falhas: falhasList,
-          laudoDocId: targetLaudo ? targetLaudo.docId : null
+          falhas: falhasList
         });
       });
       
@@ -1997,7 +1968,7 @@
       const tbody = document.getElementById('sup-table-body');
       tbody.innerHTML = '';
       if(tableItems.length === 0 || !targetLaudo) {
-        tbody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-slate-500 italic">Nenhum laudo salvo encontrado na nuvem para alimentar o supervisório.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-slate-500 italic">Nenhum laudo salvo encontrado na nuvem para alimentar o supervisório. Clique em "Salvar Análise" na aba Laudo Técnico.</td></tr>`;
       } else {
         tableItems.forEach(item => {
           const tr = document.createElement('tr');
@@ -2011,15 +1982,6 @@
           tr.innerHTML = `
             <td class="p-3">
               <span class="px-2.5 py-1 rounded-lg text-[11px] font-bold border font-mono ${badgeClass}">${item.statusVal}</span>
-            </td>
-            <td class="p-3">
-              <select onchange="changeSupervisorioStatus('${item.baseTag}', this.value, '${item.laudoDocId || ''}')" class="bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg px-2 py-1 font-mono focus:border-emerald-500">
-                <option value="Seguro" ${item.statusVal === 'Seguro' ? 'selected' : ''}>🟩 Seguro (Zerar)</option>
-                <option value="Alarme A1" ${item.statusVal === 'Alarme A1' ? 'selected' : ''}>🟨 Alarme A1</option>
-                <option value="Alarme A2" ${item.statusVal === 'Alarme A2' ? 'selected' : ''}>🟧 Alarme A2</option>
-                <option value="Perigo P1" ${item.statusVal === 'Perigo P1' ? 'selected' : ''}>🟥 Perigo P1</option>
-                <option value="Perigo P2" ${item.statusVal === 'Perigo P2' ? 'selected' : ''}>🟣 Perigo P2</option>
-              </select>
             </td>
             <td class="p-3">
               <span class="font-bold text-amber-400 font-mono">${item.baseTag}</span><br>
@@ -2189,7 +2151,6 @@
         relatorioAnalysisState[baseTag].isMedido = isMedido;
       }
       renderRelatorioTab();
-      renderSupervisorioTab();
     }
 
     function toggleRelFalha(baseTag, falhaName, checkboxEl) {
@@ -2205,7 +2166,6 @@
       } else {
         relatorioAnalysisState[baseTag].falhas = arr.filter(f => f !== falhaName);
       }
-      renderSupervisorioTab();
     }
 
     function updateRelAnalysisField(baseTag, field, value) {
@@ -2217,7 +2177,6 @@
         const sel = document.getElementById(`rel_status_select_${baseTag}`);
         if (sel) sel.className = `w-full border rounded-xl px-2.5 py-1.5 text-xs font-bold focus:outline-none shadow-sm ${getStatusBgColor(value)}`;
       }
-      renderSupervisorioTab();
     }
 
     function getStatusBgColor(status) {
@@ -2234,7 +2193,6 @@
     function clearTechnicalAnalysisState() {
       relatorioAnalysisState = {};
       renderRelatorioTab();
-      renderSupervisorioTab();
     }
 
     async function saveTechnicalAnalysisState() {
@@ -2252,8 +2210,8 @@
       };
       try {
         await db.collection("inspectcbm_laudos").add(laudoObj);
-        alert("Análise técnica salva com sucesso na nuvem!");
-        clearTechnicalAnalysisState();
+        alert("Análise técnica salva com sucesso na nuvem! O Supervisório foi atualizado.");
+        renderSupervisorioTab();
       } catch (err) {
         alert("Erro ao salvar na nuvem: " + err.message);
       }
@@ -2299,7 +2257,6 @@
       if(laudo.dataAnalise) document.getElementById('rel_data_analise').value = laudo.dataAnalise;
       relatorioAnalysisState = JSON.parse(JSON.stringify(laudo.state || {}));
       renderRelatorioTab();
-      renderSupervisorioTab();
       alert("Laudo carregado com sucesso!");
     }
 
@@ -2330,7 +2287,6 @@
       document.getElementById('rel_data_analise').value = previousDataAnalise;
       relatorioAnalysisState = previousState;
       renderRelatorioTab();
-      renderSupervisorioTab();
     }
 
     async function deleteSavedLaudo(docId) {
@@ -2640,47 +2596,6 @@
       doc.save(`PreAnalise_SCADA_${filterRota}_${new Date().toISOString().slice(0,10)}.pdf`);
     }
 
-    function generateMiniChartBase64(tagBase) {
-      return new Promise((resolve) => {
-        const tagHistory = cloudRecords
-          .filter(r => r.baseTag === tagBase || r.tag.includes(tagBase))
-          .sort((a, b) => new Date(a.data_coleta) - new Date(b.data_coleta));
-        if(tagHistory.length < 2) { resolve(null); return; }
-        const canvas = document.getElementById('hiddenPdfChart');
-        const ctx = canvas.getContext('2d');
-        const labels = tagHistory.map(r => new Date(r.data_coleta).toLocaleString('pt-PT', {dateStyle:'short', timeStyle:'short'}));
-        const dataLA = tagHistory.map(r => r.temp_la);
-        const dataC2 = tagHistory.map(r => r.temp_c2_p1 || r.temp_loa);
-        const tempChart = new Chart(ctx, {
-          type: 'line',
-          data: {
-            labels: labels,
-            datasets: [
-              { label: 'Motor (°C)', data: dataLA, borderColor: '#f43f5e', backgroundColor: 'rgba(244,63,94,0.1)', borderWidth: 1.5, tension: 0.2, fill: true },
-              { label: 'Comp. 2 (°C)', data: dataC2, borderColor: '#38bdf8', backgroundColor: 'rgba(56,189,248,0.1)', borderWidth: 1.5, tension: 0.2, fill: true }
-            ]
-          },
-          options: {
-            animation: false,
-            responsive: false,
-            plugins: {
-              title: { display: true, text: `Tendência Térmica - Tag: ${tagBase}`, color: '#1e293b', font: { size: 10 } },
-              legend: { labels: { color: '#1e293b', font: { size: 8 } } }
-            },
-            scales: {
-              x: { ticks: { color: '#64748b', font: { size: 7 } }, grid: { color: '#e2e8f0' } },
-              y: { ticks: { color: '#64748b', font: { size: 7 } }, grid: { color: '#e2e8f0' } }
-            }
-          }
-        });
-        setTimeout(() => {
-          const base64Img = canvas.toDataURL('image/png');
-          tempChart.destroy();
-          resolve(base64Img);
-        }, 150);
-      });
-    }
-
     async function exportTechnicalPDF() {
       const { jsPDF } = window.jspdf;
       const relFilterRotaEl = document.getElementById('rel_filter_rota');
@@ -2752,33 +2667,24 @@
       for (let index = 0; index < filtered.length; index++) {
         const r = filtered[index];
         const state = r.analysisState;
-        let secaoTagData = [`TAG: ${r.tag}`, `SAP: ${r.sap_number || '-'}`, `COLETA: ${dataColetaFmt}  |  ANÁLISE: ${dataAnaliseFmt}`].join('  |  ');
+        let secaoTagData = `TAG: ${r.tag}  |  SAP: ${r.sap_number || '-'}  |  COLETA: ${dataColetaFmt}  |  ANÁLISE: ${dataAnaliseFmt}`;
         let secaoStatus = `STATUS DO EQUIPAMENTO: ${state.isMedido ? state.statusVal.toUpperCase() : 'NÃO MEDIDO'}`;
-        let secaoFalhas = `TIPOS DE FALHA: ${state.falhas && state.falhas.length > 0 ? state.falhas.join(', ') : 'Nenhuma falha especificada'}`;
-        let secaoDeteccao = `MÉTODO DE DETECÇÃO: ${state.deteccao || 'Não especificado'}`;
-        let secaoInfo = [
-          `• Rota: ${r.rota || '-'}`,
-          `• Equipamento: ${r.equipamento_nome || '-'} (SAP: ${r.sap_number || '-'})`,
-          `• Setor: ${r.setor || '-'} (Área: ${r.area || '-'})`,
-          `• Conjunto: ${r.componente || '-'}`
-        ].join('\n');
+        let secaoFalhas = state.falhas && state.falhas.length > 0 ? `TIPOS DE FALHA: ${state.falhas.join(', ')}` : '';
+        let secaoDeteccao = state.deteccao ? `MÉTODO DE DETECÇÃO: ${state.deteccao}` : '';
+        let secaoInfo = `INFORMAÇÕES DO EQUIPAMENTO:\n• Rota: ${r.rota || '-'}\n• Equipamento: ${r.equipamento_nome || '-'} (SAP: ${r.sap_number || '-'})\n• Setor: ${r.setor || '-'} (Área: ${r.area || '-'})\n• Conjunto: ${r.componente || '-'}`;
         let secaoProblema = `PROBLEMA / DIAGNÓSTICO:\n${state.isMedido && state.problema ? state.problema : 'Nenhum problema reportado'}`;
         let secaoRecomendacao = `RECOMENDAÇÃO:\n${state.isMedido && state.recomendacao ? state.recomendacao : 'Nenhuma recomendação registrada'}`;
-        let secaoInspetor = `RESPONSÁVEL TÉCNICO: ${r.inspetor || '-'}`;
-        let combinedContent = [
-          secaoTagData, '',
-          secaoStatus, '',
-          secaoFalhas,
-          secaoDeteccao, '',
-          'INFORMAÇÕES DO EQUIPAMENTO:', secaoInfo, '',
-          secaoProblema, '',
-          secaoRecomendacao, '',
-          secaoInspetor
-        ].join('\n');
+        let secaoInspetor = `RESPONSÁVEL TÉCNICO: ${r.inspetor || 'PENDENTE'}`;
+        
+        let combinedParts = [secaoTagData, '', secaoStatus];
+        if(secaoFalhas) combinedParts.push(secaoFalhas);
+        if(secaoDeteccao) combinedParts.push(secaoDeteccao);
+        combinedParts.push('', secaoInfo, '', secaoProblema, '', secaoRecomendacao, '', secaoInspetor);
+        
+        let combinedContent = combinedParts.join('\n');
         tableRows.push(['', combinedContent]);
         let photoSrc = r.photo || (cloudTagRegistry[r.baseTag] ? cloudTagRegistry[r.baseTag].photo : null);
-        let chartBase64 = await generateMiniChartBase64(r.baseTag || r.tag.split(' ')[0]);
-        imageCellStore.push({ rowIndex: index, src: photoSrc, chart: chartBase64 });
+        imageCellStore.push({ rowIndex: index, src: photoSrc });
       }
       doc.autoTable({
         startY: currentY,
@@ -2795,19 +2701,13 @@
               let currentCellY = data.cell.y + 4;
               if (item.src) {
                 try {
-                  doc.addImage(item.src, 'JPEG', data.cell.x + 3, currentCellY, 64, 42);
-                  currentCellY += 46;
+                  // Foto maior, centralizada e sem gráfico embaixo
+                  doc.addImage(item.src, 'JPEG', data.cell.x + 5, currentCellY, 60, 55);
                 } catch(e) { console.error("Erro ao desenhar imagem", e); }
               } else {
                 doc.setFontSize(8);
                 doc.setTextColor(150, 150, 150);
-                doc.text("Sem Foto", data.cell.x + 25, currentCellY + 20);
-                currentCellY += 46;
-              }
-              if (item.chart) {
-                try {
-                  doc.addImage(item.chart, 'PNG', data.cell.x + 3, currentCellY, 64, 25);
-                } catch(e) { console.error("Erro ao desenhar gráfico miniatura", e); }
+                doc.text("Sem Foto", data.cell.x + 25, currentCellY + 30);
               }
             }
           }
