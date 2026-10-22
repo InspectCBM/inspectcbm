@@ -826,15 +826,10 @@
     <canvas id="hiddenPdfChart" width="400" height="150"></canvas>
   </div>
   <script>
-    let defaultRotas = ["Sopradores Massas", "Sopradores Drymix", "Compressores Chocolate", "Compressores Drymix", "Caldeiras / Utilidades"];
-    let defaultTagMap = {
-      "Sopradores Massas": ["SP8001", "SP8002"],
-      "Sopradores Drymix": ["SP8003"],
-      "Compressores Chocolate": ["UC8014", "UC01"],
-      "Compressores Drymix": ["UC02"],
-      "Caldeiras / Utilidades": ["TO01", "BO01"]
-    };
-    let defaultInspetores = ["RAFAEL AUGUSTO", "Técnico Confiabilidade 1"];
+    // Variáveis Globais Limpas (Carregadas estritamente a partir do Firebase)
+    let defaultRotas = [];
+    let defaultTagMap = {};
+    let defaultInspetores = ["TÉCNICO RESPONSÁVEL"];
     let cloudLaudos = [];
     let cloudPreLaudos = [];
     
@@ -901,6 +896,8 @@
           if (data.tagMap && Object.keys(data.tagMap).length > 0) defaultTagMap = data.tagMap;
           if (data.inspetores && data.inspetores.length > 0) defaultInspetores = data.inspetores;
         } else {
+          defaultRotas = ["Sopradores Massas"];
+          defaultTagMap = { "Sopradores Massas": ["SP8001"] };
           db.collection("inspectcbm_config").doc("rotas_tags").set({
             rotas: defaultRotas,
             tagMap: defaultTagMap,
