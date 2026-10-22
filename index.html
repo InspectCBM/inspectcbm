@@ -826,7 +826,6 @@
     <canvas id="hiddenPdfChart" width="400" height="150"></canvas>
   </div>
   <script>
-    // Variáveis Globais Limpas (Carregadas estritamente a partir do Firebase)
     let defaultRotas = [];
     let defaultTagMap = {};
     let defaultInspetores = ["TÉCNICO RESPONSÁVEL"];
@@ -1151,6 +1150,7 @@
     function closeRotasModal() {
       document.getElementById('modal-rotas').classList.add('hidden');
       loadSavedRotas();
+      populateFilters();
       onRotaChange(document.getElementById('rota_select').value);
     }
 
@@ -1174,6 +1174,8 @@
         await saveConfigToCloud();
         document.getElementById('nova_rota_input').value = '';
         renderRotasList();
+        loadSavedRotas();
+        populateFilters();
       } else { alert("Esta rota já existe."); }
     }
 
@@ -1184,6 +1186,8 @@
       delete defaultTagMap[rotaName];
       await saveConfigToCloud();
       renderRotasList();
+      loadSavedRotas();
+      populateFilters();
     }
 
     function manageTagsModal() {
@@ -1202,6 +1206,7 @@
     function closeTagsModal() {
       document.getElementById('modal-tags').classList.add('hidden');
       onRotaChange(document.getElementById('rota_select').value);
+      populateFilters();
     }
 
     function renderTagsList() {
@@ -1227,6 +1232,8 @@
         await saveConfigToCloud();
         document.getElementById('nova_tag_input').value = '';
         renderTagsList();
+        onRotaChange(document.getElementById('rota_select').value);
+        populateFilters();
       } else { alert("Esta tag já está cadastrada nesta rota."); }
     }
 
@@ -1242,6 +1249,8 @@
           console.error("Erro ao remover tag da nuvem:", e);
         }
         renderTagsList();
+        onRotaChange(document.getElementById('rota_select').value);
+        populateFilters();
       }
     }
 
@@ -1287,6 +1296,7 @@
     function onRotaChange(rota) {
       const tagSelect = document.getElementById('tag_select');
       if(!tagSelect) return;
+      const currentTagVal = tagSelect.value;
       tagSelect.innerHTML = '<option value="">Selecione a Tag...</option>';
       let tags = defaultTagMap[rota] || [];
       tags.forEach(t => {
@@ -1294,7 +1304,9 @@
         opt.value = t; opt.textContent = t;
         tagSelect.appendChild(opt);
       });
-      if(tags.length > 0) { 
+      if(tags.includes(currentTagVal)) {
+        tagSelect.value = currentTagVal;
+      } else if(tags.length > 0) { 
         tagSelect.value = tags[0]; 
         handleTagSelection(tags[0]); 
       } else {
