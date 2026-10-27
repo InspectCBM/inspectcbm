@@ -825,6 +825,9 @@
     let defaultRotas = [];
     let defaultTagMap = {};
     let defaultInspetores = ["TÉCNICO RESPONSÁVEL"];
+    // true somente depois que a configuração (rotas/tags/inspetores) foi lida do SERVIDOR.
+    // Enquanto for false, nada é gravado em inspectcbm_config/rotas_tags (evita sobrescrever a nuvem com valores vazios/padrão).
+    let configLoadedFromServer = false;
     let cloudLaudos = [];
     let cloudPreLaudos = [];
     
@@ -885,25 +888,38 @@
 
     function initCloudListeners() {
       db.collection("inspectcbm_config").doc("rotas_tags").onSnapshot((doc) => {
+        const fromCache = !!(doc.metadata && doc.metadata.fromCache);
         if (doc.exists) {
           const data = doc.data();
-          if (data.rotas && data.rotas.length > 0) defaultRotas = data.rotas;
+          if (data.rotas && data.rotas.length > 0) defaultRotas = data.rotas.slice();
           if (data.tagMap && Object.keys(data.tagMap).length > 0) defaultTagMap = data.tagMap;
-          if (data.inspetores && data.inspetores.length > 0) defaultInspetores = data.inspetores;
-        } else {
+          if (data.inspetores && data.inspetores.length > 0) defaultInspetores = data.inspetores.slice();
+          // Recuperação: se alguma rota existe no mapa de tags mas sumiu da lista de rotas, devolve à lista.
+          Object.keys(defaultTagMap).forEach(r => { if (!defaultRotas.includes(r)) defaultRotas.push(r); });
+          if (!fromCache) configLoadedFromServer = true;
+        } else if (!fromCache) {
+          // Só cria o padrão quando o SERVIDOR confirma que o documento realmente não existe.
+          // (Antes, um "doc não existe" vindo do cache/rede lenta sobrescrevia as rotas salvas.)
           defaultRotas = ["Sopradores Massas"];
           defaultTagMap = { "Sopradores Massas": ["SP8001"] };
+          configLoadedFromServer = true;
           db.collection("inspectcbm_config").doc("rotas_tags").set({
             rotas: defaultRotas,
             tagMap: defaultTagMap,
             inspetores: defaultInspetores
-          }, { merge: true });
+          });
+        } else {
+          // Resposta do cache sem dados: aguarda a resposta do servidor, não grava nem altera nada.
+          return;
         }
         loadSavedRotas();
         loadSavedInspetores();
         populateFilters();
         updateSupervisoryKPIs();
         renderSupervisorioTab();
+      }, (err) => {
+        console.error("Erro ao ler configuração de rotas na nuvem:", err);
+        alert("Não foi possível carregar as rotas da nuvem: " + err.message + "\nNenhuma alteração será gravada até a conexão voltar.");
       });
 
       db.collection("inspectcbm_records").onSnapshot((snapshot) => {
@@ -963,12 +979,17 @@
     }
 
     async function saveConfigToCloud() {
+      if (!configLoadedFromServer) {
+        alert("As rotas ainda não foram carregadas da nuvem. Aguarde alguns segundos, confira a conexão e tente novamente.");
+        return;
+      }
       try {
+        // set sem merge: grava exatamente o estado atual (assim rotas/tags removidas também somem da nuvem).
         await db.collection("inspectcbm_config").doc("rotas_tags").set({
           rotas: defaultRotas,
           tagMap: defaultTagMap,
           inspetores: defaultInspetores
-        }, { merge: true });
+        });
         updateSupervisoryKPIs();
       } catch (err) {
         console.error("Erro ao salvar configuração na nuvem:", err);
