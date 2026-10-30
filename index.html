@@ -59,6 +59,13 @@
     ::-webkit-scrollbar-track { background: #0b0f19; }
     ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
     ::-webkit-scrollbar-thumb:hover { background: #f59e0b; }
+    #supDoughnutChart, #supBarChart, #supFalhasChart {
+      width: 100% !important;
+      height: 100% !important;
+      max-width: 100% !important;
+      max-height: 100% !important;
+      display: block !important;
+    }
   </style>
 </head>
 <body class="min-h-screen pb-12 selection:bg-amber-500 selection:text-slate-950">
@@ -67,17 +74,19 @@
   <header class="bg-slate-900/90 backdrop-blur-md border-b border-slate-800 sticky top-0 z-50 shadow-2xl">
     <div class="max-w-7xl mx-auto px-4 py-3 flex flex-col md:flex-row justify-between items-center gap-3">
       <div class="flex items-center space-x-3">
-        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-500/20 border border-amber-400/30">
-          <i class="fa-solid fa-industry text-slate-950 text-base"></i>
+        <div class="h-10 px-3 rounded-xl bg-gradient-to-br from-[#4a154b] to-[#601962] flex items-center justify-center shadow-lg shadow-purple-950/60 border border-purple-400/30">
+          <span class="font-black text-xs tracking-tight text-white flex items-center select-none font-sans">
+            Mondelēz<span class="text-amber-400 font-bold ml-0.5 text-xs">.</span>
+          </span>
         </div>
         <div>
           <h1 class="font-bold text-base tracking-wide text-white flex items-center">
-            Inspect<span class="text-amber-400">CBM</span> 
+            UTILIDADES <span class="text-amber-400 ml-1.5">CBM</span> 
             <span class="ml-2.5 text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono flex items-center">
               <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse mr-1.5"></span>SCADA Cloud Live
             </span>
           </h1>
-          <p class="text-[11px] text-slate-400 font-medium">Supervisory & Condition Monitoring System</p>
+          <p class="text-[11px] text-slate-400 font-medium">MONDELEZ INTERNATIONAL • ENGENHARIA DE MANUTENÇÃO PREDITIVA</p>
         </div>
       </div>
       <!-- Supervisory Quick KPIs Header -->
@@ -184,36 +193,42 @@
 
       <!-- GRÁFICOS DO SUPERVISÓRIO -->
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div class="bg-slate-900/90 backdrop-blur-md rounded-2xl p-6 border border-slate-800 shadow-2xl relative overflow-hidden flex flex-col items-center">
+        <!-- Card 1: Saúde da Frota & Confiabilidade -->
+        <div class="bg-slate-900/90 backdrop-blur-md rounded-2xl p-5 border border-slate-800 shadow-2xl relative overflow-hidden flex flex-col justify-between min-w-0">
           <div class="absolute top-0 left-0 w-1 h-full bg-emerald-400"></div>
-          <div class="w-full flex justify-between items-center mb-4">
+          <div class="w-full flex justify-between items-center mb-3">
             <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider font-mono flex items-center">
               <i class="fa-solid fa-chart-pie text-emerald-400 mr-2"></i> Saúde da Frota (%)
             </h3>
+            <span id="sup-health-score-val" class="text-xs font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">100% Confiabilidade</span>
           </div>
-          <div class="relative h-64 w-full flex justify-center items-center">
+          <div class="relative w-full" style="height: 250px; min-height: 250px; max-height: 250px;">
             <canvas id="supDoughnutChart"></canvas>
           </div>
         </div>
-        <div class="bg-slate-900/90 backdrop-blur-md rounded-2xl p-6 border border-slate-800 shadow-2xl relative overflow-hidden flex flex-col items-center">
+
+        <!-- Card 2: Ativos por Severidade -->
+        <div class="bg-slate-900/90 backdrop-blur-md rounded-2xl p-5 border border-slate-800 shadow-2xl relative overflow-hidden flex flex-col justify-between min-w-0">
           <div class="absolute top-0 left-0 w-1 h-full bg-cyan-400"></div>
-          <div class="w-full flex justify-between items-center mb-4">
+          <div class="w-full flex justify-between items-center mb-3">
             <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider font-mono flex items-center">
               <i class="fa-solid fa-chart-column text-cyan-400 mr-2"></i> Ativos por Severidade
             </h3>
           </div>
-          <div class="relative h-64 w-full">
+          <div class="relative w-full" style="height: 250px; min-height: 250px; max-height: 250px;">
             <canvas id="supBarChart"></canvas>
           </div>
         </div>
-        <div class="bg-slate-900/90 backdrop-blur-md rounded-2xl p-6 border border-slate-800 shadow-2xl relative overflow-hidden flex flex-col items-center">
+
+        <!-- Card 3: Tipos de Falha Detectadas -->
+        <div class="bg-slate-900/90 backdrop-blur-md rounded-2xl p-5 border border-slate-800 shadow-2xl relative overflow-hidden flex flex-col justify-between min-w-0">
           <div class="absolute top-0 left-0 w-1 h-full bg-amber-400"></div>
-          <div class="w-full flex justify-between items-center mb-4">
+          <div class="w-full flex justify-between items-center mb-3">
             <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider font-mono flex items-center">
               <i class="fa-solid fa-chart-bar text-amber-400 mr-2"></i> Tipos de Falha Detectadas
             </h3>
           </div>
-          <div class="relative h-64 w-full">
+          <div class="relative w-full" style="height: 250px; min-height: 250px; max-height: 250px;">
             <canvas id="supFalhasChart"></canvas>
           </div>
         </div>
@@ -720,7 +735,7 @@
             </button>
           </div>
         </div>
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
           <div>
             <label class="block text-xs font-semibold text-slate-300 mb-1">Rotas de Inspeção *</label>
             <select id="rel_filter_rota" multiple onchange="onRelFilterRotaChange()" class="w-full bg-slate-950 border border-amber-500/40 rounded-xl px-3.5 py-2 text-xs text-amber-400 font-bold shadow-inner h-24">
@@ -742,6 +757,10 @@
           <div>
             <label class="block text-xs font-semibold text-slate-300 mb-1">Data da Análise (Laudo)</label>
             <input type="date" id="rel_data_analise" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-amber-500">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1"><i class="fa-solid fa-user-check text-amber-400 mr-1"></i> Responsável Técnico (CBM) *</label>
+            <input type="text" id="rel_responsavel_tecnico" value="TÉCNICO RESPONSÁVEL" placeholder="Ex: CARLOS SILVA" class="w-full bg-slate-950 border border-amber-500/40 rounded-xl px-3.5 py-2.5 text-xs text-amber-300 font-bold uppercase focus:outline-none focus:border-amber-500 shadow-inner">
           </div>
         </div>
       </div>
@@ -973,11 +992,23 @@
       }
     }
 
-    // Fallback robusto inicial para garantir que rotas e tags nunca sumam
-    let defaultRotas = ["Central de pó", "Sopradores Massas", "Extrusoras"];
+    // Fallback robusto inicial com rotas e tags conhecidas da planta Mondelez
+    let defaultRotas = [
+      "Bombas Torres Resfriamento",
+      "CAG 01 (Chocolate e B&G)",
+      "CAG 02 Bombas",
+      "Compressores Cho",
+      "Sopradores Massas",
+      "Central de pó",
+      "Extrusoras"
+    ];
     let defaultTagMap = { 
+      "Bombas Torres Resfriamento": ["BO8030", "BO8032"],
+      "CAG 01 (Chocolate e B&G)": ["BO8030", "BO8032"],
+      "CAG 02 Bombas": ["BO8001", "BO8002"],
+      "Compressores Cho": ["CP9001", "CP9002"],
+      "Sopradores Massas": ["SP8001", "SP8002"],
       "Central de pó": ["FM7011", "EX7002"],
-      "Sopradores Massas": ["SP8001"],
       "Extrusoras": ["EXT101"]
     };
     let defaultInspetores = ["TÉCNICO RESPONSÁVEL", "CARLOS SILVA"];
@@ -1003,6 +1034,109 @@
       "Cavitação"
     ];
     
+    // VAULT DE PROTEÇÃO PERMANENTE: Garante que nenhuma rota ou tag seja apagada por atualizações
+    function reconcileAndShieldAllRoutesAndTags() {
+      // 1. Recupera do cofre imutável local
+      let vaultRotas = [];
+      let vaultTagMap = {};
+      try {
+        const vr = localStorage.getItem('inspectcbm_shield_vault_rotas');
+        if (vr) vaultRotas = JSON.parse(vr);
+        const vt = localStorage.getItem('inspectcbm_shield_vault_tagmap');
+        if (vt) vaultTagMap = JSON.parse(vt);
+      } catch(e) {}
+
+      if (Array.isArray(vaultRotas)) {
+        vaultRotas.forEach(r => {
+          if (r && !defaultRotas.includes(r)) defaultRotas.push(r);
+        });
+      }
+      if (vaultTagMap && typeof vaultTagMap === 'object') {
+        Object.keys(vaultTagMap).forEach(r => {
+          if (!defaultTagMap[r]) defaultTagMap[r] = [];
+          if (Array.isArray(vaultTagMap[r])) {
+            vaultTagMap[r].forEach(t => {
+              if (t && !defaultTagMap[r].includes(t)) defaultTagMap[r].push(t);
+            });
+          }
+        });
+      }
+
+      // 2. Coleta todas as rotas e tags presentes nos registros já medidos/coletados
+      if (Array.isArray(cloudRecords)) {
+        cloudRecords.forEach(rec => {
+          if (rec.rota && typeof rec.rota === 'string' && rec.rota.trim()) {
+            const rName = rec.rota.trim();
+            if (!defaultRotas.includes(rName)) defaultRotas.push(rName);
+            if (!defaultTagMap[rName]) defaultTagMap[rName] = [];
+            const base = rec.baseTag || (rec.tag ? rec.tag.split(' - ')[0].trim() : null);
+            if (base && !defaultTagMap[rName].includes(base)) {
+              defaultTagMap[rName].push(base);
+            }
+          }
+        });
+      }
+
+      // 3. Coleta todas as rotas e tags presentes nos laudos salvos na nuvem
+      if (Array.isArray(cloudLaudos)) {
+        cloudLaudos.forEach(l => {
+          const rotasArr = l.rotas || (l.rota ? l.rota.split(',').map(s => s.trim()) : []);
+          rotasArr.forEach(rName => {
+            if (rName && !defaultRotas.includes(rName)) defaultRotas.push(rName);
+            if (!defaultTagMap[rName]) defaultTagMap[rName] = [];
+          });
+          if (l.state && typeof l.state === 'object') {
+            Object.keys(l.state).forEach(tag => {
+              let tagFound = false;
+              Object.keys(defaultTagMap).forEach(rName => {
+                if (defaultTagMap[rName].includes(tag)) tagFound = true;
+              });
+              if (!tagFound && rotasArr.length > 0) {
+                defaultTagMap[rotasArr[0]].push(tag);
+              }
+            });
+          }
+        });
+      }
+
+      // 4. Coleta tags cadastradas no registro de tags
+      if (cloudTagRegistry && typeof cloudTagRegistry === 'object') {
+        Object.keys(cloudTagRegistry).forEach(tag => {
+          let tagFound = false;
+          Object.keys(defaultTagMap).forEach(rName => {
+            if (defaultTagMap[rName].includes(tag)) tagFound = true;
+          });
+          if (!tagFound && defaultRotas.length > 0) {
+            defaultTagMap[defaultRotas[0]].push(tag);
+          }
+        });
+      }
+
+      // 5. Salva no cofre de segurança local
+      try {
+        localStorage.setItem('inspectcbm_shield_vault_rotas', JSON.stringify(defaultRotas));
+        localStorage.setItem('inspectcbm_shield_vault_tagmap', JSON.stringify(defaultTagMap));
+        localStorage.setItem('inspectcbm_cached_cfg', JSON.stringify({
+          rotas: defaultRotas,
+          tagMap: defaultTagMap,
+          inspetores: defaultInspetores,
+          availableFalhaTypes: availableFalhaTypes
+        }));
+      } catch(e) {}
+
+      // 6. Atualiza a nuvem Firestore com merge: true para nunca sobrescrever dados existentes
+      try {
+        db.collection("inspectcbm_config").doc("rotas_tags").set({
+          rotas: defaultRotas,
+          tagMap: defaultTagMap,
+          inspetores: defaultInspetores,
+          availableFalhaTypes: availableFalhaTypes,
+          shieldVersion: "2.0-permanent",
+          lastShieldSync: new Date().toISOString()
+        }, { merge: true }).catch(err => console.warn("Aviso na sincronização do cofre com a nuvem:", err));
+      } catch(e) {}
+    }
+
     function switchTab(tab) {
       const supTab = document.getElementById('tab-supervisorio');
       const formTab = document.getElementById('tab-form');
@@ -1027,7 +1161,21 @@
       if(tab === 'supervisorio') {
         supTab.classList.remove('hidden');
         btnSup.className = "px-3.5 py-2 rounded-xl text-xs font-semibold bg-emerald-500 text-slate-950 transition flex items-center shadow-md font-bold";
-        renderSupervisorioTab();
+        setTimeout(() => {
+          renderSupervisorioTab(true);
+          if (supDoughnutInstance && supDoughnutInstance.ctx) {
+            supDoughnutInstance.resize();
+            supDoughnutInstance.update('none');
+          }
+          if (supBarInstance && supBarInstance.ctx) {
+            supBarInstance.resize();
+            supBarInstance.update('none');
+          }
+          if (supFalhasInstance && supFalhasInstance.ctx) {
+            supFalhasInstance.resize();
+            supFalhasInstance.update('none');
+          }
+        }, 60);
       } else if(tab === 'form') {
         formTab.classList.remove('hidden');
         btnForm.className = "px-3.5 py-2 rounded-xl text-xs font-semibold bg-amber-500 text-slate-950 transition flex items-center shadow-md font-bold";
@@ -1040,14 +1188,30 @@
       }
     }
 
+    window.addEventListener('resize', () => {
+      const supTab = document.getElementById('tab-supervisorio');
+      if (supTab && !supTab.classList.contains('hidden')) {
+        if (supDoughnutInstance && supDoughnutInstance.ctx) supDoughnutInstance.resize();
+        if (supBarInstance && supBarInstance.ctx) supBarInstance.resize();
+        if (supFalhasInstance && supFalhasInstance.ctx) supFalhasInstance.resize();
+      }
+    });
+
     function initCloudListeners() {
-      // Carregamento rápido inicial via cache local
+      // Carregamento inicial via cache e cofre permanente
       try {
         const cachedCfg = localStorage.getItem('inspectcbm_cached_cfg');
         if (cachedCfg) {
           const parsed = JSON.parse(cachedCfg);
-          if (parsed.rotas && parsed.rotas.length > 0) defaultRotas = parsed.rotas;
-          if (parsed.tagMap && Object.keys(parsed.tagMap).length > 0) defaultTagMap = parsed.tagMap;
+          if (parsed.rotas && parsed.rotas.length > 0) {
+            parsed.rotas.forEach(r => { if (!defaultRotas.includes(r)) defaultRotas.push(r); });
+          }
+          if (parsed.tagMap && Object.keys(parsed.tagMap).length > 0) {
+            Object.keys(parsed.tagMap).forEach(r => {
+              if (!defaultTagMap[r]) defaultTagMap[r] = [];
+              parsed.tagMap[r].forEach(t => { if (!defaultTagMap[r].includes(t)) defaultTagMap[r].push(t); });
+            });
+          }
           if (parsed.inspetores && parsed.inspetores.length > 0) defaultInspetores = parsed.inspetores;
           if (parsed.availableFalhaTypes && parsed.availableFalhaTypes.length > 0) availableFalhaTypes = parsed.availableFalhaTypes;
         }
@@ -1062,20 +1226,43 @@
       } catch (e) {
         console.warn("Aviso ao carregar cache local:", e);
       }
+      
+      reconcileAndShieldAllRoutesAndTags();
       loadSavedRotas();
       loadSavedInspetores();
       populateFilters();
       updateSupervisoryKPIs();
       renderSupervisorioTab();
 
-      // Sincronização em tempo real com o Firestore Cloud
+      // Sincronização em tempo real com o Firestore Cloud (com proteção contra sobrescrita)
       db.collection("inspectcbm_config").doc("rotas_tags").onSnapshot((doc) => {
         if (doc.exists) {
           const data = doc.data();
-          if (data.rotas && data.rotas.length > 0) defaultRotas = data.rotas;
-          if (data.tagMap && Object.keys(data.tagMap).length > 0) defaultTagMap = data.tagMap;
-          if (data.inspetores && data.inspetores.length > 0) defaultInspetores = data.inspetores;
-          if (data.availableFalhaTypes && data.availableFalhaTypes.length > 0) availableFalhaTypes = data.availableFalhaTypes;
+          if (data.rotas && Array.isArray(data.rotas)) {
+            data.rotas.forEach(r => {
+              if (r && !defaultRotas.includes(r)) defaultRotas.push(r);
+            });
+          }
+          if (data.tagMap && typeof data.tagMap === 'object') {
+            Object.keys(data.tagMap).forEach(r => {
+              if (!defaultTagMap[r]) defaultTagMap[r] = [];
+              if (Array.isArray(data.tagMap[r])) {
+                data.tagMap[r].forEach(t => {
+                  if (t && !defaultTagMap[r].includes(t)) defaultTagMap[r].push(t);
+                });
+              }
+            });
+          }
+          if (data.inspetores && data.inspetores.length > 0) {
+            data.inspetores.forEach(i => {
+              if (i && !defaultInspetores.includes(i)) defaultInspetores.push(i);
+            });
+          }
+          if (data.availableFalhaTypes && data.availableFalhaTypes.length > 0) {
+            data.availableFalhaTypes.forEach(f => {
+              if (f && !availableFalhaTypes.includes(f)) availableFalhaTypes.push(f);
+            });
+          }
         } else {
           db.collection("inspectcbm_config").doc("rotas_tags").set({
             rotas: defaultRotas,
@@ -1084,14 +1271,7 @@
             availableFalhaTypes: availableFalhaTypes
           }, { merge: true }).catch(() => {});
         }
-        try {
-          localStorage.setItem('inspectcbm_cached_cfg', JSON.stringify({
-            rotas: defaultRotas,
-            tagMap: defaultTagMap,
-            inspetores: defaultInspetores,
-            availableFalhaTypes: availableFalhaTypes
-          }));
-        } catch(e) {}
+        reconcileAndShieldAllRoutesAndTags();
         loadSavedRotas();
         loadSavedInspetores();
         populateFilters();
@@ -1108,6 +1288,8 @@
         });
         cloudRecords.sort((a, b) => b.id - a.id);
         try { localStorage.setItem('inspectcbm_cached_records', JSON.stringify(cloudRecords)); } catch(e) {}
+        reconcileAndShieldAllRoutesAndTags();
+        loadSavedRotas();
         populateFilters();
         renderDashboard();
         renderRelatorioTab();
@@ -1123,6 +1305,7 @@
           cloudTagRegistry[doc.id] = doc.data();
         });
         try { localStorage.setItem('inspectcbm_cached_tags', JSON.stringify(cloudTagRegistry)); } catch(e) {}
+        reconcileAndShieldAllRoutesAndTags();
         const currentTag = getBaseTag();
         if(currentTag) loadTagData(currentTag);
         renderRelatorioTab();
@@ -1139,6 +1322,8 @@
         });
         cloudLaudos.sort((a, b) => b.id - a.id);
         try { localStorage.setItem('inspectcbm_cached_laudos', JSON.stringify(cloudLaudos)); } catch(e) {}
+        reconcileAndShieldAllRoutesAndTags();
+        loadSavedRotas();
         populateSupLaudosFilter();
         fetchSavedLaudosHistory();
         renderSupervisorioTab();
@@ -1172,11 +1357,13 @@
 
     async function saveConfigToCloud() {
       try {
+        reconcileAndShieldAllRoutesAndTags();
         await db.collection("inspectcbm_config").doc("rotas_tags").set({
           rotas: defaultRotas,
           tagMap: defaultTagMap,
           inspetores: defaultInspetores,
-          availableFalhaTypes: availableFalhaTypes
+          availableFalhaTypes: availableFalhaTypes,
+          lastShieldSync: new Date().toISOString()
         }, { merge: true });
         updateSupervisoryKPIs();
       } catch (err) {
@@ -1850,7 +2037,9 @@
       const supSelect = document.getElementById('sup_select_laudo');
       if (supSelect) {
         supSelect.value = docId;
-        renderSupervisorioTab();
+        setTimeout(() => {
+          renderSupervisorioTab(true);
+        }, 70);
         showToast("Supervisório alimentado com o laudo do histórico!", "success");
       }
     }
@@ -2132,7 +2321,7 @@
       }
     }
 
-    function renderSupervisorioTab() {
+    function renderSupervisorioTab(forceRenderCharts = false) {
       const supFilterRotaEl = document.getElementById('sup_filter_rota');
       if(!supFilterRotaEl) return;
       const selectedRotas = Array.from(supFilterRotaEl.selectedOptions).map(o => o.value);
@@ -2262,6 +2451,8 @@
           falhasList.forEach(falha => {
             if (falhasEstratificacaoCount[falha] !== undefined) {
               falhasEstratificacaoCount[falha]++;
+            } else {
+              falhasEstratificacaoCount[falha] = 1;
             }
           });
         }
@@ -2342,81 +2533,283 @@
           tbody.appendChild(tr);
         });
       }
-      renderSupervisorioCharts(countNormal, countObservacao, countAlerta, countAlarme, countNaoMedido, falhasEstratificacaoCount);
+
+      const supTab = document.getElementById('tab-supervisorio');
+      const isVisible = supTab && !supTab.classList.contains('hidden');
+      if (isVisible || forceRenderCharts) {
+        renderSupervisorioCharts(countNormal, countObservacao, countAlerta, countAlarme, countNaoMedido, falhasEstratificacaoCount);
+      }
     }
 
     function renderSupervisorioCharts(normal, observacao, alerta, alarme, naomedido, falhasCounts) {
-      const ctxDoughnut = document.getElementById('supDoughnutChart').getContext('2d');
-      if (supDoughnutInstance) supDoughnutInstance.destroy();
-      supDoughnutInstance = new Chart(ctxDoughnut, {
-        type: 'doughnut',
-        data: {
-          labels: ['Normal', 'Observação', 'Alerta', 'Alarme / Emergência', 'Não Medido'],
-          datasets: [{
-            data: [normal, observacao, alerta, alarme, naomedido],
-            backgroundColor: ['#10b981', '#1e3a8a', '#f59e0b', '#dc2626', '#475569'],
-            borderWidth: 2,
-            borderColor: '#0f172a'
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { position: 'bottom', labels: { color: '#cbd5e1', font: { size: 10, family: 'Inter' } } }
-          }
-        }
-      });
+      const supTab = document.getElementById('tab-supervisorio');
+      if (!supTab || supTab.classList.contains('hidden')) return;
 
-      const ctxBar = document.getElementById('supBarChart').getContext('2d');
-      if (supBarInstance) supBarInstance.destroy();
-      supBarInstance = new Chart(ctxBar, {
-        type: 'bar',
-        data: {
-          labels: ['Normal', 'Observação', 'Alerta', 'Alarme / Emerg.', 'Não Medidos'],
-          datasets: [{
-            label: 'Qtd de Ativos',
-            data: [normal, observacao, alerta, alarme, naomedido],
-            backgroundColor: ['#10b981', '#1e3a8a', '#f59e0b', '#dc2626', '#475569'],
-            borderRadius: 6
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
-          scales: {
-            x: { ticks: { color: '#94a3b8', font: { size: 10, family: 'Inter' } }, grid: { display: false } },
-            y: { ticks: { color: '#94a3b8', font: { size: 10, family: 'JetBrains Mono' }, stepSize: 1 }, grid: { color: '#1e293b' } }
-          }
-        }
-      });
+      // Puxa diretamente os dados dos campos (KPIs) exibidos acima dos gráficos conforme solicitado pelo usuário
+      const elNormal = document.getElementById('sup-kpi-normal');
+      const elObs = document.getElementById('sup-kpi-observacao');
+      const elAlerta = document.getElementById('sup-kpi-alerta');
+      const elAlarme = document.getElementById('sup-kpi-alarme');
+      const elNaoMedido = document.getElementById('sup-kpi-naomedido');
+      const elTotal = document.getElementById('sup-kpi-total');
 
-      const ctxFalhas = document.getElementById('supFalhasChart').getContext('2d');
-      if (supFalhasInstance) supFalhasInstance.destroy();
-      const falhasLabels = Object.keys(falhasCounts);
-      const falhasDataVals = falhasLabels.map(k => falhasCounts[k]);
-      supFalhasInstance = new Chart(ctxFalhas, {
-        type: 'bar',
-        data: {
-          labels: falhasLabels.map(l => l.replace('Falha de ', '')),
-          datasets: [{
-            label: 'Ocorrências',
-            data: falhasDataVals,
-            backgroundColor: '#f59e0b',
-            borderRadius: 6
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
-          scales: {
-            x: { ticks: { color: '#94a3b8', font: { size: 9, family: 'Inter' }, maxRotation: 45, minRotation: 45 }, grid: { display: false } },
-            y: { ticks: { color: '#94a3b8', font: { size: 10, family: 'JetBrains Mono' }, stepSize: 1 }, grid: { color: '#1e293b' } }
+      const kpiNormal = elNormal ? (parseInt(elNormal.textContent, 10) || 0) : (Number(normal) || 0);
+      const kpiObservacao = elObs ? (parseInt(elObs.textContent, 10) || 0) : (Number(observacao) || 0);
+      const kpiAlerta = elAlerta ? (parseInt(elAlerta.textContent, 10) || 0) : (Number(alerta) || 0);
+      const kpiAlarme = elAlarme ? (parseInt(elAlarme.textContent, 10) || 0) : (Number(alarme) || 0);
+      const kpiNaoMedido = elNaoMedido ? (parseInt(elNaoMedido.textContent, 10) || 0) : (Number(naomedido) || 0);
+      const totalMedidos = kpiNormal + kpiObservacao + kpiAlerta + kpiAlarme;
+      const totalGeral = elTotal ? (parseInt(elTotal.textContent, 10) || (totalMedidos + kpiNaoMedido)) : (totalMedidos + kpiNaoMedido);
+
+      // 1. DOUGHNUT CHART - Saúde da Frota & Confiabilidade
+      const healthScoreEl = document.getElementById('sup-health-score-val');
+      let healthScore = 100;
+      if (totalMedidos > 0) {
+        const weightedPoints = (kpiNormal * 1.0) + (kpiObservacao * 0.8) + (kpiAlerta * 0.4) + (kpiAlarme * 0.0);
+        healthScore = Math.round((weightedPoints / totalMedidos) * 100);
+      } else if (totalGeral > 0 && kpiNaoMedido === totalGeral) {
+        healthScore = 0;
+      }
+
+      if (healthScoreEl) {
+        if (totalMedidos === 0 && kpiNaoMedido > 0) {
+          healthScoreEl.textContent = "Não Medido";
+          healthScoreEl.className = "text-xs font-mono font-bold text-slate-400 bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-700";
+        } else {
+          healthScoreEl.textContent = `${healthScore}% Confiabilidade`;
+          if (healthScore >= 85) {
+            healthScoreEl.className = "text-xs font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20";
+          } else if (healthScore >= 70) {
+            healthScoreEl.className = "text-xs font-mono font-bold text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20";
+          } else {
+            healthScoreEl.className = "text-xs font-mono font-bold text-rose-400 bg-rose-500/10 px-2.5 py-1 rounded-lg border border-rose-500/20";
           }
         }
-      });
+      }
+
+      const canvasDoughnut = document.getElementById('supDoughnutChart');
+      if (canvasDoughnut) {
+        const hasData = totalGeral > 0;
+        const labels = hasData ? ['Normal', 'Observação', 'Alerta', 'Alarme / Emerg.', 'Não Medido'] : ['Sem Ativos'];
+        const dataVals = hasData ? [kpiNormal, kpiObservacao, kpiAlerta, kpiAlarme, kpiNaoMedido] : [1];
+        const bgColors = hasData ? ['#10b981', '#38bdf8', '#f59e0b', '#ef4444', '#64748b'] : ['#334155'];
+
+        if (supDoughnutInstance && supDoughnutInstance.ctx) {
+          supDoughnutInstance.data.labels = labels;
+          supDoughnutInstance.data.datasets[0].data = dataVals;
+          supDoughnutInstance.data.datasets[0].backgroundColor = bgColors;
+          supDoughnutInstance.update('none');
+          supDoughnutInstance.resize();
+        } else {
+          if (supDoughnutInstance) {
+            try { supDoughnutInstance.destroy(); } catch(e) {}
+            supDoughnutInstance = null;
+          }
+          canvasDoughnut.removeAttribute('width');
+          canvasDoughnut.removeAttribute('height');
+          const ctxDoughnut = canvasDoughnut.getContext('2d');
+          supDoughnutInstance = new Chart(ctxDoughnut, {
+            type: 'doughnut',
+            data: {
+              labels: labels,
+              datasets: [{
+                data: dataVals,
+                backgroundColor: bgColors,
+                borderColor: '#0f172a',
+                borderWidth: 2
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              animation: false,
+              plugins: {
+                legend: {
+                  position: 'bottom',
+                  labels: {
+                    color: '#cbd5e1',
+                    boxWidth: 12,
+                    padding: 10,
+                    font: { size: 11, family: 'Inter' }
+                  }
+                },
+                tooltip: {
+                  callbacks: {
+                    label: function(context) {
+                      if (!hasData) return ' Sem dados carregados';
+                      const val = context.raw || 0;
+                      const pct = totalGeral > 0 ? Math.round((val / totalGeral) * 100) : 0;
+                      return ` ${context.label}: ${val} ativo(s) (${pct}%)`;
+                    }
+                  }
+                }
+              }
+            }
+          });
+        }
+      }
+
+      // 2. BAR CHART - Ativos por Severidade (puxado diretamente dos campos acima)
+      const canvasBar = document.getElementById('supBarChart');
+      if (canvasBar) {
+        const barLabels = ['Normal', 'Observação', 'Alerta', 'Alarme/Emerg.', 'Não Medidos'];
+        const barData = [kpiNormal, kpiObservacao, kpiAlerta, kpiAlarme, kpiNaoMedido];
+        const maxBarVal = Math.max(...barData, 5);
+
+        if (supBarInstance && supBarInstance.ctx) {
+          supBarInstance.data.labels = barLabels;
+          supBarInstance.data.datasets[0].data = barData;
+          if (supBarInstance.options.scales && supBarInstance.options.scales.y) {
+            supBarInstance.options.scales.y.suggestedMax = maxBarVal + Math.ceil(maxBarVal * 0.1) + 1;
+          }
+          supBarInstance.update('none');
+          supBarInstance.resize();
+        } else {
+          if (supBarInstance) {
+            try { supBarInstance.destroy(); } catch(e) {}
+            supBarInstance = null;
+          }
+          canvasBar.removeAttribute('width');
+          canvasBar.removeAttribute('height');
+          const ctxBar = canvasBar.getContext('2d');
+          supBarInstance = new Chart(ctxBar, {
+            type: 'bar',
+            data: {
+              labels: barLabels,
+              datasets: [{
+                label: 'Qtd de Ativos',
+                data: barData,
+                backgroundColor: ['#10b981', '#38bdf8', '#f59e0b', '#ef4444', '#64748b'],
+                borderRadius: 6
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              animation: false,
+              plugins: {
+                legend: { display: false },
+                tooltip: {
+                  callbacks: {
+                    label: function(context) {
+                      return ` ${context.parsed.y} ativo(s)`;
+                    }
+                  }
+                }
+              },
+              scales: {
+                x: {
+                  ticks: { color: '#94a3b8', font: { size: 10, family: 'Inter' } },
+                  grid: { display: false }
+                },
+                y: {
+                  beginAtZero: true,
+                  suggestedMax: maxBarVal + Math.ceil(maxBarVal * 0.1) + 1,
+                  ticks: {
+                    color: '#94a3b8',
+                    font: { size: 10, family: 'JetBrains Mono' },
+                    precision: 0,
+                    stepSize: 1
+                  },
+                  grid: { color: 'rgba(51, 65, 85, 0.4)' }
+                }
+              }
+            }
+          });
+        }
+      }
+
+      // 3. FALHAS CHART - Tipos de Falha Detectadas
+      const canvasFalhas = document.getElementById('supFalhasChart');
+      if (canvasFalhas) {
+        const falhaLabels = [...(availableFalhaTypes || [
+          "Desbalanceamento",
+          "Desalinhamento",
+          "Falha de Rolamento",
+          "Falha de Lubrificação",
+          "Falha Elétrica",
+          "Falha de Base",
+          "Folga Mecânica",
+          "Cavitação"
+        ])];
+        if (falhasCounts) {
+          Object.keys(falhasCounts).forEach(f => {
+            if (falhasCounts[f] > 0 && !falhaLabels.includes(f)) {
+              falhaLabels.push(f);
+            }
+          });
+        }
+        const falhaData = falhaLabels.map(f => (falhasCounts && falhasCounts[f]) ? falhasCounts[f] : 0);
+        const maxFalhaVal = Math.max(...falhaData, 2);
+
+        if (supFalhasInstance && supFalhasInstance.ctx) {
+          supFalhasInstance.data.labels = falhaLabels;
+          supFalhasInstance.data.datasets[0].data = falhaData;
+          if (supFalhasInstance.options.scales && supFalhasInstance.options.scales.y) {
+            supFalhasInstance.options.scales.y.suggestedMax = maxFalhaVal + 1;
+          }
+          supFalhasInstance.update('none');
+          supFalhasInstance.resize();
+        } else {
+          if (supFalhasInstance) {
+            try { supFalhasInstance.destroy(); } catch(e) {}
+            supFalhasInstance = null;
+          }
+          canvasFalhas.removeAttribute('width');
+          canvasFalhas.removeAttribute('height');
+          const ctxFalhas = canvasFalhas.getContext('2d');
+          supFalhasInstance = new Chart(ctxFalhas, {
+            type: 'bar',
+            data: {
+              labels: falhaLabels,
+              datasets: [{
+                label: 'Ocorrências',
+                data: falhaData,
+                backgroundColor: '#f59e0b',
+                borderRadius: 6
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              animation: false,
+              plugins: {
+                legend: { display: false },
+                tooltip: {
+                  callbacks: {
+                    label: function(context) {
+                      return ` ${context.parsed.y} ativo(s) com esta falha`;
+                    }
+                  }
+                }
+              },
+              scales: {
+                x: {
+                  ticks: {
+                    color: '#94a3b8',
+                    font: { size: 9, family: 'Inter' },
+                    maxRotation: 35,
+                    minRotation: 20,
+                    autoSkip: false
+                  },
+                  grid: { display: false }
+                },
+                y: {
+                  beginAtZero: true,
+                  suggestedMax: maxFalhaVal + 1,
+                  ticks: {
+                    color: '#94a3b8',
+                    font: { size: 10, family: 'JetBrains Mono' },
+                    precision: 0,
+                    stepSize: 1
+                  },
+                  grid: { color: 'rgba(51, 65, 85, 0.4)' }
+                }
+              }
+            }
+          });
+        }
+      }
     }
 
     let chartInstance = null;
@@ -2543,12 +2936,14 @@
       const selectedRotas = Array.from(relFilterRotaEl.selectedOptions).map(o => o.value);
       const dataColeta = document.getElementById('rel_data_coleta').value;
       const dataAnalise = document.getElementById('rel_data_analise').value;
+      const respTec = document.getElementById('rel_responsavel_tecnico') ? document.getElementById('rel_responsavel_tecnico').value.trim() : 'TÉCNICO RESPONSÁVEL';
       const laudoObj = {
         id: Date.now(),
         rotas: selectedRotas,
         rota: selectedRotas.join(', '),
         dataColeta: dataColeta,
         dataAnalise: dataAnalise,
+        responsavelTecnico: respTec,
         state: JSON.parse(JSON.stringify(relatorioAnalysisState))
       };
       try {
@@ -2577,6 +2972,7 @@
             <span class="font-bold text-amber-400 font-mono">Rotas: ${laudo.rota || laudo.rotas?.join(', ') || '-'}</span> | 
             <span class="text-slate-300">Coleta: ${laudo.dataColeta || '-'}</span> | 
             <span class="text-slate-300">Análise: ${laudo.dataAnalise || '-'}</span>
+            ${laudo.responsavelTecnico ? `<br><span class="text-[11px] text-emerald-400 font-mono"><i class="fa-solid fa-user-check mr-1"></i>Resp: ${laudo.responsavelTecnico}</span>` : ''}
           </div>
           <div class="flex items-center space-x-2 flex-wrap gap-y-1">
             <button onclick="viewLaudoInSupervisorio('${laudo.docId}')" class="bg-emerald-600/30 hover:bg-emerald-600/40 text-emerald-300 border border-emerald-500/30 font-semibold px-2.5 py-1.5 rounded-lg transition flex items-center shadow" title="Alimentar e Visualizar no Supervisório"><i class="fa-solid fa-gauge mr-1"></i> Supervisório</button>
@@ -2600,6 +2996,9 @@
       }
       if(laudo.dataColeta) document.getElementById('rel_data_coleta').value = laudo.dataColeta;
       if(laudo.dataAnalise) document.getElementById('rel_data_analise').value = laudo.dataAnalise;
+      if(laudo.responsavelTecnico && document.getElementById('rel_responsavel_tecnico')) {
+        document.getElementById('rel_responsavel_tecnico').value = laudo.responsavelTecnico;
+      }
       relatorioAnalysisState = JSON.parse(JSON.stringify(laudo.state || {}));
       renderRelatorioTab();
       showToast("Laudo carregado com sucesso!", "success");
@@ -2613,6 +3012,7 @@
       const previousSelected = Array.from(relFilterRotaEl.selectedOptions).map(o => o.value);
       const previousDataColeta = document.getElementById('rel_data_coleta').value;
       const previousDataAnalise = document.getElementById('rel_data_analise').value;
+      const previousRespTec = document.getElementById('rel_responsavel_tecnico') ? document.getElementById('rel_responsavel_tecnico').value : '';
       
       const targetRotas = laudo.rotas || (laudo.rota ? laudo.rota.split(', ') : ['TODAS_ROTAS']);
       for (let i = 0; i < relFilterRotaEl.options.length; i++) {
@@ -2621,6 +3021,9 @@
       }
       if(laudo.dataColeta) document.getElementById('rel_data_coleta').value = laudo.dataColeta;
       if(laudo.dataAnalise) document.getElementById('rel_data_analise').value = laudo.dataAnalise;
+      if(laudo.responsavelTecnico && document.getElementById('rel_responsavel_tecnico')) {
+        document.getElementById('rel_responsavel_tecnico').value = laudo.responsavelTecnico;
+      }
       relatorioAnalysisState = laudo.state || {};
       await exportTechnicalPDF();
       
@@ -2630,6 +3033,9 @@
       }
       document.getElementById('rel_data_coleta').value = previousDataColeta;
       document.getElementById('rel_data_analise').value = previousDataAnalise;
+      if(document.getElementById('rel_responsavel_tecnico')) {
+        document.getElementById('rel_responsavel_tecnico').value = previousRespTec;
+      }
       relatorioAnalysisState = previousState;
       renderRelatorioTab();
     }
@@ -2964,6 +3370,7 @@
       const filterStatus = document.getElementById('rel_filter_status').value;
       const dataColetaInput = document.getElementById('rel_data_coleta').value;
       const dataAnaliseInput = document.getElementById('rel_data_analise').value;
+      const respTecInput = document.getElementById('rel_responsavel_tecnico') ? document.getElementById('rel_responsavel_tecnico').value.trim() : '';
       
       let dataColetaFmt = new Date().toLocaleDateString('pt-PT');
       if (dataColetaInput) {
@@ -3013,68 +3420,15 @@
       if(filtered.length === 0) { showToast('Sem itens para exportar no relatório com este filtro.', 'error'); return; }
       
       const doc = new jsPDF('p', 'mm', 'a4');
-      const totalPages = filtered.length;
+      const totalEquipments = filtered.length;
+      const totalPages = Math.ceil(totalEquipments / 2);
       
-      filtered.forEach((r, index) => {
-        if (index > 0) doc.addPage();
-        
-        // 1. HEADER EXECUTIVO COM DESIGN CORPORATIVO SCADA
-        // Fundo Superior Navy Escuro
-        doc.setFillColor(15, 23, 42); // slate-900
-        doc.rect(14, 10, 182, 19, 'F');
-        
-        // Barra Decorativa de Destaque Amber / Dourado
-        doc.setFillColor(245, 158, 11); // amber-500
-        doc.rect(14, 10, 3.5, 19, 'F');
-        
-        // Título e Subtítulo Principal
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(13);
-        doc.setTextColor(255, 255, 255);
-        doc.text("MONDELEZ  |  LAUDO TÉCNICO DE CONDICIONAMENTO", 22, 18);
-        
-        doc.setFontSize(7.5);
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(203, 213, 225); // slate-300
-        doc.text("SUPERVISORY & CONDITION MONITORING SYSTEM  •  UTILIDADES CBM", 22, 24);
-        
-        // Badge / Metadados à Direita no Header
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(8);
-        doc.setTextColor(245, 158, 11);
-        doc.text("RELATÓRIO TÉCNICO CBM", 191, 17.5, { align: "right" });
-        
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(7);
-        doc.setTextColor(148, 163, 184);
-        doc.text(`ANÁLISE: ${dataAnaliseFmt}`, 191, 24, { align: "right" });
-        
-        // 2. FAIXA DE METADADOS ROTA & DATAS
-        doc.setFillColor(241, 245, 249); // slate-100
-        doc.setDrawColor(203, 213, 225); // slate-300
-        doc.rect(14, 31, 182, 7.5, 'FD');
-        
-        doc.setFontSize(7.5);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(51, 65, 85); // slate-700
-        doc.text("ROTAS:", 18, 36);
-        doc.setFont("helvetica", "normal");
-        doc.text(rotasParaAnalisar.join(', ').slice(0, 50), 31, 36);
-        
-        doc.setFont("helvetica", "bold");
-        doc.text("COLETA:", 110, 36);
-        doc.setFont("helvetica", "normal");
-        doc.text(dataColetaFmt, 124, 36);
-        
-        doc.setFont("helvetica", "bold");
-        doc.text("STATUS:", 152, 36);
-        doc.setFont("helvetica", "normal");
-        doc.text(r.analysisState.isMedido ? "MEDIDO" : "NÃO MEDIDO", 166, 36);
-        
+      function renderSingleEquipmentBlock(doc, r, startY) {
         const state = r.analysisState;
         const sevStatus = state.isMedido ? (state.statusVal || 'NORMAL').toUpperCase() : 'NÃO MEDIDO';
-        
-        // Bloco Superior Direito: Dados Técnicos (SEM Tipos de Falha e SEM SAP repetido no equipamento)
+        const respTecFinal = respTecInput || (r.inspetor && r.inspetor !== 'PENDENTE' ? r.inspetor : 'TÉCNICO RESPONSÁVEL');
+
+        // Bloco Superior Direito: Dados Técnicos (SEM SAP repetido no equipamento)
         let blocoDadosTecnicos = `TAG: ${r.tag || r.baseTag}\n` +
                                  `SAP: ${r.sap_number || '-'}\n` +
                                  `OS: ${state.os || '-'}\n` +
@@ -3085,24 +3439,23 @@
                                  `• Setor: ${r.setor || '-'} (${r.area || '-'})\n` +
                                  `• Conjunto: ${r.componente || 'Conjunto'}`;
 
-        // Bloco Inferior: Tipos de Falha colocado DIRETAMENTE EM CIMA de DETECÇÃO / TÉCNICA
+        // Bloco Inferior: Tipos de Falha em cima de Detecção, e sem grifado gigante
         let falhasTexto = (state.falhas && state.falhas.length > 0) ? state.falhas.join(', ') : 'Nenhuma';
         if (!state.isMedido) falhasTexto = 'Não avaliado (Equipamento não medido)';
 
-        let blocoInferior = `TIPOS DE FALHA: ${falhasTexto}\n\n` +
-                            `DETECÇÃO / TÉCNICA: ${state.deteccao || 'Análise de Vibração'}\n\n` +
-                            `PROBLEMA / DIAGNÓSTICO: ${state.isMedido && state.problema ? state.problema : 'Sem pendências identificadas. Equipamento em regime normal.'}\n\n` +
-                            `RECOMENDAÇÃO TÉCNICA: ${state.isMedido && state.recomendacao ? state.recomendacao : 'Manter monitoramento de rotina preditiva.'}\n\n` +
-                            `RESPONSÁVEL TÉCNICO: ${r.inspetor || 'PENDENTE'}`;
+        let blocoInferior = `TIPOS DE FALHA: ${falhasTexto}\n` +
+                            `DETECÇÃO / TÉCNICA: ${state.deteccao || 'Análise de Vibração'}\n` +
+                            `PROBLEMA / DIAGNÓSTICO: ${state.isMedido && state.problema ? state.problema : 'Sem pendências identificadas. Equipamento em regime normal.'}\n` +
+                            `RECOMENDAÇÃO TÉCNICA: ${state.isMedido && state.recomendacao ? state.recomendacao : 'Manter monitoramento de rotina preditiva.'}\n` +
+                            `RESPONSÁVEL TÉCNICO: ${respTecFinal}`;
 
         let photoSrc = r.photo || (cloudTagRegistry[r.baseTag] ? cloudTagRegistry[r.baseTag].photo : null);
 
-        // 3. TABELA ESTRUTURADA DE ALTA QUALIDADE
         doc.autoTable({
-          startY: 41,
+          startY: startY,
           head: [['FOTO DO EQUIPAMENTO', 'DADOS TÉCNICOS DO EQUIPAMENTO']],
           body: [
-            [{ content: '', styles: { minCellHeight: 66 } }, blocoDadosTecnicos],
+            [{ content: '', styles: { minCellHeight: 46 } }, blocoDadosTecnicos],
             [{ 
               content: 'PARECER TÉCNICO & DIAGNÓSTICO DE CONFIABILIDADE (CBM)', 
               colSpan: 2, 
@@ -3110,20 +3463,20 @@
                 fillColor: [30, 41, 59], 
                 textColor: [245, 158, 11], 
                 fontStyle: 'bold', 
-                fontSize: 8, 
+                fontSize: 7.5, 
                 halign: 'left', 
-                cellPadding: 1.8,
-                minCellHeight: 5
+                cellPadding: 1.2,
+                minCellHeight: 4.5
               } 
             }],
             [{ 
               content: blocoInferior, 
               colSpan: 2, 
               styles: { 
-                cellPadding: 4, 
-                fontSize: 8.5, 
+                cellPadding: 2.2, 
+                fontSize: 7.5, 
                 textColor: [30, 41, 59], 
-                lineHeight: 1.45,
+                lineHeight: 1.35,
                 fillColor: [255, 255, 255],
                 halign: 'center'
               } 
@@ -3131,8 +3484,8 @@
           ],
           theme: 'grid',
           styles: { 
-            fontSize: 8.5, 
-            cellPadding: 3.5, 
+            fontSize: 7.5, 
+            cellPadding: 2, 
             overflow: 'linebreak', 
             valign: 'top', 
             textColor: [30, 41, 59],
@@ -3144,29 +3497,26 @@
             textColor: [255, 255, 255], 
             fontStyle: 'bold', 
             halign: 'center',
-            fontSize: 9,
-            cellPadding: 3
+            fontSize: 8,
+            cellPadding: 2
           },
           columnStyles: { 
-            0: { cellWidth: 85, halign: 'center' }, 
-            1: { cellWidth: 97, fillColor: [250, 250, 250] } 
+            0: { cellWidth: 82, halign: 'center' }, 
+            1: { cellWidth: 100, fillColor: [250, 250, 250] } 
           },
           didDrawCell: function(data) {
-            // Renderização elegante da imagem com proporção preservada
             if (data.section === 'body' && data.row.index === 0 && data.column.index === 0) {
-              const cellH = data.cell.height || 66;
-              const boxW = 79;
-              const boxH = Math.min(62, cellH - 4);
+              const cellH = data.cell.height || 46;
+              const boxW = 76;
+              const boxH = Math.min(43, cellH - 3);
               const boxX = data.cell.x + (data.cell.width - boxW) / 2;
               const boxY = data.cell.y + (cellH - boxH) / 2;
 
               if (photoSrc) {
                 try {
-                  // Fundo sutil do container da imagem
                   doc.setFillColor(248, 250, 252);
                   doc.setDrawColor(226, 232, 240);
                   doc.rect(boxX, boxY, boxW, boxH, 'FD');
-                  
                   doc.addImage(photoSrc, 'JPEG', boxX + 0.5, boxY + 0.5, boxW - 1, boxH - 1);
                 } catch(e) { 
                   console.error("Erro ao desenhar imagem no PDF", e); 
@@ -3175,8 +3525,7 @@
                 doc.setFillColor(248, 250, 252);
                 doc.setDrawColor(226, 232, 240);
                 doc.roundedRect(boxX, boxY, boxW, boxH, 2, 2, 'FD');
-                
-                doc.setFontSize(8);
+                doc.setFontSize(7.5);
                 doc.setFont("helvetica", "normal");
                 doc.setTextColor(148, 163, 184);
                 doc.text("Sem Registro Fotográfico", boxX + boxW / 2, boxY + boxH / 2, { align: "center" });
@@ -3184,21 +3533,91 @@
             }
           }
         });
+      }
+
+      for (let p = 0; p < totalPages; p++) {
+        if (p > 0) doc.addPage();
+
+        // 1. HEADER EXECUTIVO COM BRANDING MONDELEZ & UTILIDADES CBM
+        doc.setFillColor(15, 23, 42); // slate-900
+        doc.rect(14, 7, 182, 14, 'F');
         
-        // 4. RODAPÉ INSTITUCIONAL COM NUMERAÇÃO DE PÁGINAS
+        // Barra Decorativa de Destaque Amber / Dourado
+        doc.setFillColor(245, 158, 11); // amber-500
+        doc.rect(14, 7, 3, 14, 'F');
+        
+        // Título e Subtítulo Principal
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(11);
+        doc.setTextColor(255, 255, 255);
+        doc.text("MONDELEZ  |  LAUDO TÉCNICO DE CONDICIONAMENTO", 20, 13.5);
+        
+        doc.setFontSize(7);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(203, 213, 225); // slate-300
+        doc.text("SUPERVISORY & CONDITION MONITORING SYSTEM  •  UTILIDADES CBM", 20, 18.5);
+        
+        // Badge / Metadados à Direita no Header
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(7.5);
+        doc.setTextColor(245, 158, 11);
+        doc.text("RELATÓRIO TÉCNICO CBM", 191, 13, { align: "right" });
+        
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(6.5);
+        doc.setTextColor(148, 163, 184);
+        doc.text(`ANÁLISE: ${dataAnaliseFmt}`, 191, 18.5, { align: "right" });
+        
+        // 2. FAIXA DE METADADOS ROTA & DATAS
+        doc.setFillColor(241, 245, 249); // slate-100
+        doc.setDrawColor(203, 213, 225); // slate-300
+        doc.rect(14, 23, 182, 6, 'FD');
+        
+        doc.setFontSize(7);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(51, 65, 85); // slate-700
+        doc.text("ROTAS:", 17, 27.2);
+        doc.setFont("helvetica", "normal");
+        doc.text(rotasParaAnalisar.join(', ').slice(0, 50), 29, 27.2);
+        
+        doc.setFont("helvetica", "bold");
+        doc.text("COLETA:", 108, 27.2);
+        doc.setFont("helvetica", "normal");
+        doc.text(dataColetaFmt, 120, 27.2);
+        
+        doc.setFont("helvetica", "bold");
+        doc.text("RESP. TÉCNICO:", 145, 27.2);
+        doc.setFont("helvetica", "normal");
+        doc.text((respTecInput || "TÉCNICO RESPONSÁVEL").slice(0, 22), 167, 27.2);
+
+        // 3. EQUIPAMENTO 1 DA PÁGINA (PARTE SUPERIOR)
+        const equip1 = filtered[p * 2];
+        renderSingleEquipmentBlock(doc, equip1, 31.5);
+
+        // 4. EQUIPAMENTO 2 DA PÁGINA (PARTE INFERIOR - SE HOUVER)
+        const equip2 = filtered[p * 2 + 1];
+        if (equip2) {
+          doc.setDrawColor(226, 232, 240);
+          doc.setLineWidth(0.3);
+          doc.line(14, 137, 196, 137);
+
+          renderSingleEquipmentBlock(doc, equip2, 140);
+        }
+
+        // 5. RODAPÉ INSTITUCIONAL COM NUMERAÇÃO DE PÁGINAS
         doc.setDrawColor(226, 232, 240);
         doc.setLineWidth(0.3);
-        doc.line(14, 284, 196, 284);
+        doc.line(14, 286, 196, 286);
         
-        doc.setFontSize(7.5);
+        doc.setFontSize(7);
         doc.setFont("helvetica", "normal");
         doc.setTextColor(148, 163, 184);
-        doc.text("MONDELEZ SCADA  •  Sistema de Monitoramento Preditivo & Confiabilidade de Ativos", 14, 289);
-        doc.text(`Página ${index + 1} de ${totalPages}`, 196, 289, { align: "right" });
-      });
+        doc.text("MONDELEZ SCADA  •  Sistema de Monitoramento Preditivo & Confiabilidade de Ativos", 14, 290.5);
+        doc.text(`Página ${p + 1} de ${totalPages}`, 196, 290.5, { align: "right" });
+      }
       
       doc.save(`Laudo_Tecnico_Mondelez_${dataAnaliseFmt.replace(/\//g, '-')}.pdf`);
-      showToast("Laudo Técnico gerado com sucesso!", "success");
+      showToast("Laudo Técnico gerado com sucesso (2 equipamentos por página)!", "success");
     }
   </script>
 </body>
