@@ -105,6 +105,7 @@
       </div>
     </div>
   </header>
+
   <!-- Main Container -->
   <main class="max-w-7xl mx-auto px-4 mt-6">
     
@@ -127,7 +128,7 @@
           <div class="flex items-center space-x-1.5 bg-slate-950 border border-amber-500/40 rounded-xl px-3 py-1.5 text-xs text-amber-400 shadow-inner">
             <span class="text-[10px] text-slate-400 font-mono flex items-center"><i class="fa-solid fa-cloud-arrow-down mr-1.5 text-amber-400"></i>Laudo Nuvem:</span>
             <select id="sup_select_laudo" onchange="renderSupervisorioTab()" class="bg-transparent text-xs text-amber-300 font-bold font-mono focus:outline-none max-w-[220px]">
-              <option value="CONSOLIDADO">Todos os Laudos (Somatório Geral de Equipamentos)</option>
+              <option value="CONSOLIDADO">Todos os Laudos (Último Status por Ativo)</option>
             </select>
           </div>
           <select id="sup_filter_rota" multiple onchange="renderSupervisorioTab()" class="bg-slate-950 border border-emerald-500/40 rounded-xl px-3 py-1.5 text-xs text-emerald-400 font-bold shadow-inner h-14 w-44">
@@ -146,6 +147,7 @@
           </button>
         </div>
       </div>
+
       <!-- CARDS DE RESUMO EXECUTIVO (KPIs) -->
       <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
         <div class="bg-slate-900/90 backdrop-blur-md p-4 rounded-2xl border border-slate-800 shadow-xl relative overflow-hidden flex flex-col justify-between">
@@ -179,6 +181,7 @@
           <span id="sup-kpi-naomedido" class="text-2xl font-bold font-mono text-slate-300 mt-2">0</span>
         </div>
       </div>
+
       <!-- GRÁFICOS DO SUPERVISÓRIO -->
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div class="bg-slate-900/90 backdrop-blur-md rounded-2xl p-6 border border-slate-800 shadow-2xl relative overflow-hidden flex flex-col items-center">
@@ -215,6 +218,7 @@
           </div>
         </div>
       </div>
+
       <!-- TABELA DO SUPERVISÓRIO -->
       <div class="bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-800 shadow-2xl overflow-hidden">
         <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-950/40">
@@ -238,6 +242,7 @@
         </div>
       </div>
     </div>
+
     <!-- SEÇÃO: FORMULÁRIO DE COLETA DE CAMPO -->
     <div id="tab-form" class="max-w-5xl mx-auto space-y-6">
       <form id="vibration-form" onsubmit="saveInspection(event)" class="space-y-6">
@@ -258,6 +263,9 @@
               </button>
               <button type="button" onclick="saveOnlyTagRegistration()" class="bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/30 text-xs px-3 py-1.5 rounded-xl transition flex items-center font-semibold shadow">
                 <i class="fa-solid fa-bookmark mr-1.5"></i> Salvar Tag
+              </button>
+              <button type="button" onclick="confirmResetInspection()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-rose-400 border border-slate-700/60 text-xs px-3 py-1.5 rounded-xl transition flex items-center font-semibold shadow" title="Limpar campos de medição desta coleta">
+                <i class="fa-solid fa-rotate-left mr-1.5"></i> Limpar Medição
               </button>
             </div>
           </div>
@@ -339,6 +347,7 @@
             </div>
           </div>
         </div>
+
         <!-- BLOCO 2 -->
         <div class="bg-slate-900/90 backdrop-blur-md rounded-2xl p-6 border border-slate-800 shadow-2xl space-y-5 relative overflow-hidden">
           <div class="absolute top-0 left-0 w-1 h-full bg-cyan-500"></div>
@@ -407,6 +416,7 @@
             </div>
           </div>
         </div>
+
         <!-- BLOCO 3 -->
         <div class="bg-slate-900/90 backdrop-blur-md rounded-2xl p-6 border border-slate-800 shadow-2xl relative overflow-hidden">
           <div class="absolute top-0 left-0 w-1 h-full bg-emerald-500"></div>
@@ -439,6 +449,7 @@
             </div>
           </div>
         </div>
+
         <!-- BLOCO 4 -->
         <div class="bg-slate-900/90 backdrop-blur-md rounded-2xl p-6 border border-amber-500/30 shadow-2xl relative overflow-hidden">
           <div class="absolute top-0 left-0 w-1 h-full bg-amber-400"></div>
@@ -467,6 +478,7 @@
             <input type="text" id="strobo_obs" placeholder="Ex: Desgaste no elemento elástico do acoplamento." class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-amber-500">
           </div>
         </div>
+
         <!-- BLOCO 5 -->
         <div class="bg-slate-900/90 backdrop-blur-md rounded-2xl p-6 border border-slate-800 shadow-2xl space-y-4 relative overflow-hidden">
           <div class="absolute top-0 left-0 w-1 h-full bg-rose-500"></div>
@@ -506,6 +518,7 @@
             <input type="text" id="temp_obs" placeholder="Ex: Ponto quente detetado no mancal LA do Motor." class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-rose-500">
           </div>
         </div>
+
         <!-- BLOCO 6 -->
         <div class="bg-slate-900/90 backdrop-blur-md rounded-2xl p-6 border border-slate-800 shadow-2xl space-y-4 relative overflow-hidden">
           <div class="absolute top-0 left-0 w-1 h-full bg-purple-500"></div>
@@ -606,6 +619,7 @@
         </button>
       </form>
     </div>
+
     <!-- SEÇÃO: PRÉ-ANÁLISE -->
     <div id="tab-dashboard" class="hidden space-y-6">
       <div class="bg-slate-900/90 backdrop-blur-md rounded-2xl p-5 border border-slate-800 shadow-2xl flex flex-col md:flex-row justify-between items-center gap-4">
@@ -685,6 +699,7 @@
         </div>
       </div>
     </div>
+
     <!-- SEÇÃO: RELATÓRIO TÉCNICO -->
     <div id="tab-relatorio" class="hidden space-y-6">
       <div class="bg-slate-900/90 backdrop-blur-md rounded-2xl p-6 border border-slate-800 shadow-2xl space-y-4 relative overflow-hidden">
@@ -765,6 +780,7 @@
       </div>
     </div>
   </main>
+
   <!-- MODAIS -->
   <div id="modal-rotas" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
     <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-md w-full space-y-4 shadow-2xl">
@@ -788,6 +804,7 @@
       </div>
     </div>
   </div>
+
   <div id="modal-tags" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
     <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-md w-full space-y-4 shadow-2xl">
       <h3 class="text-xs font-bold text-amber-400 uppercase tracking-widest flex items-center justify-between font-mono">
@@ -816,6 +833,7 @@
       </div>
     </div>
   </div>
+
   <div id="modal-inspetores" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
     <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-md w-full space-y-4 shadow-2xl">
       <h3 class="text-xs font-bold text-amber-400 uppercase tracking-widest flex items-center justify-between font-mono">
@@ -838,8 +856,10 @@
       </div>
     </div>
   </div>
+
   <!-- TOAST CONTAINER -->
   <div id="toast-container" class="fixed top-5 right-5 z-[100] flex flex-col space-y-2 pointer-events-none max-w-sm w-full [&>*]:pointer-events-auto"></div>
+
   <!-- MODAL CONFIRM -->
   <div id="modal-confirm" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
     <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-md w-full space-y-4 shadow-2xl">
@@ -854,6 +874,7 @@
       </div>
     </div>
   </div>
+
   <!-- MODAL PROMPT -->
   <div id="modal-prompt" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
     <form onsubmit="handlePromptSubmit(event)" class="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-md w-full space-y-4 shadow-2xl">
@@ -865,8 +886,9 @@
       </div>
     </form>
   </div>
+
   <script>
-    // Sistema moderno de Notificações Toast
+    // Sistema moderno de Notificações Toast (sem bloquear iframe)
     function showToast(message, type = 'info') {
       const container = document.getElementById('toast-container');
       if (!container) return;
@@ -893,6 +915,7 @@
     }
     window.alert = (msg) => showToast(msg);
 
+    // Sistema de Confirmação e Prompt Modais sem travar o browser
     let confirmResolver = null;
     function customConfirm(message) {
       return new Promise((resolve) => {
@@ -915,6 +938,7 @@
         confirmResolver = null;
       }
     }
+
     let promptResolver = null;
     function customPrompt(title, defaultValue = '') {
       return new Promise((resolve) => {
@@ -952,6 +976,7 @@
       }
     }
 
+    // Fallback robusto inicial para garantir que rotas e tags nunca sumam
     let defaultRotas = ["Central de pó", "Sopradores Massas", "Extrusoras"];
     let defaultTagMap = { 
       "Central de pó": ["FM7011", "EX7002"],
@@ -1012,14 +1037,93 @@
       } else if(tab === 'dashboard') {
         dashTab.classList.remove('hidden');
         btnDash.className = "px-3.5 py-2 rounded-xl text-xs font-semibold bg-cyan-500 text-slate-950 transition flex items-center shadow-md font-bold";
+        renderDashboard();
       } else if(tab === 'relatorio') {
         relTab.classList.remove('hidden');
         btnRel.className = "px-4 py-2 rounded-xl text-xs font-bold bg-amber-500 text-slate-950 transition flex items-center shadow-md font-bold";
+        renderRelatorioTab();
       }
     }
 
-    function initCloudListeners() {
+    function getActiveTabId() {
+      const supTab = document.getElementById('tab-supervisorio');
+      const dashTab = document.getElementById('tab-dashboard');
+      const relTab = document.getElementById('tab-relatorio');
+      if (supTab && !supTab.classList.contains('hidden')) return 'supervisorio';
+      if (dashTab && !dashTab.classList.contains('hidden')) return 'dashboard';
+      if (relTab && !relTab.classList.contains('hidden')) return 'relatorio';
+      return 'form';
+    }
+
+    function renderActiveTab() {
+      const active = getActiveTabId();
+      if (active === 'supervisorio') renderSupervisorioTab();
+      else if (active === 'dashboard') renderDashboard();
+      else if (active === 'relatorio') renderRelatorioTab();
+    }
+
+    function mergeAndPersistRotasAndTags() {
+      const routeSet = new Set(defaultRotas);
       try {
+        const local = localStorage.getItem('inspectcbm_saved_rotas');
+        if (local) JSON.parse(local).forEach(r => r && routeSet.add(r));
+      } catch(e) {}
+      try {
+        const cachedCfg = localStorage.getItem('inspectcbm_cached_cfg');
+        if (cachedCfg) {
+          const parsed = JSON.parse(cachedCfg);
+          if (Array.isArray(parsed.rotas)) parsed.rotas.forEach(r => r && routeSet.add(r));
+        }
+      } catch(e) {}
+      (cloudRecords || []).forEach(r => { if(r.rota) routeSet.add(r.rota); });
+      (cloudLaudos || []).forEach(l => {
+        if(l.rota) routeSet.add(l.rota);
+        if(Array.isArray(l.rotas)) l.rotas.forEach(r => routeSet.add(r));
+      });
+      (cloudPreLaudos || []).forEach(p => { if(p.rota) routeSet.add(p.rota); });
+      Object.keys(defaultTagMap || {}).forEach(r => { if(r) routeSet.add(r); });
+
+      const merged = Array.from(routeSet).filter(Boolean);
+      if (merged.length > 0) defaultRotas = merged;
+
+      defaultRotas.forEach(r => {
+        if (!defaultTagMap[r]) defaultTagMap[r] = [];
+      });
+
+      (cloudRecords || []).forEach(r => {
+        if (r.rota && r.baseTag) {
+          if (!defaultTagMap[r.rota]) defaultTagMap[r.rota] = [];
+          if (!defaultTagMap[r.rota].includes(r.baseTag)) {
+            defaultTagMap[r.rota].push(r.baseTag);
+          }
+        }
+      });
+
+      try {
+        localStorage.setItem('inspectcbm_saved_rotas', JSON.stringify(defaultRotas));
+        localStorage.setItem('inspectcbm_saved_tagmap', JSON.stringify(defaultTagMap));
+        localStorage.setItem('inspectcbm_cached_cfg', JSON.stringify({
+          rotas: defaultRotas,
+          tagMap: defaultTagMap,
+          inspetores: defaultInspetores,
+          availableFalhaTypes: availableFalhaTypes
+        }));
+      } catch(e) {}
+    }
+
+    function initCloudListeners() {
+      // 1. Carregamento rápido via cache local para garantir estabilidade imediata
+      try {
+        const cachedRotas = localStorage.getItem('inspectcbm_saved_rotas');
+        if (cachedRotas) {
+          const p = JSON.parse(cachedRotas);
+          if (Array.isArray(p) && p.length > 0) defaultRotas = p;
+        }
+        const cachedTagMap = localStorage.getItem('inspectcbm_saved_tagmap');
+        if (cachedTagMap) {
+          const p = JSON.parse(cachedTagMap);
+          if (p && typeof p === 'object') defaultTagMap = p;
+        }
         const cachedCfg = localStorage.getItem('inspectcbm_cached_cfg');
         if (cachedCfg) {
           const parsed = JSON.parse(cachedCfg);
@@ -1039,19 +1143,38 @@
       } catch (e) {
         console.warn("Aviso ao carregar cache local:", e);
       }
+
+      mergeAndPersistRotasAndTags();
       loadSavedRotas();
       loadSavedInspetores();
       populateFilters();
       updateSupervisoryKPIs();
-      renderSupervisorioTab();
 
+      // Sincronização em tempo real com o Firestore Cloud (sem resetar formulário ou inputs ativos)
       db.collection("inspectcbm_config").doc("rotas_tags").onSnapshot((doc) => {
         if (doc.exists) {
           const data = doc.data();
-          if (data.rotas && data.rotas.length > 0) defaultRotas = data.rotas;
-          if (data.tagMap && Object.keys(data.tagMap).length > 0) defaultTagMap = data.tagMap;
-          if (data.inspetores && data.inspetores.length > 0) defaultInspetores = data.inspetores;
-          if (data.availableFalhaTypes && data.availableFalhaTypes.length > 0) availableFalhaTypes = data.availableFalhaTypes;
+          if (Array.isArray(data.rotas) && data.rotas.length > 0) {
+            data.rotas.forEach(r => {
+              if (r && !defaultRotas.includes(r)) defaultRotas.push(r);
+            });
+          }
+          if (data.tagMap && typeof data.tagMap === 'object') {
+            Object.keys(data.tagMap).forEach(k => {
+              if (!defaultTagMap[k]) defaultTagMap[k] = [];
+              (data.tagMap[k] || []).forEach(t => {
+                if (!defaultTagMap[k].includes(t)) defaultTagMap[k].push(t);
+              });
+            });
+          }
+          if (Array.isArray(data.inspetores) && data.inspetores.length > 0) {
+            data.inspetores.forEach(i => {
+              if (i && !defaultInspetores.includes(i)) defaultInspetores.push(i);
+            });
+          }
+          if (Array.isArray(data.availableFalhaTypes) && data.availableFalhaTypes.length > 0) {
+            availableFalhaTypes = data.availableFalhaTypes;
+          }
         } else {
           db.collection("inspectcbm_config").doc("rotas_tags").set({
             rotas: defaultRotas,
@@ -1060,19 +1183,12 @@
             availableFalhaTypes: availableFalhaTypes
           }, { merge: true }).catch(() => {});
         }
-        try {
-          localStorage.setItem('inspectcbm_cached_cfg', JSON.stringify({
-            rotas: defaultRotas,
-            tagMap: defaultTagMap,
-            inspetores: defaultInspetores,
-            availableFalhaTypes: availableFalhaTypes
-          }));
-        } catch(e) {}
+        mergeAndPersistRotasAndTags();
         loadSavedRotas();
         loadSavedInspetores();
         populateFilters();
         updateSupervisoryKPIs();
-        renderSupervisorioTab();
+        renderActiveTab();
       }, (err) => {
         console.warn("Firestore config listener offline:", err);
       });
@@ -1084,11 +1200,11 @@
         });
         cloudRecords.sort((a, b) => b.id - a.id);
         try { localStorage.setItem('inspectcbm_cached_records', JSON.stringify(cloudRecords)); } catch(e) {}
+        mergeAndPersistRotasAndTags();
+        loadSavedRotas();
         populateFilters();
-        renderDashboard();
-        renderRelatorioTab();
         updateSupervisoryKPIs();
-        renderSupervisorioTab();
+        renderActiveTab();
       }, (err) => {
         console.warn("Firestore records listener offline:", err);
       });
@@ -1101,9 +1217,8 @@
         try { localStorage.setItem('inspectcbm_cached_tags', JSON.stringify(cloudTagRegistry)); } catch(e) {}
         const currentTag = getBaseTag();
         if(currentTag) loadTagData(currentTag);
-        renderRelatorioTab();
         updateSupervisoryKPIs();
-        renderSupervisorioTab();
+        renderActiveTab();
       }, (err) => {
         console.warn("Firestore tags listener offline:", err);
       });
@@ -1115,9 +1230,10 @@
         });
         cloudLaudos.sort((a, b) => b.id - a.id);
         try { localStorage.setItem('inspectcbm_cached_laudos', JSON.stringify(cloudLaudos)); } catch(e) {}
+        mergeAndPersistRotasAndTags();
         populateSupLaudosFilter();
         fetchSavedLaudosHistory();
-        renderSupervisorioTab();
+        renderActiveTab();
       }, (err) => {
         console.warn("Firestore laudos listener offline:", err);
       });
@@ -1129,7 +1245,9 @@
         });
         cloudPreLaudos.sort((a, b) => b.id - a.id);
         try { localStorage.setItem('inspectcbm_cached_prelaudos', JSON.stringify(cloudPreLaudos)); } catch(e) {}
+        mergeAndPersistRotasAndTags();
         fetchSavedPreLaudosHistory();
+        renderActiveTab();
       }, (err) => {
         console.warn("Firestore prelaudos listener offline:", err);
       });
@@ -1148,6 +1266,7 @@
 
     async function saveConfigToCloud() {
       try {
+        mergeAndPersistRotasAndTags();
         await db.collection("inspectcbm_config").doc("rotas_tags").set({
           rotas: defaultRotas,
           tagMap: defaultTagMap,
@@ -1315,39 +1434,57 @@
       const select = document.getElementById('rota_select');
       if(!select) return;
       const currentVal = select.value;
-      select.innerHTML = '';
-      defaultRotas.forEach(r => {
-        const opt = document.createElement('option');
-        opt.value = r; opt.textContent = r;
-        select.appendChild(opt);
-      });
-      if(defaultRotas.includes(currentVal)) select.value = currentVal;
-      else if(defaultRotas.length > 0) onRotaChange(defaultRotas[0]);
+      const existingOptions = Array.from(select.options).map(o => o.value);
+      const isSame = existingOptions.length === defaultRotas.length && existingOptions.every((val, index) => val === defaultRotas[index]);
+      
+      if (!isSame) {
+        select.innerHTML = '';
+        defaultRotas.forEach(r => {
+          const opt = document.createElement('option');
+          opt.value = r; opt.textContent = r;
+          select.appendChild(opt);
+        });
+      }
+      
+      if (currentVal && defaultRotas.includes(currentVal)) {
+        select.value = currentVal;
+      } else if (defaultRotas.length > 0) {
+        select.value = defaultRotas[0];
+        onRotaChange(defaultRotas[0]);
+      }
     }
 
     function loadSavedInspetores() {
       const select = document.getElementById('inspetor_select');
       if(!select) return;
       const currentVal = select.value;
-      select.innerHTML = '';
-      defaultInspetores.forEach(insp => {
-        const opt = document.createElement('option');
-        opt.value = insp; opt.textContent = insp;
-        select.appendChild(opt);
-      });
-      if(defaultInspetores.includes(currentVal)) select.value = currentVal;
+      const existingOptions = Array.from(select.options).map(o => o.value);
+      const isSame = existingOptions.length === defaultInspetores.length && existingOptions.every((val, index) => val === defaultInspetores[index]);
+      
+      if (!isSame) {
+        select.innerHTML = '';
+        defaultInspetores.forEach(insp => {
+          const opt = document.createElement('option');
+          opt.value = insp; opt.textContent = insp;
+          select.appendChild(opt);
+        });
+      }
+      if(currentVal && defaultInspetores.includes(currentVal)) select.value = currentVal;
+      else if (defaultInspetores.length > 0) select.value = defaultInspetores[0];
     }
 
     function manageRotasModal() {
       document.getElementById('modal-rotas').classList.remove('hidden');
       renderRotasList();
     }
+
     function closeRotasModal() {
       document.getElementById('modal-rotas').classList.add('hidden');
       loadSavedRotas();
       populateFilters();
       onRotaChange(document.getElementById('rota_select').value);
     }
+
     function renderRotasList() {
       const container = document.getElementById('lista-rotas-cadastradas');
       container.innerHTML = '';
@@ -1396,11 +1533,13 @@
       modalRotaSelect.onchange = renderTagsList;
       renderTagsList();
     }
+
     function closeTagsModal() {
       document.getElementById('modal-tags').classList.add('hidden');
       onRotaChange(document.getElementById('rota_select').value);
       populateFilters();
     }
+
     function renderTagsList() {
       const rota = document.getElementById('modal_tag_rota_select').value;
       const container = document.getElementById('lista-tags-cadastradas');
@@ -1452,10 +1591,12 @@
       document.getElementById('modal-inspetores').classList.remove('hidden');
       renderInspetoresList();
     }
+
     function closeInspetoresModal() {
       document.getElementById('modal-inspetores').classList.add('hidden');
       loadSavedInspetores();
     }
+
     function renderInspetoresList() {
       const container = document.getElementById('lista-inspetores-cadastradas');
       container.innerHTML = '';
@@ -1489,16 +1630,23 @@
       const tagSelect = document.getElementById('tag_select');
       if(!tagSelect) return;
       const currentTagVal = tagSelect.value;
-      tagSelect.innerHTML = '<option value="">Selecione a Tag...</option>';
       let tags = defaultTagMap[rota] || [];
-      tags.forEach(t => {
-        const opt = document.createElement('option');
-        opt.value = t; opt.textContent = t;
-        tagSelect.appendChild(opt);
-      });
-      if(tags.includes(currentTagVal)) {
+      
+      const existingOptions = Array.from(tagSelect.options).map(o => o.value).filter(Boolean);
+      const isSame = existingOptions.length === tags.length && existingOptions.every((val, index) => val === tags[index]);
+      
+      if (!isSame) {
+        tagSelect.innerHTML = '<option value="">Selecione a Tag...</option>';
+        tags.forEach(t => {
+          const opt = document.createElement('option');
+          opt.value = t; opt.textContent = t;
+          tagSelect.appendChild(opt);
+        });
+      }
+      
+      if (currentTagVal && tags.includes(currentTagVal)) {
         tagSelect.value = currentTagVal;
-      } else if(tags.length > 0) { 
+      } else if (tags.length > 0) { 
         tagSelect.value = tags[0]; 
         handleTagSelection(tags[0]); 
       } else {
@@ -1510,7 +1658,15 @@
     function handleTagSelection(tag) {
       updateFullTagPreview();
       loadTagData(tag);
-      resetInspectionFields();
+      // Mantém as medições inseridas para não perder informações ao navegar
+    }
+
+    async function confirmResetInspection() {
+      const confirmed = await customConfirm("Deseja realmente limpar todos os campos de medição desta coleta?");
+      if (confirmed) {
+        resetInspectionFields();
+        showToast("Campos de medição limpos.", "info");
+      }
     }
 
     function getBaseTag() {
@@ -1798,7 +1954,7 @@
       const supSelect = document.getElementById('sup_select_laudo');
       if(!supSelect) return;
       const currentVal = supSelect.value;
-      supSelect.innerHTML = '<option value="CONSOLIDADO">Todos os Laudos (Somatório Geral de Equipamentos)</option>';
+      supSelect.innerHTML = '<option value="CONSOLIDADO">Todos os Laudos (Último Status por Ativo)</option>';
       cloudLaudos.forEach((l, idx) => {
         const opt = document.createElement('option');
         opt.value = l.docId || String(l.id);
@@ -1868,13 +2024,16 @@
       populateDateFilterSelect();
       renderDashboard(); 
     }
+
     function onRelFilterRotaChange() { renderRelatorioTab(); }
+
     function clearDateFilter() { 
       document.getElementById('filter_date_select').value = 'TODAS_DATAS';
       document.getElementById('filter_date_start').value = ''; 
       document.getElementById('filter_date_end').value = ''; 
       renderDashboard(); 
     }
+
     function clearSupervisorioFilters() {
       document.getElementById('sup_data_coleta').value = '';
       if(document.getElementById('sup_mes_filtro')) document.getElementById('sup_mes_filtro').value = '';
@@ -2099,7 +2258,6 @@
       }
     }
 
-    // FUNÇÃO SUPERVISÓRIO - LÓGICA DE SOMATÓRIO CORRIGIDA
     function renderSupervisorioTab() {
       const supFilterRotaEl = document.getElementById('sup_filter_rota');
       if(!supFilterRotaEl) return;
@@ -2108,14 +2266,15 @@
       const filterMesVal = document.getElementById('sup_mes_filtro') ? document.getElementById('sup_mes_filtro').value : '';
       const selectedLaudoDocId = document.getElementById('sup_select_laudo') ? document.getElementById('sup_select_laudo').value : 'CONSOLIDADO';
       const badgeSourceEl = document.getElementById('sup-active-source-badge');
-      
+
       let rotasParaAnalisar = [];
       if (selectedRotas.includes('TODAS_ROTAS') || selectedRotas.length === 0) {
         rotasParaAnalisar = defaultRotas;
       } else {
         rotasParaAnalisar = selectedRotas;
       }
-      
+
+      // Filtrar laudos do histórico na nuvem de acordo com os filtros de rota e data
       let matchingLaudos = (cloudLaudos || []).filter(l => {
         let matchRota = selectedRotas.includes('TODAS_ROTAS') || !l.rotas || l.rotas.some(r => selectedRotas.includes(r));
         let matchData = !filterColetaDate || l.dataColeta === filterColetaDate;
@@ -2123,15 +2282,9 @@
         return matchRota && matchData && matchMes;
       });
 
-      let countNormal = 0;
-      let countObservacao = 0;
-      let countAlerta = 0;
-      let countAlarme = 0;
-      let countNaoMedido = 0;
-      let falhasEstratificacaoCount = {};
-      availableFalhaTypes.forEach(f => falhasEstratificacaoCount[f] = 0);
-      
-      let tableItems = [];
+      // Determinar o modo: Consolidado (todos os laudos do histórico) ou Laudo Específico
+      let evaluatedAssetState = {};
+      let assetSourceMap = {};
 
       if (cloudLaudos.length === 0) {
         if (badgeSourceEl) {
@@ -2139,125 +2292,130 @@
           badgeSourceEl.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-amber-400 mr-1.5"></span>Nenhum Laudo Salvo na Nuvem`;
         }
       } else if (selectedLaudoDocId === 'CONSOLIDADO') {
+        // Modo Consolidado: Itera laudos do mais recente ao mais antigo.
+        // O primeiro laudo que avaliou o ativo com medição define o seu estado mais recente.
         const poolLaudos = matchingLaudos.length > 0 ? matchingLaudos : cloudLaudos;
-        
         poolLaudos.forEach(l => {
           if (!l.state) return;
           const laudoLabel = `${l.dataAnalise || l.dataColeta || 'Sem data'} (${l.rota || 'Geral'})`;
-          
-          Object.keys(l.state).forEach(baseTag => {
-            let assetState = l.state[baseTag];
-            if (!assetState) return;
-            
-            let tagData = cloudTagRegistry[baseTag] || {};
-            let tagRota = assetState.rota || l.rota || 'Geral';
-            
-            let isMedido = assetState.isMedido !== undefined ? assetState.isMedido : false;
-            let statusVal = assetState.statusVal || 'NORMAL';
-            let problemaDesc = assetState.problema || '-';
-            let falhasList = assetState.falhas || [];
-            if (statusVal === 'NORMAL') falhasList = [];
-
-            if (!isMedido) {
-              countNaoMedido++;
-            } else {
-              if (statusVal === 'NORMAL') countNormal++;
-              else if (statusVal === 'OBSERVAÇÃO') countObservacao++;
-              else if (statusVal === 'ALERTA') countAlerta++;
-              else if (statusVal === 'ALARME' || statusVal === 'EMERGÊNCIA') countAlarme++;
-              else countNormal++;
-
-              falhasList.forEach(falha => {
-                if (falhasEstratificacaoCount[falha] !== undefined) {
-                  falhasEstratificacaoCount[falha]++;
-                }
-              });
+          Object.keys(l.state).forEach(tag => {
+            const st = l.state[tag];
+            if (!evaluatedAssetState[tag] && st && st.isMedido) {
+              evaluatedAssetState[tag] = st;
+              assetSourceMap[tag] = laudoLabel;
             }
+          });
+        });
 
-            tableItems.push({
-              baseTag: baseTag,
-              rota: tagRota,
-              equipamento: tagData.equipamento_nome || '-',
-              setor: tagData.setor || '-',
-              isMedido: isMedido,
-              statusVal: isMedido ? statusVal : 'Não Medido',
-              problema: problemaDesc,
-              falhas: falhasList,
-              origem: laudoLabel
-            });
+        // Para os que continuam sem medição, se houver registro mesmo não medido em algum laudo recente
+        poolLaudos.forEach(l => {
+          if (!l.state) return;
+          const laudoLabel = `${l.dataAnalise || l.dataColeta || 'Sem data'} (${l.rota || 'Geral'})`;
+          Object.keys(l.state).forEach(tag => {
+            const st = l.state[tag];
+            if (!evaluatedAssetState[tag] && st) {
+              evaluatedAssetState[tag] = st;
+              assetSourceMap[tag] = laudoLabel;
+            }
           });
         });
 
         if (badgeSourceEl) {
           badgeSourceEl.className = "text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2.5 py-0.5 rounded-full font-mono font-bold flex items-center";
-          badgeSourceEl.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse mr-1.5"></span>Somatório Acumulado (${poolLaudos.length} Laudos da Nuvem)`;
+          badgeSourceEl.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse mr-1.5"></span>Consolidado (${poolLaudos.length} Laudos da Nuvem)`;
         }
       } else {
+        // Laudo Específico selecionado pelo usuário
         const targetLaudo = cloudLaudos.find(l => (l.docId || String(l.id)) === selectedLaudoDocId);
         if (targetLaudo && targetLaudo.state) {
           const laudoLabel = `${targetLaudo.dataAnalise || targetLaudo.dataColeta || 'Sem data'} (${targetLaudo.rota || 'Geral'})`;
-          
-          Object.keys(targetLaudo.state).forEach(baseTag => {
-            let assetState = targetLaudo.state[baseTag];
-            if (!assetState) return;
-            
-            let tagData = cloudTagRegistry[baseTag] || {};
-            let isMedido = assetState.isMedido !== undefined ? assetState.isMedido : false;
-            let statusVal = assetState.statusVal || 'NORMAL';
-            let problemaDesc = assetState.problema || '-';
-            let falhasList = assetState.falhas || [];
-            if (statusVal === 'NORMAL') falhasList = [];
-
-            if (!isMedido) {
-              countNaoMedido++;
-            } else {
-              if (statusVal === 'NORMAL') countNormal++;
-              else if (statusVal === 'OBSERVAÇÃO') countObservacao++;
-              else if (statusVal === 'ALERTA') countAlerta++;
-              else if (statusVal === 'ALARME' || statusVal === 'EMERGÊNCIA') countAlarme++;
-              else countNormal++;
-
-              falhasList.forEach(falha => {
-                if (falhasEstratificacaoCount[falha] !== undefined) {
-                  falhasEstratificacaoCount[falha]++;
-                }
-              });
-            }
-
-            tableItems.push({
-              baseTag: baseTag,
-              rota: targetLaudo.rota || 'Geral',
-              equipamento: tagData.equipamento_nome || '-',
-              setor: tagData.setor || '-',
-              isMedido: isMedido,
-              statusVal: isMedido ? statusVal : 'Não Medido',
-              problema: problemaDesc,
-              falhas: falhasList,
-              origem: laudoLabel
-            });
+          evaluatedAssetState = targetLaudo.state;
+          Object.keys(targetLaudo.state).forEach(tag => {
+            assetSourceMap[tag] = laudoLabel;
           });
-
           if (badgeSourceEl) {
             badgeSourceEl.className = "text-[10px] bg-sky-500/10 text-sky-400 border border-sky-500/30 px-2.5 py-0.5 rounded-full font-mono font-bold flex items-center";
             badgeSourceEl.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-sky-400 mr-1.5"></span>Laudo Selecionado: ${laudoLabel}`;
           }
         }
       }
+      
+      let tagToRotaMap = {};
+      rotasParaAnalisar.forEach(rota => {
+        let tagsDaRota = defaultTagMap[rota] || [];
+        tagsDaRota.forEach(baseTag => {
+          if (!tagToRotaMap[baseTag]) {
+            tagToRotaMap[baseTag] = rota;
+          }
+        });
+      });
+      let uniqueBaseTags = Object.keys(tagToRotaMap);
+      let totalAtivos = uniqueBaseTags.length;
+      
+      let countNormal = 0;
+      let countObservacao = 0;
+      let countAlerta = 0;
+      let countAlarme = 0;
+      let countNaoMedido = 0;
+      
+      let falhasEstratificacaoCount = {};
+      availableFalhaTypes.forEach(f => falhasEstratificacaoCount[f] = 0);
+      
+      let tableItems = [];
+      uniqueBaseTags.forEach(baseTag => {
+        let rota = tagToRotaMap[baseTag];
+        let assetState = evaluatedAssetState[baseTag];
+        
+        let isMedido = assetState ? (assetState.isMedido !== undefined ? assetState.isMedido : false) : false;
+        let statusVal = assetState ? (assetState.statusVal || 'NORMAL') : 'NORMAL';
+        let problemaDesc = assetState ? (assetState.problema || '-') : '-';
+        let falhasList = assetState ? (assetState.falhas || []) : [];
+        let origemLaudo = assetSourceMap[baseTag] || null;
 
-      let totalAtivos = tableItems.length;
-
+        if (statusVal === 'NORMAL') {
+          falhasList = [];
+        }
+        if (!isMedido || !assetState) {
+          countNaoMedido++;
+          isMedido = false;
+        } else {
+          if (statusVal === 'NORMAL') countNormal++;
+          else if (statusVal === 'OBSERVAÇÃO') countObservacao++;
+          else if (statusVal === 'ALERTA') countAlerta++;
+          else if (statusVal === 'ALARME' || statusVal === 'EMERGÊNCIA') countAlarme++;
+          else countNormal++;
+          
+          falhasList.forEach(falha => {
+            if (falhasEstratificacaoCount[falha] !== undefined) {
+              falhasEstratificacaoCount[falha]++;
+            }
+          });
+        }
+        let tagData = cloudTagRegistry[baseTag] || {};
+        tableItems.push({
+          baseTag: baseTag,
+          rota: rota,
+          equipamento: tagData.equipamento_nome || '-',
+          setor: tagData.setor || '-',
+          isMedido: isMedido,
+          statusVal: isMedido ? statusVal : 'Não Medido',
+          problema: problemaDesc,
+          falhas: falhasList,
+          origem: origemLaudo
+        });
+      });
+      
       document.getElementById('sup-kpi-total').textContent = totalAtivos;
       document.getElementById('sup-kpi-normal').textContent = countNormal;
       document.getElementById('sup-kpi-observacao').textContent = countObservacao;
       document.getElementById('sup-kpi-alerta').textContent = countAlerta;
       document.getElementById('sup-kpi-alarme').textContent = countAlarme;
       document.getElementById('sup-kpi-naomedido').textContent = countNaoMedido;
-      document.getElementById('sup-table-count').textContent = `${tableItems.length} ocorrências/ativos`;
-
+      document.getElementById('sup-table-count').textContent = `${tableItems.length} ativos`;
+      
       const tbody = document.getElementById('sup-table-body');
       tbody.innerHTML = '';
-      
-      if (tableItems.length === 0 || cloudLaudos.length === 0) {
+      if(tableItems.length === 0 || cloudLaudos.length === 0) {
         tbody.innerHTML = `
           <tr>
             <td colspan="6" class="p-8 text-center text-slate-400">
@@ -2276,10 +2434,11 @@
           tr.className = "hover:bg-slate-800/40 transition border-b border-slate-800/60";
           let badgeClass = getStatusBgColor(item.statusVal);
           if(!item.isMedido) badgeClass = 'bg-slate-800 text-slate-400 border-slate-700';
-
+          
           let falhasBadges = item.falhas.length > 0 
             ? item.falhas.map(f => `<span class="inline-block bg-amber-500/10 text-amber-300 border border-amber-500/30 text-[10px] px-2 py-0.5 rounded-md mr-1 mb-1 font-mono">${f}</span>`).join('')
             : '<span class="text-[10px] text-slate-500 italic">Nenhuma falha ativa</span>';
+
           let origemBadge = item.origem 
             ? `<span class="inline-flex items-center text-[10px] bg-slate-950 text-amber-300 px-2.5 py-1 rounded-lg border border-amber-500/30 font-mono shadow-sm"><i class="fa-solid fa-cloud mr-1.5 text-amber-400"></i>${item.origem}</span>`
             : '<span class="text-[10px] text-slate-500 italic">Sem laudo salvo</span>';
@@ -2309,7 +2468,6 @@
           tbody.appendChild(tr);
         });
       }
-
       renderSupervisorioCharts(countNormal, countObservacao, countAlerta, countAlarme, countNaoMedido, falhasEstratificacaoCount);
     }
 
@@ -2335,6 +2493,7 @@
           }
         }
       });
+
       const ctxBar = document.getElementById('supBarChart').getContext('2d');
       if (supBarInstance) supBarInstance.destroy();
       supBarInstance = new Chart(ctxBar, {
@@ -2358,6 +2517,7 @@
           }
         }
       });
+
       const ctxFalhas = document.getElementById('supFalhasChart').getContext('2d');
       if (supFalhasInstance) supFalhasInstance.destroy();
       const falhasLabels = Object.keys(falhasCounts);
@@ -2984,12 +3144,16 @@
       filtered.forEach((r, index) => {
         if (index > 0) doc.addPage();
         
-        doc.setFillColor(15, 23, 42);
+        // 1. HEADER EXECUTIVO COM DESIGN CORPORATIVO SCADA
+        // Fundo Superior Navy Escuro
+        doc.setFillColor(15, 23, 42); // slate-900
         doc.rect(14, 10, 182, 19, 'F');
         
-        doc.setFillColor(245, 158, 11);
+        // Barra Decorativa de Destaque Amber / Dourado
+        doc.setFillColor(245, 158, 11); // amber-500
         doc.rect(14, 10, 3.5, 19, 'F');
         
+        // Título e Subtítulo Principal
         doc.setFont("helvetica", "bold");
         doc.setFontSize(13);
         doc.setTextColor(255, 255, 255);
@@ -2997,9 +3161,10 @@
         
         doc.setFontSize(7.5);
         doc.setFont("helvetica", "normal");
-        doc.setTextColor(203, 213, 225);
+        doc.setTextColor(203, 213, 225); // slate-300
         doc.text("SUPERVISORY & CONDITION MONITORING SYSTEM  •  UTILIDADES CBM", 22, 24);
         
+        // Badge / Metadados à Direita no Header
         doc.setFont("helvetica", "bold");
         doc.setFontSize(8);
         doc.setTextColor(245, 158, 11);
@@ -3010,13 +3175,14 @@
         doc.setTextColor(148, 163, 184);
         doc.text(`ANÁLISE: ${dataAnaliseFmt}`, 191, 24, { align: "right" });
         
-        doc.setFillColor(241, 245, 249);
-        doc.setDrawColor(203, 213, 225);
+        // 2. FAIXA DE METADADOS ROTA & DATAS
+        doc.setFillColor(241, 245, 249); // slate-100
+        doc.setDrawColor(203, 213, 225); // slate-300
         doc.rect(14, 31, 182, 7.5, 'FD');
         
         doc.setFontSize(7.5);
         doc.setFont("helvetica", "bold");
-        doc.setTextColor(51, 65, 85);
+        doc.setTextColor(51, 65, 85); // slate-700
         doc.text("ROTAS:", 18, 36);
         doc.setFont("helvetica", "normal");
         doc.text(rotasParaAnalisar.join(', ').slice(0, 50), 31, 36);
@@ -3034,6 +3200,7 @@
         const state = r.analysisState;
         const sevStatus = state.isMedido ? (state.statusVal || 'NORMAL').toUpperCase() : 'NÃO MEDIDO';
         
+        // Bloco Superior Direito: Dados Técnicos (SEM Tipos de Falha e SEM SAP repetido no equipamento)
         let blocoDadosTecnicos = `TAG: ${r.tag || r.baseTag}\n` +
                                  `SAP: ${r.sap_number || '-'}\n` +
                                  `OS: ${state.os || '-'}\n` +
@@ -3044,15 +3211,19 @@
                                  `• Setor: ${r.setor || '-'} (${r.area || '-'})\n` +
                                  `• Conjunto: ${r.componente || 'Conjunto'}`;
 
+        // Bloco Inferior: Tipos de Falha colocado DIRETAMENTE EM CIMA de DETECÇÃO / TÉCNICA
         let falhasTexto = (state.falhas && state.falhas.length > 0) ? state.falhas.join(', ') : 'Nenhuma';
         if (!state.isMedido) falhasTexto = 'Não avaliado (Equipamento não medido)';
+
         let blocoInferior = `TIPOS DE FALHA: ${falhasTexto}\n\n` +
                             `DETECÇÃO / TÉCNICA: ${state.deteccao || 'Análise de Vibração'}\n\n` +
                             `PROBLEMA / DIAGNÓSTICO: ${state.isMedido && state.problema ? state.problema : 'Sem pendências identificadas. Equipamento em regime normal.'}\n\n` +
                             `RECOMENDAÇÃO TÉCNICA: ${state.isMedido && state.recomendacao ? state.recomendacao : 'Manter monitoramento de rotina preditiva.'}\n\n` +
                             `RESPONSÁVEL TÉCNICO: ${r.inspetor || 'PENDENTE'}`;
+
         let photoSrc = r.photo || (cloudTagRegistry[r.baseTag] ? cloudTagRegistry[r.baseTag].photo : null);
 
+        // 3. TABELA ESTRUTURADA DE ALTA QUALIDADE
         doc.autoTable({
           startY: 41,
           head: [['FOTO DO EQUIPAMENTO', 'DADOS TÉCNICOS DO EQUIPAMENTO']],
@@ -3107,14 +3278,17 @@
             1: { cellWidth: 97, fillColor: [250, 250, 250] } 
           },
           didDrawCell: function(data) {
+            // Renderização elegante da imagem com proporção preservada
             if (data.section === 'body' && data.row.index === 0 && data.column.index === 0) {
               const cellH = data.cell.height || 66;
               const boxW = 79;
               const boxH = Math.min(62, cellH - 4);
               const boxX = data.cell.x + (data.cell.width - boxW) / 2;
               const boxY = data.cell.y + (cellH - boxH) / 2;
+
               if (photoSrc) {
                 try {
+                  // Fundo sutil do container da imagem
                   doc.setFillColor(248, 250, 252);
                   doc.setDrawColor(226, 232, 240);
                   doc.rect(boxX, boxY, boxW, boxH, 'FD');
@@ -3137,6 +3311,7 @@
           }
         });
         
+        // 4. RODAPÉ INSTITUCIONAL COM NUMERAÇÃO DE PÁGINAS
         doc.setDrawColor(226, 232, 240);
         doc.setLineWidth(0.3);
         doc.line(14, 284, 196, 284);
