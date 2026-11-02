@@ -30,6 +30,33 @@
     }
     const db = firebase.firestore();
   </script>
+
+  <!-- Estilos de Impressão e Geração de PDF Limpo -->
+  <style>
+    @media print {
+      body {
+        background-color: white !important;
+        color: #1e293b !important;
+        font-size: 11px !important;
+      }
+      header, nav, .no-print, button, .app-header, .app-nav {
+        display: none !important;
+      }
+      .print-modal-container {
+        position: static !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        box-shadow: none !important;
+        border: none !important;
+      }
+      .print-page-break {
+        page-break-before: always;
+        break-before: page;
+      }
+    }
+  </style>
 </head>
 <body class="bg-slate-100 text-slate-800 font-sans antialiased">
   <div id="root"></div>
@@ -41,6 +68,18 @@
       { id: '1', name: 'Carlos Eduardo', email: 'carlos.eduardo@empresa.com', password: '123', role: 'Solicitante (Área)' },
       { id: '2', name: 'João Silva', email: 'joao.silva@empresa.com', password: 'JDANDAIME', role: 'Equipe de Andaimes' },
       { id: '3', name: 'Roberto Alves', email: 'roberto.alves@empresa.com', password: 'AUTOKRAFT01', role: 'Gestor de Andaimes' }
+    ];
+
+    // Fábricas pré-carregadas solicitadas pelo usuário
+    const DEFAULT_FACTORIES = [
+      'DRYMIX',
+      'QUEIJO',
+      'TECCENTER',
+      'PLANTA PILOTO',
+      'CHOCOLATE',
+      'BALAS E GOMAS',
+      'PRÉDIO MILKA',
+      'CASA LACTA'
     ];
 
     // Compressor em tempo real de fotos para celulares (otimiza para ~60KB-90KB evitando limite de 1MB do Firestore)
@@ -92,12 +131,10 @@
         return new Date(dateVal.seconds * 1000);
       }
       const str = String(dateVal).trim();
-      // Formato YYYY-MM-DD
       if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
         const d = new Date(str);
         if (!isNaN(d.getTime())) return d;
       }
-      // Formato DD/MM/YYYY HH:mm ou DD/MM/YYYY
       const ptMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
       if (ptMatch) {
         const d = parseInt(ptMatch[1], 10);
@@ -150,6 +187,12 @@
       const [loginMode, setLoginMode] = useState('select');
       const [newUser, setNewUser] = useState({ name: '', email: '', password: '', role: 'Solicitante (Área)' });
 
+      // Lista de Fábricas sincronizada no Firebase
+      const [factories, setFactories] = useState(DEFAULT_FACTORIES);
+      const [isAddingNewFactoryInForm, setIsAddingNewFactoryInForm] = useState(false);
+      const [newFactoryInputForm, setNewFactoryInputForm] = useState('');
+      const [newFactoryInputManage, setNewFactoryInputManage] = useState('');
+
       // Navegação por abas otimizada para celular
       const [activeTab, setActiveTab] = useState('solicitacoes');
 
@@ -166,6 +209,10 @@
         extraSolicitados: 0,
         extraMontados: 0
       });
+
+      // Estado para o Modal / Relatório PDF dos Indicadores
+      const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
+      const [pdfFactoryFilter, setPdfFactoryFilter] = useState('ALL'); // 'ALL' ou fábrica específica
 
       // Modais
       const [visitModalReqId, setVisitModalReqId] = useState(null);
@@ -267,14 +314,62 @@
           }
         }, () => {});
 
+        // 5. Escuta lista de fábricas
+        const unsubFactories = db.collection('andaimes_config').doc('fabricas').onSnapshot((doc) => {
+          if (!isMounted) return;
+          if (doc.exists && Array.isArray(doc.data().list) && doc.data().list.length > 0) {
+            setFactories(doc.data().list);
+          } else {
+            db.collection('andaimes_config').doc('fabricas').set({ list: DEFAULT_FACTORIES }).catch(() => {});
+          }
+        }, () => {});
+
         return () => {
           isMounted = false;
           unsubRequests();
           unsubUsers();
           unsubConfig();
           unsubStats();
+          unsubFactories();
         };
       }, []);
+
+      // Adicionar Nova Fábrica no Firebase
+      const handleAddFactory = async (newFactoryName) => {
+        const cleanName = newFactoryName.trim().toUpperCase();
+        if (!cleanName) return;
+
+        if (factories.some(f => f.toUpperCase() === cleanName)) {
+          alert('Esta fábrica já está na lista.');
+          return;
+        }
+
+        const updated = [...factories, cleanName];
+        setFactories(updated);
+
+        try {
+          await db.collection('andaimes_config').doc('fabricas').set({ list: updated });
+          alert(`Fábrica "${cleanName}" adicionada com sucesso!`);
+        } catch (err) {
+          console.error('Erro ao salvar fábrica:', err);
+        }
+      };
+
+      // Remover Fábrica
+      const handleRemoveFactory = async (factoryToRemove) => {
+        if (!isGestor) return;
+        const confirmDelete = window.confirm(`Deseja remover a fábrica "${factoryToRemove}" da lista de opções?`);
+        if (!confirmDelete) return;
+
+        const updated = factories.filter(f => f !== factoryToRemove);
+        setFactories(updated);
+
+        try {
+          await db.collection('andaimes_config').doc('fabricas').set({ list: updated });
+        } catch (err) {
+          console.error(err);
+        }
+      };
 
       // Formulário Nova Solicitação
       const [formData, setFormData] = useState({
@@ -328,32 +423,48 @@
       const cancelledRequests = requests
         .filter(r => r.status === 'Cancelado');
 
+      // Agrupamento dos Andaimes por Fábrica para o Relatório e PDF
+      const requestsByFactory = useMemo(() => {
+        const map = {};
+
+        // Adiciona fábricas conhecidas
+        factories.forEach(f => {
+          map[f.toUpperCase()] = [];
+        });
+
+        // Agrupa solicitações
+        requests.forEach(r => {
+          const fName = (r.factory || 'OUTRAS').trim().toUpperCase();
+          if (!map[fName]) map[fName] = [];
+          map[fName].push(r);
+        });
+
+        return map;
+      }, [requests, factories]);
+
       // CÁLCULO DINÂMICO E PRECISO DOS INDICADORES CONFORME FILTRO DE PERÍODO
       const displayedStats = useMemo(() => {
         if (filterPeriod === 'all') {
           return {
-            solicitados: queueRequests.length, // Exatamente 3 solicitações na fila
-            montados: mountedRequests.length,    // Exatamente 5 montados em campo
-            desmontados: dismantledRequests.length + (archivedStats.extraDesmontados || 0), // Exatamente 3 desmontados concluídos
-            cancelados: cancelledRequests.length + (archivedStats.extraCancelados || 0),     // 0 cancelados
+            solicitados: queueRequests.length,
+            montados: mountedRequests.length,
+            desmontados: dismantledRequests.length + (archivedStats.extraDesmontados || 0),
+            cancelados: cancelledRequests.length + (archivedStats.extraCancelados || 0),
             totalGeralCriado: requests.length + (archivedStats.extraDesmontados || 0) + (archivedStats.extraCancelados || 0)
           };
         }
 
-        // Filtro por Data (Hoje, Esta Semana, Este Mês)
         let solCount = 0;
         let montCount = 0;
         let desCount = 0;
         let cancCount = 0;
 
         requests.forEach(r => {
-          // 1. Data de Criação / Solicitação
           const createdDate = parseCustomDate(r.createdAt) || (r.history && r.history[0] ? parseCustomDate(r.history[0].date) : null);
           if (isDateInFilter(createdDate, filterPeriod)) {
             solCount++;
           }
 
-          // 2. Data de Montagem
           let mountDate = null;
           if (r.history) {
             const mountEntry = r.history.find(h => h.action && (h.action.toLowerCase().includes('montado') || h.action.toLowerCase().includes('montagem')));
@@ -366,7 +477,6 @@
             montCount++;
           }
 
-          // 3. Data de Desmontagem
           let dismDate = null;
           if (r.history) {
             const dismEntry = r.history.find(h => h.action && h.action.toLowerCase().includes('desmontad'));
@@ -379,7 +489,6 @@
             desCount++;
           }
 
-          // 4. Data de Cancelamento
           let cancDate = null;
           if (r.history) {
             const cancEntry = r.history.find(h => h.action && h.action.toLowerCase().includes('cancelad'));
@@ -402,7 +511,6 @@
         };
       }, [filterPeriod, requests, queueRequests.length, mountedRequests.length, dismantledRequests.length, cancelledRequests.length, archivedStats]);
 
-      // Rótulo textual do período selecionado
       const filterPeriodLabel = useMemo(() => {
         if (filterPeriod === 'all') return 'Geral (Todo o Histórico da Planta)';
         if (filterPeriod === 'month') return `Este Mês (${new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })})`;
@@ -411,7 +519,7 @@
         return '';
       }, [filterPeriod]);
 
-      // Função do Gestor para Sincronizar com o Firebase
+      // Sincronizar com o Firebase
       const handleSyncIndicatorsWithDatabase = async () => {
         try {
           const syncData = {
@@ -534,6 +642,21 @@
       const handleCreateRequest = async (e) => {
         e.preventDefault();
 
+        let selectedFactory = formData.factory;
+        if (isAddingNewFactoryInForm) {
+          if (!newFactoryInputForm.trim()) {
+            alert('Por favor, digite o nome da nova fábrica.');
+            return;
+          }
+          selectedFactory = newFactoryInputForm.trim().toUpperCase();
+          handleAddFactory(selectedFactory);
+        }
+
+        if (!selectedFactory) {
+          alert('Por favor, selecione ou digite a fábrica.');
+          return;
+        }
+
         if (formData.canUsePEMT === 'SIM' && !formData.pemtJustification.trim()) {
           alert('Por favor, informe a justificativa do porquê montar andaime quando é possível usar PEMT.');
           return;
@@ -544,7 +667,7 @@
 
         const newReq = {
           id: `SOL-${1000 + requests.length + 1}`,
-          factory: formData.factory.trim(),
+          factory: selectedFactory,
           area: formData.area.trim(),
           reference: formData.reference.trim(),
           activityDescription: formData.activityDescription.trim(),
@@ -603,6 +726,8 @@
           length: '',
           height: ''
         });
+        setIsAddingNewFactoryInForm(false);
+        setNewFactoryInputForm('');
 
         setActiveTab('solicitacoes');
       };
@@ -639,12 +764,10 @@
         if (!confirmAction) return;
 
         try {
-          // Incrementa contagem de arquivados no Firestore
           await db.collection('andaimes_config').doc('indicadores').set({
             extraDesmontados: firebase.firestore.FieldValue.increment(1)
           }, { merge: true });
 
-          // Registra histórico do evento
           await db.collection('andaimes_eventos_historico').add({
             type: 'DESMONTADO',
             reqId: req.id,
@@ -654,7 +777,6 @@
             dateStr: new Date().toLocaleString('pt-BR')
           }).catch(() => {});
 
-          // Remove da coleção ativa para liberar espaço na nuvem
           await db.collection('andaimes_solicitacoes').doc(reqId).delete();
           setRequests(prev => prev.filter(r => r.id !== reqId));
           alert(`Andaime ${req.id} finalizado com sucesso! Espaço liberado na nuvem e somado ao indicador de Desmontados Concluídos.`);
@@ -1013,7 +1135,7 @@
             <div className="flex justify-between items-start gap-2">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-bold text-sm text-slate-900">{req.id}</span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700 max-w-[140px] truncate" title={req.factory}>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-100 text-blue-900 border border-blue-200 max-w-[150px] truncate" title={req.factory}>
                   {req.factory}
                 </span>
                 
@@ -1234,7 +1356,7 @@
       return (
         <div className="min-h-screen flex flex-col">
           {/* Top Bar Corporativa */}
-          <header className="bg-slate-900 text-white shadow-lg sticky top-0 z-40">
+          <header className="bg-slate-900 text-white shadow-lg sticky top-0 z-40 app-header">
             <div className="max-w-7xl mx-auto px-4 py-3 flex flex-col sm:flex-row justify-between items-center gap-2">
               <div className="flex items-center space-x-3 w-full sm:w-auto">
                 <a href="/" className="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-2.5 py-1.5 rounded-lg border border-slate-700 transition" title="Ir para InspectCBM">
@@ -1250,7 +1372,7 @@
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Firebase Conectado
                     </span>
                   </h1>
-                  <p className="text-[11px] text-slate-400">Controle de Fila, Montagens e Liberação de Nuvem</p>
+                  <p className="text-[11px] text-slate-400">Controle de Fila, Montagens, Liberação de Nuvem e Relatórios PDF</p>
                 </div>
               </div>
 
@@ -1270,7 +1392,7 @@
             </div>
 
             {/* NAVEGAÇÃO POR ABAS SEPARADAS */}
-            <div className="max-w-7xl mx-auto px-2 sm:px-4 border-t border-slate-800 flex space-x-1 overflow-x-auto text-xs py-1 scrollbar-thin">
+            <div className="max-w-7xl mx-auto px-2 sm:px-4 border-t border-slate-800 flex space-x-1 overflow-x-auto text-xs py-1 scrollbar-thin app-nav">
               <button 
                 onClick={() => setActiveTab('solicitacoes')} 
                 className={`py-2 px-3 font-bold rounded-lg flex items-center gap-1.5 transition whitespace-nowrap ${activeTab === 'solicitacoes' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-300 hover:bg-slate-800'}`}
@@ -1320,7 +1442,7 @@
                   onClick={() => setActiveTab('gestao')} 
                   className={`py-2 px-3 font-bold rounded-lg flex items-center gap-1.5 transition whitespace-nowrap ${activeTab === 'gestao' ? 'bg-purple-600 text-white shadow' : 'text-purple-300 hover:bg-slate-800'}`}
                 >
-                  <span>⚙️</span> Gestão & Logins
+                  <span>⚙️</span> Gestão, Fábricas & Logins
                 </button>
               )}
             </div>
@@ -1328,7 +1450,7 @@
 
           {/* Banner de Andaimes Atrasados */}
           {delayedRequests.length > 0 && (
-            <div className="bg-red-600 text-white px-4 py-2 text-xs font-semibold flex items-center justify-between shadow">
+            <div className="bg-red-600 text-white px-4 py-2 text-xs font-semibold flex items-center justify-between shadow no-print">
               <div className="max-w-7xl mx-auto w-full flex items-center justify-between">
                 <span>⚠️ Atenção: Existem {delayedRequests.length} andaime(s) com Data Limite Ultrapassada precisando de alinhamento!</span>
                 <button onClick={() => setActiveTab('solicitacoes')} className="underline hover:text-red-100 font-bold">Ver Fila</button>
@@ -1339,8 +1461,8 @@
           {/* Conteúdo Principal */}
           <main className="max-w-7xl mx-auto px-4 py-5 flex-1 w-full space-y-5">
 
-            {/* BLOCO DE INDICADORES DA GESTÃO COM FILTROS POR SEMANA E MÊS */}
-            <div className="bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+            {/* BLOCO DE INDICADORES DA GESTÃO COM FILTROS POR SEMANA E MÊS E BOTÃO DE PDF */}
+            <div className="bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4 no-print">
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 border-b border-slate-100 pb-3">
                 <div>
                   <div className="flex items-center gap-2">
@@ -1356,72 +1478,82 @@
                   </p>
                 </div>
 
-                {/* BOTÕES DE FILTRO POR PERÍODO */}
-                <div className="flex items-center gap-1.5 flex-wrap bg-slate-100 p-1 rounded-xl border border-slate-200">
-                  <button 
+                <div className="flex items-center gap-2 flex-wrap">
+                  {/* BOTÃO GERAR RELATÓRIO PDF */}
+                  <button
                     type="button"
-                    onClick={() => setFilterPeriod('all')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
-                      filterPeriod === 'all' 
-                        ? 'bg-white text-slate-900 shadow-sm border border-slate-200' 
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
+                    onClick={() => setIsPdfModalOpen(true)}
+                    className="px-3.5 py-1.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs transition shadow flex items-center gap-1.5"
                   >
-                    <span>📌</span> Geral
+                    <span>📄</span> Gerar Relatório PDF por Fábrica
                   </button>
 
-                  <button 
-                    type="button"
-                    onClick={() => setFilterPeriod('month')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
-                      filterPeriod === 'month' 
-                        ? 'bg-blue-600 text-white shadow-sm' 
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    <span>🗓️</span> Este Mês
-                  </button>
-
-                  <button 
-                    type="button"
-                    onClick={() => setFilterPeriod('week')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
-                      filterPeriod === 'week' 
-                        ? 'bg-indigo-600 text-white shadow-sm' 
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    <span>⏱️</span> Esta Semana
-                  </button>
-
-                  <button 
-                    type="button"
-                    onClick={() => setFilterPeriod('today')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
-                      filterPeriod === 'today' 
-                        ? 'bg-emerald-600 text-white shadow-sm' 
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    <span>📍</span> Hoje
-                  </button>
-
-                  {isGestor && (
+                  {/* BOTÕES DE FILTRO POR PERÍODO */}
+                  <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200">
                     <button 
                       type="button"
-                      onClick={handleSyncIndicatorsWithDatabase}
-                      className="ml-1 px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-lg text-xs transition shadow-sm flex items-center gap-1"
-                      title="Sincronizar indicadores com a base real do Firebase"
+                      onClick={() => setFilterPeriod('all')}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
+                        filterPeriod === 'all' 
+                          ? 'bg-white text-slate-900 shadow-sm border border-slate-200' 
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
                     >
-                      <span>🔄</span> Sincronizar
+                      <span>📌</span> Geral
                     </button>
-                  )}
+
+                    <button 
+                      type="button"
+                      onClick={() => setFilterPeriod('month')}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
+                        filterPeriod === 'month' 
+                          ? 'bg-blue-600 text-white shadow-sm' 
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      <span>🗓️</span> Este Mês
+                    </button>
+
+                    <button 
+                      type="button"
+                      onClick={() => setFilterPeriod('week')}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
+                        filterPeriod === 'week' 
+                          ? 'bg-indigo-600 text-white shadow-sm' 
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      <span>⏱️</span> Esta Semana
+                    </button>
+
+                    <button 
+                      type="button"
+                      onClick={() => setFilterPeriod('today')}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
+                        filterPeriod === 'today' 
+                          ? 'bg-emerald-600 text-white shadow-sm' 
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      <span>📍</span> Hoje
+                    </button>
+
+                    {isGestor && (
+                      <button 
+                        type="button"
+                        onClick={handleSyncIndicatorsWithDatabase}
+                        className="ml-1 px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-lg text-xs transition shadow-sm flex items-center gap-1"
+                        title="Sincronizar indicadores com a base real do Firebase"
+                      >
+                        <span>🔄</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              {/* 4 CARDS DE INDICADORES (CONECTADOS AOS DADOS REAIS) */}
+              {/* 4 CARDS DE INDICADORES */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {/* 1. SOLICITAÇÕES */}
                 <div className="p-3.5 bg-amber-50 rounded-xl border border-amber-200">
                   <p className="text-[10px] font-bold text-amber-800 uppercase tracking-wide">
                     {filterPeriod === 'all' ? 'Solicitações na Fila' : 'Solicitados no Período'}
@@ -1432,7 +1564,6 @@
                   </p>
                 </div>
 
-                {/* 2. MONTADOS */}
                 <div className="p-3.5 bg-emerald-50 rounded-xl border border-emerald-200">
                   <p className="text-[10px] font-bold text-emerald-800 uppercase tracking-wide">
                     {filterPeriod === 'all' ? 'Montados em Campo' : 'Montagens no Período'}
@@ -1443,7 +1574,6 @@
                   </p>
                 </div>
 
-                {/* 3. DESMONTADOS */}
                 <div className="p-3.5 bg-slate-100 rounded-xl border border-slate-300">
                   <p className="text-[10px] font-bold text-slate-700 uppercase tracking-wide">
                     {filterPeriod === 'all' ? 'Desmontados Concluídos' : 'Desmontados no Período'}
@@ -1454,7 +1584,6 @@
                   </p>
                 </div>
 
-                {/* 4. CANCELADOS */}
                 <div className="p-3.5 bg-red-50 rounded-xl border border-red-200">
                   <p className="text-[10px] font-bold text-red-800 uppercase tracking-wide">
                     {filterPeriod === 'all' ? 'Total Cancelados' : 'Cancelados no Período'}
@@ -1612,7 +1741,7 @@
               </div>
             )}
 
-            {/* ABA 5: NOVA SOLICITAÇÃO */}
+            {/* ABA 5: NOVA SOLICITAÇÃO (SELEÇÃO E CADASTRO DE FÁBRICA) */}
             {activeTab === 'nova' && (
               <div className="max-w-2xl mx-auto bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200">
                 <h2 className="text-base font-bold text-slate-800 mb-1">Nova Solicitação de Andaime</h2>
@@ -1620,20 +1749,70 @@
 
                 <form onSubmit={handleCreateRequest} className="space-y-4">
                   
-                  {/* FÁBRICA E ÁREA */}
+                  {/* FÁBRICA (SELECT COM OPÇÃO DE ADICIONAR NOVA) E ÁREA */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Planta / Fábrica *</label>
-                      <input 
-                        type="text" 
-                        name="factory" 
-                        placeholder="Ex: Fábrica 01, Fábrica de Motores" 
-                        value={formData.factory} 
-                        onChange={handleInputChange} 
-                        required 
-                        className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm font-medium focus:outline-none focus:border-blue-500" 
-                      />
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="block text-xs font-semibold text-slate-600 uppercase">Planta / Fábrica *</label>
+                        {!isAddingNewFactoryInForm && (
+                          <button
+                            type="button"
+                            onClick={() => setIsAddingNewFactoryInForm(true)}
+                            className="text-[11px] text-blue-600 hover:text-blue-800 font-bold underline"
+                          >
+                            + Nova Fábrica
+                          </button>
+                        )}
+                      </div>
+
+                      {isAddingNewFactoryInForm ? (
+                        <div className="space-y-1.5 animate-in fade-in">
+                          <input 
+                            type="text" 
+                            placeholder="Digite o nome da nova fábrica..." 
+                            value={newFactoryInputForm} 
+                            onChange={(e) => setNewFactoryInputForm(e.target.value)} 
+                            required 
+                            className="w-full p-2.5 bg-blue-50 border border-blue-400 rounded-lg text-sm font-bold uppercase focus:outline-none focus:border-blue-600" 
+                          />
+                          <div className="flex justify-between items-center text-[10px]">
+                            <span className="text-slate-500">Será salva no Firebase</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsAddingNewFactoryInForm(false);
+                                setNewFactoryInputForm('');
+                              }}
+                              className="text-red-600 hover:underline font-bold"
+                            >
+                              Voltar para lista
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <select 
+                          name="factory" 
+                          value={formData.factory} 
+                          onChange={(e) => {
+                            if (e.target.value === '__NOVA__') {
+                              setIsAddingNewFactoryInForm(true);
+                              setFormData({ ...formData, factory: '' });
+                            } else {
+                              setFormData({ ...formData, factory: e.target.value });
+                            }
+                          }} 
+                          required 
+                          className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm font-semibold text-slate-800 focus:outline-none focus:border-blue-500"
+                        >
+                          <option value="">Selecione a Fábrica / Planta *</option>
+                          {factories.map((f, idx) => (
+                            <option key={idx} value={f}>{f}</option>
+                          ))}
+                          <option value="__NOVA__">➕ Cadastrar Nova Fábrica...</option>
+                        </select>
+                      )}
                     </div>
+
                     <div>
                       <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Área / Setor *</label>
                       <input 
@@ -1837,10 +2016,69 @@
               </div>
             )}
 
-            {/* ABA 6: GESTÃO & LOGINS (EXCLUSIVO GESTOR) */}
+            {/* ABA 6: GESTÃO, FÁBRICAS & LOGINS (EXCLUSIVO GESTOR) */}
             {activeTab === 'gestao' && isGestor && (
               <div className="space-y-6 max-w-4xl mx-auto">
-                {/* 1. GERENCIAMENTO DE LOGINS E ACESSOS */}
+                {/* 1. GERENCIAMENTO DE FÁBRICAS / PLANTAS */}
+                <div className="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+                  <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                    <div>
+                      <h3 className="font-bold text-base text-slate-800 flex items-center gap-2">
+                        <span>🏢</span> Gerenciamento de Plantas e Fábricas
+                      </h3>
+                      <p className="text-xs text-slate-500">
+                        Adicione ou remova fábricas disponíveis no sistema. Salvo automaticamente no Firebase para todos.
+                      </p>
+                    </div>
+                    <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs font-bold">
+                      {factories.length} fábricas
+                    </span>
+                  </div>
+
+                  {/* Adicionar Nova Fábrica */}
+                  <form 
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      if (newFactoryInputManage.trim()) {
+                        handleAddFactory(newFactoryInputManage);
+                        setNewFactoryInputManage('');
+                      }
+                    }}
+                    className="flex gap-2"
+                  >
+                    <input 
+                      type="text" 
+                      placeholder="Nome da nova fábrica (Ex: PRÉDIO MILKA, CALDEIRAS...)" 
+                      value={newFactoryInputManage}
+                      onChange={(e) => setNewFactoryInputManage(e.target.value)}
+                      className="flex-1 p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-bold uppercase focus:outline-none focus:border-blue-500"
+                    />
+                    <button 
+                      type="submit" 
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow transition flex items-center gap-1"
+                    >
+                      <span>+</span> Adicionar Fábrica
+                    </button>
+                  </form>
+
+                  {/* Lista de Fábricas Cadastradas */}
+                  <div className="flex flex-wrap gap-2 pt-2">
+                    {factories.map((f, i) => (
+                      <span key={i} className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 border border-slate-300 rounded-lg text-xs font-bold text-slate-700">
+                        <span>🏢</span> {f}
+                        <button 
+                          onClick={() => handleRemoveFactory(f)}
+                          className="text-slate-400 hover:text-red-600 font-bold ml-1"
+                          title="Remover fábrica da lista"
+                        >
+                          &times;
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 2. GERENCIAMENTO DE LOGINS E ACESSOS */}
                 <div className="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
                   <div className="flex justify-between items-center border-b border-slate-100 pb-3">
                     <div>
@@ -1900,7 +2138,7 @@
                   </div>
                 </div>
 
-                {/* 2. SINCRONIZAÇÃO E RECALIBRAÇÃO DE INDICADORES */}
+                {/* 3. SINCRONIZAÇÃO E RECALIBRAÇÃO DE INDICADORES */}
                 <div className="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200 space-y-3">
                   <div className="flex justify-between items-center">
                     <div>
@@ -1918,7 +2156,7 @@
                   </div>
                 </div>
 
-                {/* 3. AJUSTE DE CAPACIDADE CONTRATADA */}
+                {/* 4. AJUSTE DE CAPACIDADE CONTRATADA */}
                 <div className="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200 space-y-3">
                   <h3 className="font-bold text-base text-slate-800">Ajuste de Capacidade Máxima Contratada</h3>
                   <p className="text-xs text-slate-500">Ajuste o volume total em m³ contratado junto à montadora. Salvo no Firebase para todos.</p>
@@ -1937,6 +2175,219 @@
             )}
 
           </main>
+
+          {/* MODAL: RELATÓRIO PDF EXECUTIVO DE CONTROLE DOS INDICADORES SEPARADO POR FÁBRICA */}
+          {isPdfModalOpen && (
+            <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 overflow-y-auto p-2 sm:p-6 flex justify-center">
+              <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full p-4 sm:p-8 space-y-6 print-modal-container my-auto">
+                
+                {/* Barra de Ações Superior (Oculta na impressão do PDF) */}
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-200 pb-4 no-print">
+                  <div>
+                    <h2 className="text-lg font-black text-slate-800 flex items-center gap-2">
+                      <span>📄</span> Visualização do Relatório Executivo de Indicadores
+                    </h2>
+                    <p className="text-xs text-slate-500">
+                      Configure os filtros e clique no botão verde para gerar ou salvar em PDF.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {/* Filtro de Fábrica para o PDF */}
+                    <select
+                      value={pdfFactoryFilter}
+                      onChange={(e) => setPdfFactoryFilter(e.target.value)}
+                      className="p-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-bold text-slate-800"
+                    >
+                      <option value="ALL">🏢 Todas as Fábricas</option>
+                      {factories.map((f, i) => (
+                        <option key={i} value={f.toUpperCase()}>{f}</option>
+                      ))}
+                    </select>
+
+                    <button
+                      type="button"
+                      onClick={() => window.print()}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs shadow-md transition flex items-center gap-1.5"
+                    >
+                      <span>🖨️</span> Salvar em PDF / Imprimir
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsPdfModalOpen(false)}
+                      className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-xs transition"
+                    >
+                      Fechar ✕
+                    </button>
+                  </div>
+                </div>
+
+                {/* CORPO DO RELATÓRIO FORMATADO PARA A4 / PDF */}
+                <div className="space-y-6 text-slate-800">
+                  
+                  {/* CABEÇALHO DO RELATÓRIO */}
+                  <div className="flex justify-between items-start border-b-2 border-slate-800 pb-4">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="p-2 bg-blue-600 text-white rounded font-black text-sm">INSPECTCBM</span>
+                        <h1 className="text-xl font-black text-slate-900 tracking-wide uppercase">
+                          Relatório de Controle de Andaimes
+                        </h1>
+                      </div>
+                      <p className="text-xs text-slate-600 mt-1 font-semibold">
+                        Gestão Operacional, Fila de Espera, Ocupação em M³ e Montagens por Fábrica
+                      </p>
+                    </div>
+
+                    <div className="text-right text-xs space-y-0.5">
+                      <p><span className="font-bold">Data de Emissão:</span> {new Date().toLocaleDateString('pt-BR')} às {new Date().toLocaleTimeString('pt-BR')}</p>
+                      <p><span className="font-bold">Emitido por:</span> {currentUser ? `${currentUser.name} (${currentUser.role})` : 'Sistema'}</p>
+                      <p><span className="font-bold">Período:</span> {filterPeriodLabel}</p>
+                    </div>
+                  </div>
+
+                  {/* RESUMO GERAL CONSOLIDADO DA PLANTA */}
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-300 space-y-3">
+                    <h3 className="text-xs font-black uppercase tracking-wider text-slate-700">
+                      1. Indicadores Consolidados da Planta
+                    </h3>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+                      <div className="p-2 bg-white rounded-lg border border-slate-200">
+                        <span className="text-[10px] text-slate-500 font-bold uppercase block">Solicitações na Fila</span>
+                        <span className="text-2xl font-black text-amber-900">{displayedStats.solicitados}</span>
+                      </div>
+                      <div className="p-2 bg-white rounded-lg border border-slate-200">
+                        <span className="text-[10px] text-slate-500 font-bold uppercase block">Montados em Campo</span>
+                        <span className="text-2xl font-black text-emerald-900">{displayedStats.montados}</span>
+                      </div>
+                      <div className="p-2 bg-white rounded-lg border border-slate-200">
+                        <span className="text-[10px] text-slate-500 font-bold uppercase block">Desmontados Concluídos</span>
+                        <span className="text-2xl font-black text-slate-900">{displayedStats.desmontados}</span>
+                      </div>
+                      <div className="p-2 bg-white rounded-lg border border-slate-200">
+                        <span className="text-[10px] text-slate-500 font-bold uppercase block">Cancelados</span>
+                        <span className="text-2xl font-black text-red-900">{displayedStats.cancelados}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-center text-xs font-bold pt-2 border-t border-slate-200">
+                      <span>Volume Ocupado em Campo: <span className="text-blue-700">{allocatedM3} m³</span></span>
+                      <span>Capacidade Total Contratada: <span>{totalCapacityM3} m³</span></span>
+                      <span>Taxa de Ocupação da Planta: <span className={allocatedM3 > totalCapacityM3 * 0.85 ? 'text-red-600' : 'text-emerald-700'}>{((allocatedM3 / totalCapacityM3) * 100).toFixed(1)}%</span></span>
+                    </div>
+                  </div>
+
+                  {/* SEÇÃO 2: DETALHAMENTO SEPARADO POR FÁBRICA */}
+                  <div className="space-y-6 pt-2">
+                    <h3 className="text-sm font-black uppercase tracking-wider text-slate-900 border-b border-slate-300 pb-2 flex items-center justify-between">
+                      <span>2. Detalhamento dos Indicadores Separado por Fábrica</span>
+                      <span className="text-xs font-normal text-slate-500">
+                        {pdfFactoryFilter === 'ALL' ? 'Todas as Fábricas' : `Fábrica: ${pdfFactoryFilter}`}
+                      </span>
+                    </h3>
+
+                    {Object.keys(requestsByFactory)
+                      .filter(fName => pdfFactoryFilter === 'ALL' || fName === pdfFactoryFilter)
+                      .map(fName => {
+                        const factoryRequests = requestsByFactory[fName] || [];
+                        const fQueue = factoryRequests.filter(r => ['Avaliação', 'Iniciado Montagem', 'Em Movimentação'].includes(r.status));
+                        const fMounted = factoryRequests.filter(r => ['Montado', 'Liberado para Desmontagem'].includes(r.status));
+                        const fDismantled = factoryRequests.filter(r => r.status === 'Desmontado');
+                        const fVolM3 = fMounted.reduce((sum, r) => sum + ((r.realVolumeM3 !== null && r.realVolumeM3 !== undefined) ? r.realVolumeM3 : r.volumeM3), 0);
+
+                        return (
+                          <div key={fName} className="border border-slate-300 rounded-xl overflow-hidden print-page-break-inside-avoid">
+                            {/* Cabeçalho da Fábrica */}
+                            <div className="bg-slate-800 text-white p-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                              <div className="flex items-center gap-2">
+                                <span className="px-2 py-0.5 bg-blue-600 text-white rounded text-xs font-bold uppercase">FÁBRICA</span>
+                                <span className="font-black text-sm uppercase tracking-wide">{fName}</span>
+                              </div>
+                              <div className="flex gap-4 text-xs">
+                                <span>Fila: <strong>{fQueue.length}</strong></span>
+                                <span>Montados: <strong>{fMounted.length} ({fVolM3} m³)</strong></span>
+                                <span>Desmontados: <strong>{fDismantled.length}</strong></span>
+                              </div>
+                            </div>
+
+                            {/* Tabela de Andaimes da Fábrica */}
+                            {factoryRequests.length > 0 ? (
+                              <div className="overflow-x-auto">
+                                <table className="w-full text-left text-xs border-collapse">
+                                  <thead>
+                                    <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-300 text-[10px] uppercase">
+                                      <th className="p-2">ID</th>
+                                      <th className="p-2">Área / Ponto Ref</th>
+                                      <th className="p-2">Atividade / PEMT</th>
+                                      <th className="p-2">Dimensões / Vol.</th>
+                                      <th className="p-2">Responsável</th>
+                                      <th className="p-2">Prazo</th>
+                                      <th className="p-2 text-right">Status</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-slate-200">
+                                    {factoryRequests.map((r) => {
+                                      const hasReal = r.realVolumeM3 !== null && r.realVolumeM3 !== undefined;
+                                      return (
+                                        <tr key={r.id} className="hover:bg-slate-50">
+                                          <td className="p-2 font-bold text-slate-900">{r.id}</td>
+                                          <td className="p-2">
+                                            <p className="font-semibold text-slate-800">{r.area}</p>
+                                            <p className="text-[10px] text-slate-500">{r.reference}</p>
+                                          </td>
+                                          <td className="p-2 max-w-[200px]">
+                                            <p className="font-medium text-slate-800 truncate" title={r.activityDescription}>{r.activityDescription || 'Não informada'}</p>
+                                            <p className="text-[10px] text-slate-500">PEMT: <strong>{r.canUsePEMT || 'NÃO'}</strong></p>
+                                          </td>
+                                          <td className="p-2">
+                                            {hasReal ? (
+                                              <span className="font-bold text-blue-700">{r.realWidth}x{r.realLength}x{r.realHeight}m ({r.realVolumeM3} m³)</span>
+                                            ) : (
+                                              <span className="text-slate-600">{r.width}x{r.length}x{r.height}m ({r.volumeM3} m³)</span>
+                                            )}
+                                          </td>
+                                          <td className="p-2">
+                                            <p className="font-semibold text-slate-800">{r.responsible}</p>
+                                            <p className="text-[10px] text-slate-500">{r.phone || r.email || ''}</p>
+                                          </td>
+                                          <td className="p-2 font-medium">{r.dueDate || '-'}</td>
+                                          <td className="p-2 text-right">
+                                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                              r.status === 'Montado' ? 'bg-emerald-100 text-emerald-800' :
+                                              r.status === 'Avaliação' ? 'bg-amber-100 text-amber-800' :
+                                              r.status === 'Desmontado' ? 'bg-slate-200 text-slate-700' :
+                                              'bg-blue-100 text-blue-800'
+                                            }`}>
+                                              {r.status}
+                                            </span>
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
+                              </div>
+                            ) : (
+                              <div className="p-4 text-center text-xs text-slate-400 bg-white">
+                                Nenhum andaime registrado nesta fábrica no momento.
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                  </div>
+
+                  {/* RODAPÉ DO RELATÓRIO */}
+                  <div className="pt-6 border-t border-slate-300 flex justify-between items-center text-[10px] text-slate-500">
+                    <span>InspectCBM — Sistema de Gestão e Controle de Andaimes • Sincronizado via Firebase Firestore</span>
+                    <span>Documento Oficial de Controle Operacional da Planta</span>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* MODAL: VISITA TÉCNICA E DIMENSÃO REAL */}
           {visitModalReqId && (
