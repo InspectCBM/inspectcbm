@@ -12,7 +12,7 @@
   <!-- Babel Compiler -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   
-  <!-- Firebase Compat SDKs (Mesmo banco de dados do seu projeto) -->
+  <!-- Firebase Compat SDKs (Mesmo banco de dados inspectcbm-db) -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
   <script>
@@ -43,7 +43,7 @@
       { id: '3', name: 'Roberto Alves', email: 'roberto.alves@empresa.com', password: 'AUTOKRAFT01', role: 'Gestor de Andaimes' }
     ];
 
-    // Função de compressão de alta performance para fotos de celulares (evita estourar o limite de 1MB do Firestore)
+    // Compressor em tempo real de fotos para celulares (otimiza para ~60KB-90KB evitando limite de 1MB do Firestore)
     const compressImage = (file, maxWidth = 1000, quality = 0.65) => {
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -72,7 +72,6 @@
             canvas.height = height;
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0, width, height);
-            // Converte para JPEG com qualidade 0.65 (tamanho médio ~60KB a 120KB)
             const compressedBase64 = canvas.toDataURL('image/jpeg', quality);
             resolve(compressedBase64);
           };
@@ -83,47 +82,55 @@
     };
 
     function App() {
-      // Lista de Usuários sincronizada com Firebase
+      // Usuários
       const [users, setUsers] = useState(DEFAULT_USERS);
-
-      // Autenticação
       const [isAuthenticated, setIsAuthenticated] = useState(false);
       const [currentUser, setCurrentUser] = useState(null);
       const [loginEmail, setLoginEmail] = useState(DEFAULT_USERS[0].email);
       const [loginPassword, setLoginPassword] = useState('');
       const [loginError, setLoginError] = useState('');
-
       const [loginMode, setLoginMode] = useState('select');
       const [newUser, setNewUser] = useState({ name: '', email: '', password: '', role: 'Solicitante (Área)' });
 
-      // Navegação e Estoque
-      const [activeTab, setActiveTab] = useState('dashboard');
+      // Navegação por abas otimizada para celular
+      // Opções: 'solicitacoes' (Fila), 'montados', 'desmontados', 'dashboard' (Indicadores), 'nova', 'gestao'
+      const [activeTab, setActiveTab] = useState('solicitacoes');
+
       const [totalCapacityM3, setTotalCapacityM3] = useState(500);
       const [isCloudConnected, setIsCloudConnected] = useState(true);
-      
-      // Estado para modal de Visita Técnica
+
+      // Indicadores Históricos Acumulados no Firebase
+      const [stats, setStats] = useState({
+        totalSolicitados: 3,
+        totalMontados: 1,
+        totalDesmontados: 1,
+        totalCancelados: 0
+      });
+
+      // Modais
       const [visitModalReqId, setVisitModalReqId] = useState(null);
       const [visitDimensions, setVisitDimensions] = useState({ width: '', length: '', height: '' });
 
-      // Estado para modal de Alteração de Data Limite pelo Gestor
       const [editDateModalReq, setEditDateModalReq] = useState(null);
       const [newDueDate, setNewDueDate] = useState('');
       const [dateChangeReason, setDateChangeReason] = useState('');
       const [autoReorderOnDateChange, setAutoReorderOnDateChange] = useState(true);
 
-      // Estado para modal de Conclusão de Montagem e Câmera de Foto
       const [photoModalReq, setPhotoModalReq] = useState(null);
       const [tempPhotoUrl, setTempPhotoUrl] = useState(null);
       const [isCompressingPhoto, setIsCompressingPhoto] = useState(false);
       const [isSavingMontado, setIsSavingMontado] = useState(false);
 
-      // Função de ordenação da fila de espera pela Data Limite (dueDate)
+      const [cancelModalReq, setCancelModalReq] = useState(null);
+      const [cancelReason, setCancelReason] = useState('');
+      const [isCancelling, setIsCancelling] = useState(false);
+
+      // Ordenar fila de espera pela data limite
       const sortQueueByDueDate = (reqList) => {
         const queueStatuses = ['Avaliação', 'Iniciado Montagem', 'Em Movimentação'];
         const inQueue = reqList.filter(r => queueStatuses.includes(r.status));
         const notInQueue = reqList.filter(r => !queueStatuses.includes(r.status));
 
-        // Ordena a fila: Data Limite mais próxima primeiro
         inQueue.sort((a, b) => {
           const dateA = a.dueDate || '9999-99-99';
           const dateB = b.dueDate || '9999-99-99';
@@ -132,7 +139,6 @@
           return (a.id || '').localeCompare(b.id || '');
         });
 
-        // Atribui queueOrder sequencial (1, 2, 3...)
         inQueue.forEach((r, idx) => {
           r.queueOrder = idx + 1;
         });
@@ -140,13 +146,16 @@
         return [...inQueue, ...notInQueue];
       };
 
-      // Solicitações
+      // Solicitações ativas
       const [requests, setRequests] = useState([
         {
           id: 'SOL-1001',
           factory: 'Fábrica 01 - Motores',
           area: 'Utilidades - Caldeiras',
           reference: 'Ao lado do tanque de condensado',
+          activityDescription: 'Substituição de válvula de vapor com isolamento',
+          canUsePEMT: 'NÃO',
+          pemtJustification: '',
           responsible: 'Carlos Eduardo',
           phone: '(41) 99876-5432',
           email: 'carlos.eduardo@empresa.com',
@@ -173,6 +182,9 @@
           factory: 'Fábrica 02 - Envase',
           area: 'Embalagem 02',
           reference: 'Linha de Potes',
+          activityDescription: 'Reparo de cabeamento em esteira suspensa',
+          canUsePEMT: 'SIM',
+          pemtJustification: 'Local sem espaço para manobra do rodízio da PEMT',
           responsible: 'Mariana Luz',
           phone: '(41) 99123-4567',
           email: 'mariana.luz@empresa.com',
@@ -195,42 +207,14 @@
             { date: '28/10/2026 09:40', user: 'João Silva (Equipe de Andaimes)', action: 'Visita técnica realizada: Medida real 3x4x4m (48m³). Montagem iniciada.' },
             { date: '28/10/2026 11:30', user: 'João Silva (Equipe de Andaimes)', action: 'Andaime Montado com sucesso' }
           ]
-        },
-        {
-          id: 'SOL-1000',
-          factory: 'Fábrica Central',
-          area: 'Manutenção Mecânica',
-          reference: 'Ponte Rolante 01',
-          responsible: 'Antônio Ferreira',
-          phone: '(41) 98765-1122',
-          email: 'antonio.ferreira@empresa.com',
-          dueDate: '2026-10-25',
-          isUrgent: false,
-          queueOrder: null,
-          width: 2,
-          length: 2,
-          height: 5,
-          volumeM3: 20,
-          realWidth: 2,
-          realLength: 2,
-          realHeight: 5,
-          realVolumeM3: 20,
-          status: 'Desmontado',
-          photoUrl: null,
-          createdAt: '22/10/2026 08:00',
-          history: [
-            { date: '22/10/2026 08:00', user: 'Antônio Ferreira (Solicitante)', action: 'Solicitação Criada' },
-            { date: '23/10/2026 14:00', user: 'João Silva (Equipe de Andaimes)', action: 'Andaime Montado' },
-            { date: '25/10/2026 16:30', user: 'João Silva (Equipe de Andaimes)', action: 'Andaime Desmontado e materiais recolhidos' }
-          ]
         }
       ]);
 
-      // Conexão em Tempo Real com Firestore do Firebase
+      // Sincronização em tempo real com Firestore
       useEffect(() => {
         let isMounted = true;
 
-        // 1. Escuta alterações em tempo real nas solicitações de andaimes
+        // 1. Escuta solicitações
         const unsubRequests = db.collection('andaimes_solicitacoes').onSnapshot((snapshot) => {
           if (!isMounted) return;
           if (!snapshot.empty) {
@@ -241,17 +225,16 @@
             setRequests(sortQueueByDueDate(list));
             setIsCloudConnected(true);
           } else {
-            // Se a coleção estiver vazia pela primeira vez, alimenta os registros iniciais
             requests.forEach(r => {
               db.collection('andaimes_solicitacoes').doc(r.id).set(r).catch(() => {});
             });
           }
         }, (err) => {
-          console.warn('Firestore offline ou em fallback:', err);
+          console.warn('Firestore offline:', err);
           setIsCloudConnected(false);
         });
 
-        // 2. Escuta alterações em tempo real nos usuários cadastrados
+        // 2. Escuta usuários cadastrados
         const unsubUsers = db.collection('andaimes_usuarios').onSnapshot((snapshot) => {
           if (!isMounted) return;
           if (!snapshot.empty) {
@@ -275,18 +258,45 @@
           }
         }, () => {});
 
+        // 4. Escuta Indicadores Históricos Acumulados
+        const unsubStats = db.collection('andaimes_config').doc('indicadores').onSnapshot((doc) => {
+          if (!isMounted) return;
+          if (doc.exists) {
+            const data = doc.data();
+            setStats({
+              totalSolicitados: data.totalSolicitados || 0,
+              totalMontados: data.totalMontados || 0,
+              totalDesmontados: data.totalDesmontados || 0,
+              totalCancelados: data.totalCancelados || 0
+            });
+          } else {
+            // Inicializa indicadores históricos
+            db.collection('andaimes_config').doc('indicadores').set({
+              totalSolicitados: 3,
+              totalMontados: 1,
+              totalDesmontados: 1,
+              totalCancelados: 0
+            }).catch(() => {});
+          }
+        }, () => {});
+
         return () => {
           isMounted = false;
           unsubRequests();
           unsubUsers();
           unsubConfig();
+          unsubStats();
         };
       }, []);
 
+      // Formulário Nova Solicitação
       const [formData, setFormData] = useState({
         factory: '',
         area: '',
         reference: '',
+        activityDescription: '',
+        canUsePEMT: 'NÃO',
+        pemtJustification: '',
         activityResponsible: '',
         email: '',
         phone: '',
@@ -300,12 +310,12 @@
       const calcBaseArea = (Number(formData.width) || 0) * (Number(formData.length) || 0);
       const calcVolume = calcBaseArea * (Number(formData.height) || 0);
 
-      // MÉTRICA: CONTABILIZA APENAS O QUE ESTÁ MONTADO (MEDIDA REAL)
+      // Volume em m³ em uso efetivo (montados)
       const allocatedM3 = requests
         .filter(r => r.status === 'Montado' || r.status === 'Liberado para Desmontagem')
         .reduce((acc, curr) => {
-          const volumeEfetivo = (curr.realVolumeM3 !== null && curr.realVolumeM3 !== undefined) ? curr.realVolumeM3 : curr.volumeM3;
-          return acc + volumeEfetivo;
+          const vol = (curr.realVolumeM3 !== null && curr.realVolumeM3 !== undefined) ? curr.realVolumeM3 : curr.volumeM3;
+          return acc + (Number(vol) || 0);
         }, 0);
       
       const availableM3 = totalCapacityM3 - allocatedM3;
@@ -317,7 +327,7 @@
       const isEquipe = currentUser?.role === 'Equipe de Andaimes';
       const isSolicitante = currentUser?.role === 'Solicitante (Área)';
 
-      // Listas filtradas para as colunas e abas
+      // Listas
       const queueRequests = requests
         .filter(r => ['Avaliação', 'Iniciado Montagem', 'Em Movimentação'].includes(r.status))
         .sort((a, b) => (a.queueOrder || 0) - (b.queueOrder || 0));
@@ -328,7 +338,7 @@
       const dismantledRequests = requests
         .filter(r => r.status === 'Desmontado');
 
-      // Autenticação com Senha
+      // Login
       const handleLogin = (e) => {
         e.preventDefault();
         setLoginError('');
@@ -349,7 +359,7 @@
         setLoginPassword('');
       };
 
-      // Novo Cadastro - Validação de Senhas por Perfil e Persistência no Firebase
+      // Cadastro
       const handleRegisterAndLogin = async (e) => {
         e.preventDefault();
         setLoginError('');
@@ -360,23 +370,21 @@
         }
 
         if (!newUser.name.trim() || !newUser.email.trim()) {
-          setLoginError('Por favor, preencha o nome completo e o e-mail corporativo.');
+          setLoginError('Preencha o nome completo e o e-mail corporativo.');
           return;
         }
 
-        // Validação de senhas por perfil de acesso conforme regras de segurança
         if (newUser.role === 'Gestor de Andaimes') {
           if (newUser.password !== 'AUTOKRAFT01') {
-            setLoginError('Senha de segurança incorreta para o perfil Gestor de Andaimes. Acesso não autorizado.');
+            setLoginError('Senha de segurança incorreta para o perfil Gestor de Andaimes.');
             return;
           }
         } else if (newUser.role === 'Equipe de Andaimes') {
           if (newUser.password !== 'JDANDAIME') {
-            setLoginError('Senha de segurança incorreta para o perfil Equipe de Andaimes. Acesso não autorizado.');
+            setLoginError('Senha de segurança incorreta para o perfil Equipe de Andaimes.');
             return;
           }
         } else {
-          // Solicitante (Área): ele mesmo escolhe a senha livremente
           if (!newUser.password || newUser.password.trim() === '') {
             setLoginError('Por favor, informe uma senha para o seu cadastro.');
             return;
@@ -386,7 +394,6 @@
         const created = { id: String(Date.now()), ...newUser };
 
         try {
-          // Salva no Firebase para persistir para sempre
           await db.collection('andaimes_usuarios').doc(created.email.toLowerCase()).set(created);
         } catch (err) {
           console.warn('Erro ao salvar usuário no Firebase:', err);
@@ -396,6 +403,27 @@
         setCurrentUser(created);
         setIsAuthenticated(true);
         setNewUser({ name: '', email: '', password: '', role: 'Solicitante (Área)' });
+      };
+
+      // Gestor Excluir Login de Usuário
+      const handleDeleteUser = async (userToDelete) => {
+        if (!isGestor) return;
+        if (userToDelete.email.toLowerCase() === currentUser.email.toLowerCase()) {
+          alert('Você não pode excluir o seu próprio usuário logado no momento.');
+          return;
+        }
+
+        const confirmDelete = window.confirm(`Deseja realmente excluir o login de "${userToDelete.name}" (${userToDelete.email})? Esta ação revogará o acesso dele.`);
+        if (!confirmDelete) return;
+
+        try {
+          await db.collection('andaimes_usuarios').doc(userToDelete.email.toLowerCase()).delete();
+          setUsers(users.filter(u => u.email.toLowerCase() !== userToDelete.email.toLowerCase()));
+          alert(`Usuário ${userToDelete.name} excluído com sucesso.`);
+        } catch (err) {
+          console.error('Erro ao excluir usuário:', err);
+          alert('Erro ao excluir usuário no Firebase.');
+        }
       };
 
       const handleLogout = () => {
@@ -409,18 +437,26 @@
         setFormData({ ...formData, [e.target.name]: value });
       };
 
-      // Criação de Solicitação - Salva no Firebase Firestore
+      // Criar Solicitação
       const handleCreateRequest = async (e) => {
         e.preventDefault();
+
+        if (formData.canUsePEMT === 'SIM' && !formData.pemtJustification.trim()) {
+          alert('Por favor, informe a justificativa do porquê montar andaime quando é possível usar PEMT.');
+          return;
+        }
 
         const activityResp = (formData.activityResponsible || '').trim() || currentUser.name;
         const respEmail = (formData.email || '').trim() || currentUser.email;
 
         const newReq = {
-          id: `SOL-${1000 + requests.length + 1}`,
+          id: `SOL-${1000 + stats.totalSolicitados + 1}`,
           factory: formData.factory.trim(),
           area: formData.area.trim(),
           reference: formData.reference.trim(),
+          activityDescription: formData.activityDescription.trim(),
+          canUsePEMT: formData.canUsePEMT,
+          pemtJustification: formData.canUsePEMT === 'SIM' ? formData.pemtJustification.trim() : '',
           responsible: activityResp,
           email: respEmail,
           requesterName: currentUser.name,
@@ -444,14 +480,19 @@
             { 
               date: new Date().toLocaleString('pt-BR'), 
               user: `${currentUser.name} (${currentUser.role})`, 
-              action: `Solicitação Criada${formData.isUrgent ? ' (Urgente)' : ''} | Resp. Atividade: ${activityResp} | E-mail: ${respEmail}` 
+              action: `Solicitação Criada${formData.isUrgent ? ' (Urgente)' : ''} | Atividade: ${formData.activityDescription} | PEMT: ${formData.canUsePEMT}` 
             }
           ]
         };
 
         try {
-          // Grava no Firebase Firestore
+          // Salva no Firestore
           await db.collection('andaimes_solicitacoes').doc(newReq.id).set(newReq);
+          
+          // Incrementa contador histórico de Solicitados
+          await db.collection('andaimes_config').doc('indicadores').set({
+            totalSolicitados: firebase.firestore.FieldValue.increment(1)
+          }, { merge: true });
         } catch (err) {
           console.warn('Erro ao salvar no Firestore:', err);
         }
@@ -463,6 +504,9 @@
           factory: '',
           area: '',
           reference: '',
+          activityDescription: '',
+          canUsePEMT: 'NÃO',
+          pemtJustification: '',
           activityResponsible: '',
           email: '',
           phone: '',
@@ -472,10 +516,12 @@
           length: '',
           height: ''
         });
-        setActiveTab('dashboard');
+
+        // Vai direto para a aba de Solicitações (Fila)
+        setActiveTab('solicitacoes');
       };
 
-      // Alteração de Status - Atualiza no Firebase Firestore
+      // Alteração de status normal
       const updateStatus = async (id, newStatus, extraAction = '') => {
         const histMsg = extraAction ? `${extraAction}` : `Status alterado para: ${newStatus}`;
         const targetReq = requests.find(r => r.id === id);
@@ -498,7 +544,62 @@
         }
       };
 
-      // Salvar Visita Técnica com Dimensões Reais no Firestore
+      // AÇÃO ESPECIAL: FINALIZAR DESMONTAGEM -> APAGA DA NUVEM PARA LIVRAR ESPAÇO E SOMA NO INDICADOR
+      const handleCompleteDismantle = async (reqId) => {
+        const req = requests.find(r => r.id === reqId);
+        if (!req) return;
+
+        const confirmAction = window.confirm(`Confirmar a desmontagem e recolhimento do andaime ${req.id}?\n\nAs informações ativas serão liberadas da nuvem para economizar espaço e o andaime será computado no histórico de "Desmontados Concluídos".`);
+        if (!confirmAction) return;
+
+        // 1. Remove do estado local imediatamente
+        setRequests(prev => prev.filter(r => r.id !== reqId));
+
+        try {
+          // 2. Incrementa contador de Desmontados Concluídos no Firebase
+          await db.collection('andaimes_config').doc('indicadores').set({
+            totalDesmontados: firebase.firestore.FieldValue.increment(1)
+          }, { merge: true });
+
+          // 3. Apaga da coleção ativa para liberar espaço na nuvem
+          await db.collection('andaimes_solicitacoes').doc(reqId).delete();
+          alert(`Andaime ${req.id} concluído! Espaço liberado na nuvem e somado ao indicador de Desmontados Concluídos.`);
+        } catch (err) {
+          console.error('Erro ao finalizar desmontagem:', err);
+          alert('Erro ao comunicar com Firebase.');
+        }
+      };
+
+      // AÇÃO ESPECIAL: GESTOR CANCELAR SOLICITAÇÃO
+      const handleCancelRequestConfirm = async (e) => {
+        e.preventDefault();
+        if (!cancelModalReq) return;
+        setIsCancelling(true);
+
+        const reqId = cancelModalReq.id;
+
+        // 1. Remove local
+        setRequests(prev => prev.filter(r => r.id !== reqId));
+
+        try {
+          // 2. Incrementa indicador de Cancelados
+          await db.collection('andaimes_config').doc('indicadores').set({
+            totalCancelados: firebase.firestore.FieldValue.increment(1)
+          }, { merge: true });
+
+          // 3. Remove da nuvem para não ocupar fila nem espaço
+          await db.collection('andaimes_solicitacoes').doc(reqId).delete();
+        } catch (err) {
+          console.error('Erro ao cancelar:', err);
+        } finally {
+          setIsCancelling(false);
+          setCancelModalReq(null);
+          setCancelReason('');
+          alert(`Solicitação ${reqId} cancelada com sucesso.`);
+        }
+      };
+
+      // Salvar Visita Técnica
       const handleSaveVisit = async (e) => {
         e.preventDefault();
         const w = Number(visitDimensions.width) || 0;
@@ -545,7 +646,7 @@
         setVisitDimensions({ width: '', length: '', height: '' });
       };
 
-      // Abertura do modal de alteração de Data Limite pelo Gestor
+      // Alterar Data Limite
       const openEditDateModal = (req) => {
         setEditDateModalReq(req);
         setNewDueDate(req.dueDate || '');
@@ -553,102 +654,102 @@
         setAutoReorderOnDateChange(true);
       };
 
-      // Salvar nova Data Limite pelo Gestor no Firestore
       const handleSaveNewDueDate = async (e) => {
         e.preventDefault();
-        if (!editDateModalReq || !newDueDate) return;
+        if (!editDateModalReq) return;
 
+        const reqId = editDateModalReq.id;
         const oldDate = editDateModalReq.dueDate || 'Não definida';
         const reasonText = dateChangeReason.trim() ? ` Motivo: "${dateChangeReason.trim()}"` : '';
 
-        const newHistory = [
-          ...editDateModalReq.history,
-          {
-            date: new Date().toLocaleString('pt-BR'),
-            user: `${currentUser.name} (${currentUser.role})`,
-            action: `Data Limite alterada de ${oldDate} para ${newDueDate}.${reasonText}`
+        const newHistoryItem = {
+          date: new Date().toLocaleString('pt-BR'),
+          user: `${currentUser.name} (${currentUser.role})`,
+          action: `Data Limite alinhada: alterada de ${oldDate} para ${newDueDate}.${reasonText}`
+        };
+
+        let updatedList = requests.map(r => {
+          if (r.id === reqId) {
+            return {
+              ...r,
+              dueDate: newDueDate,
+              history: [...r.history, newHistoryItem]
+            };
           }
-        ];
+          return r;
+        });
+
+        if (autoReorderOnDateChange) {
+          updatedList = sortQueueByDueDate(updatedList);
+        }
+
+        setRequests(updatedList);
 
         try {
-          await db.collection('andaimes_solicitacoes').doc(editDateModalReq.id).update({
+          const targetUpdated = updatedList.find(r => r.id === reqId);
+          await db.collection('andaimes_solicitacoes').doc(reqId).update({
             dueDate: newDueDate,
-            history: newHistory
+            queueOrder: targetUpdated.queueOrder || null,
+            history: targetUpdated.history
           });
 
           if (autoReorderOnDateChange) {
-            const updated = requests.map(r => r.id === editDateModalReq.id ? { ...r, dueDate: newDueDate, history: newHistory } : r);
-            const sorted = sortQueueByDueDate(updated);
             const batch = db.batch();
-            sorted.forEach(r => {
+            updatedList.forEach(r => {
               if (r.queueOrder) {
-                batch.update(db.collection('andaimes_solicitacoes').doc(r.id), { queueOrder: r.queueOrder });
+                const ref = db.collection('andaimes_solicitacoes').doc(r.id);
+                batch.update(ref, { queueOrder: r.queueOrder });
               }
             });
             await batch.commit();
           }
         } catch (err) {
-          console.warn('Erro ao atualizar data no Firestore:', err);
+          console.error('Erro ao atualizar data limite:', err);
         }
 
         setEditDateModalReq(null);
-        setNewDueDate('');
-        setDateChangeReason('');
       };
 
-      // Reordenação Manual na Fila de Espera (Subir / Descer) no Firestore
+      // Mover Item na Fila
       const moveQueueItem = async (reqId, direction) => {
         const queueStatuses = ['Avaliação', 'Iniciado Montagem', 'Em Movimentação'];
         const inQueue = requests.filter(r => queueStatuses.includes(r.status));
-        const notInQueue = requests.filter(r => !queueStatuses.includes(r.status));
+        const idx = inQueue.findIndex(r => r.id === reqId);
+        if (idx === -1) return;
 
-        inQueue.sort((a, b) => (a.queueOrder || 0) - (b.queueOrder || 0));
+        if (direction === 'up' && idx > 0) {
+          const temp = inQueue[idx];
+          inQueue[idx] = inQueue[idx - 1];
+          inQueue[idx - 1] = temp;
+        } else if (direction === 'down' && idx < inQueue.length - 1) {
+          const temp = inQueue[idx];
+          inQueue[idx] = inQueue[idx + 1];
+          inQueue[idx + 1] = temp;
+        } else {
+          return;
+        }
 
-        const currentIndex = inQueue.findIndex(r => r.id === reqId);
-        if (currentIndex === -1) return;
-
-        const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
-        if (targetIndex < 0 || targetIndex >= inQueue.length) return;
-
-        const temp = inQueue[currentIndex];
-        inQueue[currentIndex] = inQueue[targetIndex];
-        inQueue[targetIndex] = temp;
-
-        inQueue.forEach((r, idx) => {
-          r.queueOrder = idx + 1;
+        inQueue.forEach((item, index) => {
+          item.queueOrder = index + 1;
         });
 
+        const notInQueue = requests.filter(r => !queueStatuses.includes(r.status));
+        const reordered = [...inQueue, ...notInQueue];
+        setRequests(reordered);
+
         try {
           const batch = db.batch();
-          inQueue.forEach(r => {
-            batch.update(db.collection('andaimes_solicitacoes').doc(r.id), { queueOrder: r.queueOrder });
+          inQueue.forEach(item => {
+            const ref = db.collection('andaimes_solicitacoes').doc(item.id);
+            batch.update(ref, { queueOrder: item.queueOrder });
           });
           await batch.commit();
         } catch (err) {
-          console.warn('Erro ao sincronizar fila no Firestore:', err);
+          console.warn('Erro ao persistir ordem da fila:', err);
         }
-
-        setRequests([...inQueue, ...notInQueue]);
       };
 
-      // Reordenar toda a fila pela Data Limite no Firestore
-      const handleReorderQueueByDate = async () => {
-        const sorted = sortQueueByDueDate(requests);
-        try {
-          const batch = db.batch();
-          sorted.forEach(r => {
-            if (r.queueOrder) {
-              batch.update(db.collection('andaimes_solicitacoes').doc(r.id), { queueOrder: r.queueOrder });
-            }
-          });
-          await batch.commit();
-        } catch (err) {
-          console.warn(err);
-        }
-        setRequests(sorted);
-      };
-
-      // Atualizar Capacidade Contratada no Firestore
+      // Capacidade contratada
       const handleUpdateCapacity = async (val) => {
         setTotalCapacityM3(val);
         try {
@@ -662,13 +763,13 @@
       if (!isAuthenticated) {
         return (
           <div className="min-h-screen flex items-center justify-center p-4 bg-slate-900">
-            <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full space-y-6">
+            <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 max-w-md w-full space-y-6">
               <div className="text-center">
                 <div className="inline-flex p-3 bg-blue-50 text-blue-600 rounded-xl mb-3">
                   <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
                 </div>
                 <h1 className="text-2xl font-black text-slate-800">Controle de Andaimes</h1>
-                <p className="text-sm text-slate-500 mt-1">Autenticação com Controle de Perfis</p>
+                <p className="text-xs text-slate-500 mt-1">Autenticação com Controle de Perfis</p>
                 <div className="mt-2 flex items-center justify-center gap-1.5 text-[11px] text-emerald-600 font-semibold">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                   Nuvem Firebase Conectada
@@ -767,14 +868,14 @@
                     <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">
                       {newUser.role === 'Solicitante (Área)' 
                         ? 'Criar Senha de Acesso' 
-                        : 'Senha de Acesso'}
+                        : 'Senha de Segurança do Perfil'}
                     </label>
                     <input 
                       type="password" 
                       placeholder={
                         newUser.role === 'Solicitante (Área)'
                           ? 'Crie uma senha de acesso'
-                          : 'Digite a senha de segurança do perfil'
+                          : 'Digite a senha do perfil autorizada'
                       } 
                       value={newUser.password} 
                       onChange={(e) => setNewUser({...newUser, password: e.target.value})} 
@@ -783,7 +884,7 @@
                     />
                     {newUser.role !== 'Solicitante (Área)' ? (
                       <p className="text-[11px] text-slate-500 mt-1.5">
-                        Perfil restrito. Informe a chave corporativa autorizada correspondente à função.
+                        Perfil restrito. Informe a senha de segurança corporativa correspondente.
                       </p>
                     ) : (
                       <p className="text-[11px] text-slate-500 mt-1.5">
@@ -801,7 +902,7 @@
         );
       }
 
-      // Renderização do Card de Solicitação
+      // Renderização do Card de Andaime
       const renderCard = (req) => {
         const isLate = req.status !== 'Desmontado' && req.dueDate && req.dueDate < todayStr;
         const hasReal = req.realVolumeM3 !== null && req.realVolumeM3 !== undefined;
@@ -809,14 +910,15 @@
 
         return (
           <div key={req.id} className={`bg-white rounded-xl p-4 shadow-sm border ${req.isUrgent ? 'border-red-300 bg-red-50/20' : 'border-slate-200'} space-y-3`}>
+            {/* Cabeçalho do Card */}
             <div className="flex justify-between items-start gap-2">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-bold text-sm text-slate-900">{req.id}</span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700 max-w-[130px] truncate" title={req.factory}>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700 max-w-[140px] truncate" title={req.factory}>
                   {req.factory}
                 </span>
                 
-                {/* Badge de Posição na Fila */}
+                {/* Posição na Fila */}
                 {isInQueue && req.queueOrder && (
                   <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-500 text-slate-950 shadow-sm flex items-center gap-1">
                     <span>#{req.queueOrder} na Fila</span>
@@ -831,19 +933,19 @@
                 )}
               </div>
 
-              {/* Botões de Subir e Descer na Fila (Gestor e Equipe) */}
+              {/* Botões de Subir e Descer na Fila */}
               {isInQueue && (isGestor || isEquipe) && (
                 <div className="flex items-center space-x-1 bg-slate-100 p-1 rounded-lg border border-slate-200">
                   <button 
                     onClick={() => moveQueueItem(req.id, 'up')}
-                    title="Subir na fila de prioridade"
+                    title="Subir prioridade na fila"
                     className="p-1 hover:bg-white rounded text-slate-600 hover:text-blue-600 transition"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 15l7-7 7 7"></path></svg>
                   </button>
                   <button 
                     onClick={() => moveQueueItem(req.id, 'down')}
-                    title="Descer na fila de prioridade"
+                    title="Descer prioridade na fila"
                     className="p-1 hover:bg-white rounded text-slate-600 hover:text-blue-600 transition"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7"></path></svg>
@@ -852,20 +954,37 @@
               )}
             </div>
 
+            {/* Informações da Atividade */}
+            <div className="bg-blue-50/60 p-2.5 rounded-lg border border-blue-100 space-y-1">
+              <p className="text-xs font-bold text-blue-900 flex items-center gap-1">
+                <span>🔧</span> Atividade: <span className="font-medium text-slate-800">{req.activityDescription || 'Não descrita'}</span>
+              </p>
+              
+              <div className="text-[11px] flex items-center gap-2 pt-0.5">
+                <span className="text-slate-500 font-semibold">Uso de PEMT:</span>
+                <span className={`px-2 py-0.2 rounded font-bold text-[10px] ${req.canUsePEMT === 'SIM' ? 'bg-amber-100 text-amber-800 border border-amber-300' : 'bg-slate-200 text-slate-700'}`}>
+                  {req.canUsePEMT === 'SIM' ? 'Possível PEMT' : 'PEMT Não Aplicável'}
+                </span>
+              </div>
+              {req.canUsePEMT === 'SIM' && req.pemtJustification && (
+                <p className="text-[11px] text-amber-900 italic bg-amber-50 p-1.5 rounded border border-amber-200/60">
+                  <span className="font-semibold not-italic">Justificativa Andaime:</span> {req.pemtJustification}
+                </p>
+              )}
+            </div>
+
+            {/* Dados do Local e Responsável */}
             <div className="text-xs text-slate-600 space-y-1">
               <p><span className="font-semibold text-slate-700">Área:</span> {req.area}</p>
               <p><span className="font-semibold text-slate-700">Ponto de Ref:</span> {req.reference}</p>
-              <p><span className="font-semibold text-slate-700">Resp. da Atividade:</span> {req.responsible} {req.phone ? `(${req.phone})` : ''}</p>
+              <p><span className="font-semibold text-slate-700">Resp. Atividade:</span> {req.responsible} {req.phone ? `(${req.phone})` : ''}</p>
               <p><span className="font-semibold text-slate-700">E-mail:</span> {req.email || 'Não informado'}</p>
-              {req.requesterName && req.requesterName !== req.responsible && (
-                <p className="text-[11px] text-slate-500 italic"><span className="font-semibold">Solicitante:</span> {req.requesterName}</p>
-              )}
               
               <div className="flex items-center justify-between pt-1">
                 <p className={isLate ? 'text-red-600 font-bold' : ''}>
                   <span className="font-semibold text-slate-700">Data Limite:</span> {req.dueDate || 'Não definida'}
                 </p>
-                {/* Botão de Alinhamento / Ajuste de Data Limite pelo Gestor */}
+                {/* Gestor Alinhar Data */}
                 {isGestor && (
                   <button 
                     onClick={() => openEditDateModal(req)}
@@ -878,14 +997,14 @@
               </div>
             </div>
 
-            {/* Volume e Dimensões */}
+            {/* Medições Estimadas e Reais */}
             <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100 flex justify-between items-center text-xs">
               <div>
-                <span className="text-[10px] text-slate-500 block uppercase">Estimado (Área)</span>
-                <span className="font-semibold">{req.width}x{req.length}x{req.height}m ({req.volumeM3}m³)</span>
+                <span className="text-[10px] text-slate-500 block uppercase font-medium">Estimado</span>
+                <span className="font-semibold text-slate-800">{req.width}x{req.length}x{req.height}m ({req.volumeM3}m³)</span>
               </div>
               <div className="text-right">
-                <span className="text-[10px] text-slate-500 block uppercase">Real (Visita)</span>
+                <span className="text-[10px] text-slate-500 block uppercase font-medium">Real (Visita)</span>
                 {hasReal ? (
                   <span className="font-bold text-blue-600">{req.realWidth}x{req.realLength}x{req.realHeight}m ({req.realVolumeM3}m³)</span>
                 ) : (
@@ -894,7 +1013,7 @@
               </div>
             </div>
 
-            {/* Foto registrada (se houver) */}
+            {/* Foto registrada */}
             {req.photoUrl && (
               <div className="relative group rounded-lg overflow-hidden border border-slate-200">
                 <img src={req.photoUrl} alt="Foto Andaime" className="w-full h-32 object-cover" />
@@ -912,9 +1031,9 @@
               </div>
             )}
 
-            {/* Status Atual */}
-            <div className="flex items-center justify-between pt-1">
-              <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${
+            {/* Status e Ações */}
+            <div className="flex items-center justify-between pt-2 border-t border-slate-100 flex-wrap gap-2">
+              <span className={`text-xs px-2.5 py-1 rounded-full font-bold ${
                 req.status === 'Avaliação' ? 'bg-amber-100 text-amber-800' :
                 req.status === 'Iniciado Montagem' ? 'bg-blue-100 text-blue-800' :
                 req.status === 'Em Movimentação' ? 'bg-indigo-100 text-indigo-800' :
@@ -925,9 +1044,9 @@
                 {req.status}
               </span>
 
-              {/* Ações permitidas conforme Perfil */}
-              <div className="flex space-x-1.5">
-                {/* Avaliação -> Visita Técnica / Iniciar */}
+              {/* Botões de Ação */}
+              <div className="flex space-x-1.5 flex-wrap gap-1">
+                {/* Visita Técnica */}
                 {req.status === 'Avaliação' && (isEquipe || isGestor) && (
                   <button 
                     onClick={() => {
@@ -940,7 +1059,7 @@
                   </button>
                 )}
 
-                {/* Iniciado Montagem -> Movimentação */}
+                {/* Movimentar */}
                 {req.status === 'Iniciado Montagem' && (isEquipe || isGestor) && (
                   <button 
                     onClick={() => updateStatus(req.id, 'Em Movimentação', 'Movimentação dos materiais iniciada')}
@@ -950,20 +1069,20 @@
                   </button>
                 )}
 
-                {/* Em Movimentação -> Abre Modal com Câmera e Otimização para Concluir Montagem */}
+                {/* Montado (Foto) */}
                 {req.status === 'Em Movimentação' && (isEquipe || isGestor) && (
                   <button 
                     onClick={() => {
                       setPhotoModalReq(req);
                       setTempPhotoUrl(req.photoUrl || null);
                     }}
-                    className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow transition flex items-center gap-1 animate-pulse"
+                    className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow transition flex items-center gap-1"
                   >
                     <span>📸</span> Montado (Foto)
                   </button>
                 )}
 
-                {/* Solicitante: Liberar para desmontagem */}
+                {/* Liberar Desmontagem */}
                 {req.status === 'Montado' && (isSolicitante || isGestor) && (
                   <button 
                     onClick={() => updateStatus(req.id, 'Liberado para Desmontagem', 'Solicitada a desmontagem pela área')}
@@ -973,13 +1092,25 @@
                   </button>
                 )}
 
-                {/* Equipe / Gestor: Finalizar desmontagem */}
+                {/* Concluir Desmontagem -> Libera espaço na nuvem e soma no indicador */}
                 {req.status === 'Liberado para Desmontagem' && (isEquipe || isGestor) && (
                   <button 
-                    onClick={() => updateStatus(req.id, 'Desmontado', 'Andaime desmontado e recolhido')}
-                    className="px-2.5 py-1 bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold rounded-lg shadow transition"
+                    onClick={() => handleCompleteDismantle(req.id)}
+                    className="px-2.5 py-1 bg-slate-800 hover:bg-black text-white text-xs font-bold rounded-lg shadow transition flex items-center gap-1"
+                    title="Conclui o andaime, libera espaço na nuvem e soma ao total de Desmontados Concluídos"
                   >
-                    Desmontado
+                    <span>✓</span> Desmontar (Concluir)
+                  </button>
+                )}
+
+                {/* BOTÃO DO GESTOR: CANCELAR SOLICITAÇÃO */}
+                {isGestor && req.status !== 'Desmontado' && (
+                  <button 
+                    onClick={() => setCancelModalReq(req)}
+                    className="px-2 py-1 bg-red-100 hover:bg-red-200 text-red-700 hover:text-red-900 text-xs font-bold rounded-lg border border-red-300 transition"
+                    title="Cancelar esta solicitação"
+                  >
+                    ✕ Cancelar
                   </button>
                 )}
               </div>
@@ -1005,106 +1136,251 @@
         <div className="min-h-screen flex flex-col">
           {/* Top Bar Corporativa */}
           <header className="bg-slate-900 text-white shadow-lg sticky top-0 z-40">
-            <div className="max-w-7xl mx-auto px-4 py-3 flex flex-col md:flex-row justify-between items-center gap-3">
-              <div className="flex items-center space-x-3">
-                <a href="/" className="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-2.5 py-1.5 rounded-lg border border-slate-700 transition" title="Ir para InspectCBM SCADA">
+            <div className="max-w-7xl mx-auto px-4 py-3 flex flex-col sm:flex-row justify-between items-center gap-2">
+              <div className="flex items-center space-x-3 w-full sm:w-auto">
+                <a href="/" className="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-2.5 py-1.5 rounded-lg border border-slate-700 transition" title="Ir para InspectCBM">
                   ← InspectCBM
                 </a>
                 <div className="p-2 bg-blue-600 rounded-lg">
                   <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
                 </div>
                 <div>
-                  <h1 className="font-bold text-base tracking-wide flex items-center gap-2">
+                  <h1 className="font-bold text-sm sm:text-base tracking-wide flex items-center gap-1.5 flex-wrap">
                     Gestão de Andaimes
-                    <span className="text-[10px] bg-blue-500/20 text-blue-300 border border-blue-400/30 px-2 py-0.5 rounded-full font-normal">Fila por Data Limite</span>
                     <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 px-2 py-0.5 rounded-full font-mono flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Firebase Nuvem
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Firebase Conectado
                     </span>
                   </h1>
-                  <p className="text-xs text-slate-400">Controle de Capacidade, Fila de Espera e Montagens Sincronizadas</p>
+                  <p className="text-[11px] text-slate-400">Controle de Fila, Montagens e Liberação de Nuvem</p>
                 </div>
               </div>
 
-              {/* Informações do Usuário Conectado */}
-              <div className="flex items-center space-x-3 text-xs">
-                <div className="text-right">
+              {/* Informações do Usuário */}
+              <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto space-x-3 text-xs pt-1 sm:pt-0 border-t sm:border-0 border-slate-800">
+                <div className="text-left sm:text-right">
                   <p className="font-bold text-slate-200">{currentUser.name}</p>
-                  <p className="text-blue-400 font-semibold">{currentUser.role}</p>
+                  <p className="text-blue-400 font-semibold text-[11px]">{currentUser.role}</p>
                 </div>
                 <button 
                   onClick={handleLogout}
-                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 transition"
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 transition text-xs"
                 >
                   Sair
                 </button>
               </div>
             </div>
 
-            {/* Menu de Abas */}
-            <div className="max-w-7xl mx-auto px-4 border-t border-slate-800 flex space-x-1 overflow-x-auto text-xs">
+            {/* NAVEGAÇÃO POR ABAS SEPARADAS (PERFEITAS PARA O CELULAR) */}
+            <div className="max-w-7xl mx-auto px-2 sm:px-4 border-t border-slate-800 flex space-x-1 overflow-x-auto text-xs py-1 scrollbar-thin">
               <button 
-                onClick={() => setActiveTab('dashboard')} 
-                className={`py-3 px-4 font-semibold border-b-2 flex items-center gap-1.5 transition whitespace-nowrap ${activeTab === 'dashboard' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'}`}
+                onClick={() => setActiveTab('solicitacoes')} 
+                className={`py-2 px-3 font-bold rounded-lg flex items-center gap-1.5 transition whitespace-nowrap ${activeTab === 'solicitacoes' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-300 hover:bg-slate-800'}`}
               >
-                Visão Geral
-              </button>
-              <button 
-                onClick={() => setActiveTab('fila')} 
-                className={`py-3 px-4 font-semibold border-b-2 flex items-center gap-1.5 transition whitespace-nowrap ${activeTab === 'fila' ? 'border-amber-500 text-amber-400' : 'border-transparent text-slate-400 hover:text-slate-200'}`}
-              >
-                Fila de Espera (Prioridade)
-                <span className="ml-1 px-1.5 py-0.2 bg-amber-500/20 text-amber-300 rounded-full text-[10px]">
+                <span>📋</span> Solicitações (Fila)
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${activeTab === 'solicitacoes' ? 'bg-slate-950 text-white' : 'bg-amber-500/30 text-amber-300'}`}>
                   {queueRequests.length}
                 </span>
               </button>
+
               <button 
                 onClick={() => setActiveTab('montados')} 
-                className={`py-3 px-4 font-semibold border-b-2 flex items-center gap-1.5 transition whitespace-nowrap ${activeTab === 'montados' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-slate-400 hover:text-slate-200'}`}
+                className={`py-2 px-3 font-bold rounded-lg flex items-center gap-1.5 transition whitespace-nowrap ${activeTab === 'montados' ? 'bg-emerald-600 text-white shadow' : 'text-slate-300 hover:bg-slate-800'}`}
               >
-                Montados em Campo
-                <span className="ml-1 px-1.5 py-0.2 bg-emerald-500/20 text-emerald-300 rounded-full text-[10px]">
+                <span>🏗️</span> Montados
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${activeTab === 'montados' ? 'bg-white text-emerald-800' : 'bg-emerald-500/30 text-emerald-300'}`}>
                   {mountedRequests.length}
                 </span>
               </button>
+
+              <button 
+                onClick={() => setActiveTab('desmontados')} 
+                className={`py-2 px-3 font-bold rounded-lg flex items-center gap-1.5 transition whitespace-nowrap ${activeTab === 'desmontados' ? 'bg-slate-200 text-slate-900 shadow' : 'text-slate-300 hover:bg-slate-800'}`}
+              >
+                <span>✅</span> Desmontados Concluídos
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${activeTab === 'desmontados' ? 'bg-slate-900 text-white' : 'bg-slate-700 text-slate-300'}`}>
+                  {stats.totalDesmontados}
+                </span>
+              </button>
+
+              <button 
+                onClick={() => setActiveTab('dashboard')} 
+                className={`py-2 px-3 font-semibold rounded-lg flex items-center gap-1.5 transition whitespace-nowrap ${activeTab === 'dashboard' ? 'bg-blue-600 text-white shadow' : 'text-slate-300 hover:bg-slate-800'}`}
+              >
+                <span>📊</span> Indicadores & Estoque
+              </button>
+
               <button 
                 onClick={() => setActiveTab('nova')} 
-                className={`py-3 px-4 font-semibold border-b-2 flex items-center gap-1.5 transition whitespace-nowrap ${activeTab === 'nova' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'}`}
+                className={`py-2 px-3 font-bold rounded-lg flex items-center gap-1.5 transition whitespace-nowrap ${activeTab === 'nova' ? 'bg-blue-500 text-white shadow' : 'text-slate-300 hover:bg-slate-800'}`}
               >
-                + Nova Solicitação
+                <span>➕</span> Nova Solicitação
               </button>
+
               {isGestor && (
                 <button 
                   onClick={() => setActiveTab('gestao')} 
-                  className={`py-3 px-4 font-semibold border-b-2 flex items-center gap-1.5 transition whitespace-nowrap ${activeTab === 'gestao' ? 'border-purple-500 text-purple-400' : 'border-transparent text-slate-400 hover:text-slate-200'}`}
+                  className={`py-2 px-3 font-bold rounded-lg flex items-center gap-1.5 transition whitespace-nowrap ${activeTab === 'gestao' ? 'bg-purple-600 text-white shadow' : 'text-purple-300 hover:bg-slate-800'}`}
                 >
-                  Gestão & Estoque M³
+                  <span>⚙️</span> Gestão & Logins
                 </button>
               )}
             </div>
           </header>
 
-          {/* Banner de Andaimes Atrasados (se houver) */}
+          {/* Banner de Andaimes Atrasados */}
           {delayedRequests.length > 0 && (
-            <div className="bg-red-500 text-white px-4 py-2 text-xs font-semibold flex items-center justify-between shadow">
+            <div className="bg-red-600 text-white px-4 py-2 text-xs font-semibold flex items-center justify-between shadow">
               <div className="max-w-7xl mx-auto w-full flex items-center justify-between">
-                <span>⚠️ Atenção: Existem {delayedRequests.length} andaime(s) com Data Limite Ultrapassada precisando de alinhamento com as áreas!</span>
-                <button onClick={() => setActiveTab('fila')} className="underline hover:text-red-100">Ver Fila</button>
+                <span>⚠️ Atenção: Existem {delayedRequests.length} andaime(s) com Data Limite Ultrapassada precisando de alinhamento!</span>
+                <button onClick={() => setActiveTab('solicitacoes')} className="underline hover:text-red-100 font-bold">Ver Fila</button>
               </div>
             </div>
           )}
 
           {/* Conteúdo Principal */}
-          <main className="max-w-7xl mx-auto px-4 py-6 flex-1 w-full space-y-6">
+          <main className="max-w-7xl mx-auto px-4 py-5 flex-1 w-full space-y-5">
 
-            {/* ABA: VISÃO GERAL (INCLUI MÉTRICAS E O PANORAMA GERAL EM 3 COLUNAS) */}
+            {/* BARRA DE INDICADORES GERAIS ACUMULADOS (SALVOS NA NUVEM) */}
+            <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1 border-b border-slate-100 pb-2 mb-3">
+                <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5 uppercase tracking-wide">
+                  <span>📈</span> Indicadores Gerais Acumulados
+                </span>
+                <span className="text-[10px] text-slate-400 font-medium">
+                  Preservados no Firebase mesmo com liberação de espaço de desmontados
+                </span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="p-3 bg-amber-50 rounded-xl border border-amber-200">
+                  <p className="text-[10px] font-bold text-amber-800 uppercase">Total Solicitados</p>
+                  <p className="text-2xl font-black text-amber-900 mt-0.5">{stats.totalSolicitados}</p>
+                </div>
+                <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200">
+                  <p className="text-[10px] font-bold text-emerald-800 uppercase">Total Montados</p>
+                  <p className="text-2xl font-black text-emerald-900 mt-0.5">{stats.totalMontados}</p>
+                </div>
+                <div className="p-3 bg-slate-100 rounded-xl border border-slate-300">
+                  <p className="text-[10px] font-bold text-slate-700 uppercase">Desmontados Concluídos</p>
+                  <p className="text-2xl font-black text-slate-900 mt-0.5">{stats.totalDesmontados}</p>
+                </div>
+                <div className="p-3 bg-red-50 rounded-xl border border-red-200">
+                  <p className="text-[10px] font-bold text-red-800 uppercase">Total Cancelados</p>
+                  <p className="text-2xl font-black text-red-900 mt-0.5">{stats.totalCancelados}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* ABA 1: SOLICITAÇÕES (FILA DE ESPERA POR DATA LIMITE) */}
+            {activeTab === 'solicitacoes' && (
+              <div className="space-y-4">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-amber-50 p-4 rounded-xl border border-amber-200">
+                  <div>
+                    <h2 className="font-bold text-amber-900 text-sm flex items-center gap-2">
+                      <span>📋</span> Solicitações & Fila de Espera ({queueRequests.length})
+                    </h2>
+                    <p className="text-xs text-amber-700 mt-0.5">
+                      Fila organizada automaticamente com base na <strong>Data Limite de Finalização</strong> (a mais urgente primeiro).
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => setActiveTab('nova')}
+                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg shadow transition"
+                    >
+                      + Nova Solicitação
+                    </button>
+                    {isGestor && (
+                      <button 
+                        onClick={() => setRequests(sortQueueByDueDate([...requests]))}
+                        className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-lg shadow transition"
+                        title="Reordenar com base na data limite"
+                      >
+                        ⚡ Reordenar por Prazo
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {queueRequests.map(renderCard)}
+                </div>
+
+                {queueRequests.length === 0 && (
+                  <div className="text-center py-12 bg-white rounded-xl border border-dashed border-slate-300">
+                    <p className="text-sm font-semibold text-slate-600">Nenhuma solicitação na fila de espera no momento.</p>
+                    <p className="text-xs text-slate-400 mt-1">Todas as montagens pendentes foram atendidas.</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ABA 2: MONTADOS EM CAMPO */}
+            {activeTab === 'montados' && (
+              <div className="space-y-4">
+                <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                  <div>
+                    <h2 className="font-bold text-emerald-900 text-sm flex items-center gap-2">
+                      <span>🏗️</span> Andaimes Montados em Campo ({mountedRequests.length})
+                    </h2>
+                    <p className="text-xs text-emerald-700 mt-0.5">
+                      Consumindo atualmente <strong>{allocatedM3} m³</strong> de {totalCapacityM3} m³ contratados.
+                    </p>
+                  </div>
+                  <span className="text-xs font-extrabold px-3 py-1 bg-emerald-200 text-emerald-900 rounded-full border border-emerald-300">
+                    Ocupação: {((allocatedM3 / totalCapacityM3) * 100).toFixed(1)}%
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {mountedRequests.map(renderCard)}
+                </div>
+
+                {mountedRequests.length === 0 && (
+                  <div className="text-center py-12 bg-white rounded-xl border border-dashed border-slate-300">
+                    <p className="text-sm font-semibold text-slate-600">Não há andaimes montados em campo no momento.</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ABA 3: DESMONTADOS CONCLUÍDOS */}
+            {activeTab === 'desmontados' && (
+              <div className="space-y-4">
+                <div className="bg-slate-200/70 p-4 rounded-xl border border-slate-300 space-y-1">
+                  <h2 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                    <span>✅</span> Histórico de Andaimes Desmontados Concluídos ({stats.totalDesmontados})
+                  </h2>
+                  <p className="text-xs text-slate-600">
+                    Quando o andaime é finalizado e recolhido, as informações ativas são limpas da nuvem para economizar espaço e custos de banco, mantendo o total acumulado seguro no indicador histórico.
+                  </p>
+                </div>
+
+                {dismantledRequests.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {dismantledRequests.map(renderCard)}
+                  </div>
+                ) : (
+                  <div className="bg-white p-8 rounded-xl border border-slate-200 text-center space-y-2">
+                    <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto text-xl">
+                      ✓
+                    </div>
+                    <h3 className="font-bold text-slate-800 text-sm">Nuvem Otimizada e 100% Livre</h3>
+                    <p className="text-xs text-slate-500 max-w-md mx-auto">
+                      Todos os andaimes já desmontados tiveram seus documentos liberados do banco de dados na nuvem para manter a operação ágil e limpa. O total de <strong>{stats.totalDesmontados} andaimes finalizados</strong> está registrado nos indicadores históricos.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ABA 4: INDICADORES, CAPACIDADE E ESTOQUE M3 */}
             {activeTab === 'dashboard' && (
               <div className="space-y-6">
-                {/* Cartões de Capacidade e Estoque M3 */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
                     <p className="text-xs font-semibold text-slate-500 uppercase">Capacidade Contratada</p>
                     <p className="text-2xl font-black text-slate-800 mt-1">{totalCapacityM3} <span className="text-sm font-normal text-slate-500">m³</span></p>
-                    <p className="text-[11px] text-slate-400 mt-1">Sincronizado na Nuvem</p>
+                    <p className="text-[11px] text-slate-400 mt-1">Limite mensal contratado</p>
                   </div>
                   <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
                     <p className="text-xs font-semibold text-slate-500 uppercase">Em Uso Efetivo (Montado)</p>
@@ -1118,16 +1394,9 @@
                     </p>
                     <p className="text-[11px] text-slate-400 mt-1">{((availableM3 / totalCapacityM3) * 100).toFixed(1)}% livre</p>
                   </div>
-                  <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-                    <p className="text-xs font-semibold text-slate-500 uppercase">Aguardando na Fila</p>
-                    <p className="text-2xl font-black text-amber-600 mt-1">
-                      {queueRequests.length}
-                    </p>
-                    <p className="text-[11px] text-slate-400 mt-1">Ordenados por Data Limite</p>
-                  </div>
                 </div>
 
-                {/* Barra de Progresso Visual de Uso de M3 */}
+                {/* Barra de Progresso de Ocupação */}
                 <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 space-y-2">
                   <div className="flex justify-between items-center text-xs">
                     <span className="font-bold text-slate-700">Taxa de Ocupação de Andaimes da Planta</span>
@@ -1143,178 +1412,25 @@
                     ></div>
                   </div>
                 </div>
-
-                {/* PANORAMA GERAL DA GESTÃO DOS ANDAIMES (3 COLUNAS) */}
-                <div className="space-y-4 pt-4 border-t border-slate-200">
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                    <div>
-                      <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                        <span>📌</span> Panorama Geral da Gestão de Andaimes
-                      </h2>
-                      <p className="text-xs text-slate-500">
-                        Visão panorâmica em 3 colunas em tempo real: Fila de Espera por Prazo, Andaimes Montados em Campo e Andaimes Desmontados.
-                      </p>
-                    </div>
-                    {isGestor && (
-                      <button 
-                        onClick={handleReorderQueueByDate}
-                        className="bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-bold px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 shadow-sm"
-                        title="Reordenar todas as solicitações em aberto pela Data Limite"
-                      >
-                        <span>⚡</span> Reordenar Fila por Prazo
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-                    
-                    {/* COLUNA 1: SOLICITAÇÕES NA FILA DE ESPERA */}
-                    <div className="bg-slate-200/60 p-4 rounded-xl space-y-4 border border-slate-300/70 min-h-[500px]">
-                      <div className="flex justify-between items-center border-b border-slate-300 pb-2">
-                        <div>
-                          <h3 className="font-bold text-slate-800 text-sm flex items-center gap-1.5">
-                            <span>📋</span> 1. Fila de Espera & Solicitações
-                          </h3>
-                          <span className="text-[10px] text-slate-500 font-medium">Prioridade por Data Limite</span>
-                        </div>
-                        <span className="bg-amber-100 text-amber-800 border border-amber-300 font-extrabold text-xs px-2.5 py-0.5 rounded-full">
-                          {queueRequests.length}
-                        </span>
-                      </div>
-
-                      <div className="space-y-3">
-                        {queueRequests.length > 0 ? (
-                          queueRequests.map(renderCard)
-                        ) : (
-                          <div className="text-center py-12 bg-white/60 rounded-xl border border-dashed border-slate-300 text-xs text-slate-400">
-                            Nenhuma solicitação aguardando na fila.
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* COLUNA 2: ANDAIMES MONTADOS */}
-                    <div className="bg-emerald-50/70 p-4 rounded-xl space-y-4 border border-emerald-200 min-h-[500px]">
-                      <div className="flex justify-between items-center border-b border-emerald-200 pb-2">
-                        <div>
-                          <h3 className="font-bold text-emerald-900 text-sm flex items-center gap-1.5">
-                            <span>🏗️</span> 2. Andaimes Montados
-                          </h3>
-                          <span className="text-[10px] text-emerald-700 font-medium">Consumindo estoque ({allocatedM3} m³)</span>
-                        </div>
-                        <span className="bg-emerald-200 text-emerald-900 border border-emerald-300 font-extrabold text-xs px-2.5 py-0.5 rounded-full">
-                          {mountedRequests.length}
-                        </span>
-                      </div>
-
-                      <div className="space-y-3">
-                        {mountedRequests.length > 0 ? (
-                          mountedRequests.map(renderCard)
-                        ) : (
-                          <div className="text-center py-12 bg-white/60 rounded-xl border border-dashed border-emerald-200 text-xs text-emerald-600/70">
-                            Nenhum andaime montado em campo no momento.
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* COLUNA 3: ANDAIMES DESMONTADOS */}
-                    <div className="bg-slate-100/70 p-4 rounded-xl space-y-4 border border-slate-200 min-h-[500px]">
-                      <div className="flex justify-between items-center border-b border-slate-200 pb-2">
-                        <div>
-                          <h3 className="font-bold text-slate-700 text-sm flex items-center gap-1.5">
-                            <span>✓</span> 3. Andaimes Desmontados
-                          </h3>
-                          <span className="text-[10px] text-slate-500 font-medium">Histórico finalizado</span>
-                        </div>
-                        <span className="bg-slate-200 text-slate-700 border border-slate-300 font-extrabold text-xs px-2.5 py-0.5 rounded-full">
-                          {dismantledRequests.length}
-                        </span>
-                      </div>
-
-                      <div className="space-y-3">
-                        {dismantledRequests.length > 0 ? (
-                          dismantledRequests.map(renderCard)
-                        ) : (
-                          <div className="text-center py-12 bg-white/60 rounded-xl border border-dashed border-slate-200 text-xs text-slate-400">
-                            Nenhum andaime desmontado registrado ainda.
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                  </div>
-                </div>
               </div>
             )}
 
-            {/* ABA: FILA DE ESPERA (PRIORIDADE) */}
-            {activeTab === 'fila' && (
-              <div className="space-y-4">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-amber-50 p-4 rounded-xl border border-amber-200">
-                  <div>
-                    <h2 className="font-bold text-amber-900 text-sm">Fila de Prioridade dos Andaimes</h2>
-                    <p className="text-xs text-amber-700 mt-0.5">
-                      Fila organizada automaticamente com base na <strong>Data Limite de Finalização</strong> (a data mais urgente/próxima é atendida primeiro).
-                    </p>
-                  </div>
-                  {isGestor && (
-                    <button 
-                      onClick={handleReorderQueueByDate}
-                      className="px-3 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-lg shadow transition flex items-center gap-1.5"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                      Reorganizar Automaticamente por Data Limite
-                    </button>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {queueRequests.map(renderCard)}
-                </div>
-
-                {queueRequests.length === 0 && (
-                  <div className="text-center py-12 bg-white rounded-xl border border-slate-200">
-                    <p className="text-sm text-slate-500">Nenhum andaime aguardando na fila de montagem no momento.</p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* ABA: MONTADOS EM CAMPO */}
-            {activeTab === 'montados' && (
-              <div className="space-y-4">
-                <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-200">
-                  <h2 className="font-bold text-emerald-900 text-sm">Andaimes Montados em Campo</h2>
-                  <p className="text-xs text-emerald-700 mt-0.5">Estes andaimes estão consumindo a cota contratada ({allocatedM3} m³ de {totalCapacityM3} m³).</p>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {mountedRequests.map(renderCard)}
-                </div>
-
-                {mountedRequests.length === 0 && (
-                  <div className="text-center py-12 bg-white rounded-xl border border-slate-200">
-                    <p className="text-sm text-slate-500">Não há andaimes montados em campo no momento.</p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* ABA: NOVA SOLICITAÇÃO (CAMPO FÁBRICA PREENCHIDO PELO SOLICITANTE) */}
+            {/* ABA 5: NOVA SOLICITAÇÃO */}
             {activeTab === 'nova' && (
-              <div className="max-w-2xl mx-auto bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+              <div className="max-w-2xl mx-auto bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200">
                 <h2 className="text-base font-bold text-slate-800 mb-1">Nova Solicitação de Andaime</h2>
-                <p className="text-xs text-slate-500 mb-6">Preencha os dados da atividade. A solicitação é salva automaticamente no Firebase e atualizada para todos.</p>
+                <p className="text-xs text-slate-500 mb-5">Preencha os dados da atividade. A solicitação é salva automaticamente no Firebase e atualizada para todos.</p>
 
                 <form onSubmit={handleCreateRequest} className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  
+                  {/* FÁBRICA E ÁREA */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Planta / Fábrica *</label>
                       <input 
                         type="text" 
                         name="factory" 
-                        placeholder="Digite o nome da fábrica (Ex: Fábrica 01, Fábrica de Motores...)" 
+                        placeholder="Ex: Fábrica 01, Fábrica de Motores" 
                         value={formData.factory} 
                         onChange={handleInputChange} 
                         required 
@@ -1335,6 +1451,7 @@
                     </div>
                   </div>
 
+                  {/* PONTO DE REFERÊNCIA */}
                   <div>
                     <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Ponto de Referência / Local Exato *</label>
                     <input 
@@ -1348,7 +1465,74 @@
                     />
                   </div>
 
-                  {/* RESPONSÁVEL PELA ATIVIDADE (DONO DA ATIVIDADE), E-MAIL E TELEFONE */}
+                  {/* QUAL ATIVIDADE SERÁ REALIZADA */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1 flex items-center gap-1.5">
+                      <span>🔧</span> Qual atividade será realizada? *
+                    </label>
+                    <textarea 
+                      name="activityDescription" 
+                      rows="2"
+                      placeholder="Descreva detalhadamente o serviço a ser feito no local..." 
+                      value={formData.activityDescription} 
+                      onChange={handleInputChange} 
+                      required 
+                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-blue-500"
+                    ></textarea>
+                  </div>
+
+                  {/* É POSSÍVEL REALIZAR COM PEMT? SIM / NÃO */}
+                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+                    <label className="block text-xs font-bold text-slate-800 uppercase tracking-wide">
+                      É possível realizar a atividade com PEMT (Plataforma Elevatória Móvel de Trabalho)? *
+                    </label>
+                    
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, canUsePEMT: 'NÃO', pemtJustification: '' })}
+                        className={`py-2.5 px-4 rounded-xl text-xs font-bold border transition flex items-center justify-center gap-2 ${
+                          formData.canUsePEMT === 'NÃO'
+                            ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                            : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                        }`}
+                      >
+                        <span>✕</span> NÃO
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, canUsePEMT: 'SIM' })}
+                        className={`py-2.5 px-4 rounded-xl text-xs font-bold border transition flex items-center justify-center gap-2 ${
+                          formData.canUsePEMT === 'SIM'
+                            ? 'bg-amber-600 text-white border-amber-600 shadow-sm'
+                            : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                        }`}
+                      >
+                        <span>✓</span> SIM
+                      </button>
+                    </div>
+
+                    {/* SE SIM -> JUSTIFICATIVA OBRIGATÓRIA */}
+                    {formData.canUsePEMT === 'SIM' && (
+                      <div className="pt-2 animate-in fade-in">
+                        <label className="block text-xs font-bold text-amber-900 uppercase mb-1">
+                          Justificativa para montagem de andaime *
+                        </label>
+                        <textarea 
+                          name="pemtJustification" 
+                          rows="2"
+                          placeholder="Informe a justificativa técnica para optar pelo andaime..." 
+                          value={formData.pemtJustification} 
+                          onChange={handleInputChange} 
+                          required 
+                          className="w-full p-2.5 bg-white border border-amber-300 rounded-lg text-sm text-slate-800 focus:outline-none focus:border-amber-500"
+                        ></textarea>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* RESPONSÁVEL PELA ATIVIDADE, EMAIL E TELEFONE */}
                   <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
                     <div className="flex items-center justify-between">
                       <label className="text-xs font-bold text-slate-700 uppercase tracking-wide flex items-center gap-1.5">
@@ -1357,13 +1541,13 @@
                       <span className="text-[10px] text-slate-500 font-medium">Pode ser diferente do solicitante logado</span>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <div>
                         <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Nome do Responsável *</label>
                         <input 
                           type="text" 
                           name="activityResponsible" 
-                          placeholder="Nome do dono da atividade" 
+                          placeholder="Nome do responsável" 
                           value={formData.activityResponsible} 
                           onChange={handleInputChange} 
                           required 
@@ -1397,7 +1581,8 @@
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* DATA LIMITE E URGÊNCIA */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Data Limite de Finalização *</label>
                       <input 
@@ -1410,7 +1595,7 @@
                       />
                       <p className="text-[10px] text-slate-400 mt-1">Define automaticamente a posição na fila de prioridade.</p>
                     </div>
-                    <div className="flex items-center pt-6">
+                    <div className="flex items-center pt-2 sm:pt-6">
                       <label className="flex items-center space-x-2 cursor-pointer">
                         <input 
                           type="checkbox" 
@@ -1424,7 +1609,7 @@
                     </div>
                   </div>
 
-                  {/* Dimensões Estimadas */}
+                  {/* DIMENSÕES ESTIMADAS */}
                   <div className="border-t border-slate-200 pt-4">
                     <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Dimensões Estimadas (Metros)</label>
                     <div className="grid grid-cols-3 gap-3">
@@ -1448,21 +1633,82 @@
                     </div>
                   </div>
 
-                  <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg shadow-md transition text-sm">
+                  <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl shadow-md transition text-sm">
                     Enviar Solicitação para a Fila (Salvar na Nuvem)
                   </button>
                 </form>
               </div>
             )}
 
-            {/* ABA: GESTÃO & ESTOQUE M3 (EXCLUSIVO GESTOR) */}
+            {/* ABA 6: GESTÃO & LOGINS (EXCLUSIVO GESTOR) */}
             {activeTab === 'gestao' && isGestor && (
-              <div className="space-y-6">
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 max-w-xl">
-                  <h3 className="font-bold text-sm text-slate-800 mb-2">Ajuste de Capacidade Máxima Contratada</h3>
-                  <p className="text-xs text-slate-500 mb-4">Ajuste o volume total em m³ contratado junto à montadora. Salvo no Firebase para todos.</p>
+              <div className="space-y-6 max-w-4xl mx-auto">
+                {/* 1. GERENCIAMENTO DE LOGINS E ACESSOS */}
+                <div className="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+                  <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                    <div>
+                      <h3 className="font-bold text-base text-slate-800 flex items-center gap-2">
+                        <span>👥</span> Controle e Exclusão de Logins Cadastrados
+                      </h3>
+                      <p className="text-xs text-slate-500">
+                        O Gestor pode excluir acessos não mais autorizados ou cadastrados incorretamente.
+                      </p>
+                    </div>
+                    <span className="px-2.5 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-bold">
+                      {users.length} usuários
+                    </span>
+                  </div>
+
+                  <div className="divide-y divide-slate-100">
+                    {users.map((u) => {
+                      const isMe = u.email.toLowerCase() === currentUser.email.toLowerCase();
+                      return (
+                        <div key={u.id || u.email} className="py-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-sm text-slate-800">{u.name}</span>
+                              {isMe && (
+                                <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.2 rounded-full">
+                                  Você
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-slate-500">{u.email}</p>
+                            <span className={`inline-block mt-1 text-[11px] font-semibold px-2 py-0.5 rounded ${
+                              u.role === 'Gestor de Andaimes' ? 'bg-purple-100 text-purple-800' :
+                              u.role === 'Equipe de Andaimes' ? 'bg-blue-100 text-blue-800' :
+                              'bg-slate-100 text-slate-700'
+                            }`}>
+                              {u.role}
+                            </span>
+                          </div>
+
+                          <div>
+                            {isMe ? (
+                              <span className="text-xs text-slate-400 italic">Sessão Atual</span>
+                            ) : (
+                              <button 
+                                onClick={() => handleDeleteUser(u)}
+                                className="px-3 py-1.5 bg-red-50 hover:bg-red-600 text-red-600 hover:text-white border border-red-200 rounded-lg text-xs font-bold transition flex items-center gap-1.5"
+                                title="Excluir o login deste usuário do sistema"
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                Excluir Login
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 2. AJUSTE DE CAPACIDADE CONTRATADA */}
+                <div className="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200 space-y-3">
+                  <h3 className="font-bold text-base text-slate-800">Ajuste de Capacidade Máxima Contratada</h3>
+                  <p className="text-xs text-slate-500">Ajuste o volume total em m³ contratado junto à montadora. Salvo no Firebase para todos.</p>
                   
-                  <div className="flex items-center space-x-3">
+                  <div className="flex items-center space-x-3 pt-2">
                     <input 
                       type="number" 
                       value={totalCapacityM3} 
@@ -1536,7 +1782,7 @@
                   <p><span className="font-semibold text-slate-700">Dimensões Reais:</span> {photoModalReq.realWidth || photoModalReq.width}x{photoModalReq.realLength || photoModalReq.length}x{photoModalReq.realHeight || photoModalReq.height}m ({photoModalReq.realVolumeM3 || photoModalReq.volumeM3} m³)</p>
                 </div>
 
-                {/* Pré-visualização da foto capturada */}
+                {/* Pré-visualização da foto */}
                 {tempPhotoUrl ? (
                   <div className="space-y-2">
                     <div className="relative rounded-xl overflow-hidden border border-slate-200 max-h-56 bg-slate-900 flex items-center justify-center">
@@ -1664,18 +1910,25 @@
                         updateData.photoUrl = tempPhotoUrl;
                       }
 
-                      // 1. Atualiza estado local imediatamente (garante que vai para a coluna Montados na tela)
+                      // Atualiza local imediatamente
                       setRequests(prev => prev.map(r => r.id === reqId ? { ...r, ...updateData } : r));
 
                       try {
-                        // 2. Grava na nuvem Firebase Firestore (com foto comprimida < 100KB, nunca falha o limite de 1MB)
+                        // Grava no Firestore
                         await db.collection('andaimes_solicitacoes').doc(reqId).update(updateData);
+                        
+                        // Incrementa indicador de Montados no Firebase
+                        await db.collection('andaimes_config').doc('indicadores').set({
+                          totalMontados: firebase.firestore.FieldValue.increment(1)
+                        }, { merge: true });
                       } catch (err) {
                         console.error('Erro ao atualizar no Firestore:', err);
                       } finally {
                         setIsSavingMontado(false);
                         setPhotoModalReq(null);
                         setTempPhotoUrl(null);
+                        // Navega para a aba Montados
+                        setActiveTab('montados');
                       }
                     }} 
                     className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs shadow-md transition flex items-center justify-center gap-1.5"
@@ -1687,6 +1940,53 @@
                     )}
                   </button>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* MODAL: GESTOR CANCELAR SOLICITAÇÃO */}
+          {cancelModalReq && (
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full space-y-4 animate-in fade-in zoom-in">
+                <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                  <h3 className="font-bold text-base text-red-600 flex items-center gap-2">
+                    <span>✕</span> Cancelar Solicitação
+                  </h3>
+                  <button onClick={() => setCancelModalReq(null)} className="text-slate-400 hover:text-slate-600 font-bold">&times;</button>
+                </div>
+
+                <div className="text-xs text-slate-600 bg-red-50 p-3 rounded-xl border border-red-200 space-y-1">
+                  <p><span className="font-bold text-slate-800">Solicitação:</span> {cancelModalReq.id} ({cancelModalReq.factory})</p>
+                  <p><span className="font-bold text-slate-800">Local:</span> {cancelModalReq.area} - {cancelModalReq.reference}</p>
+                  <p><span className="font-bold text-slate-800">Atividade:</span> {cancelModalReq.activityDescription || 'Não informada'}</p>
+                  <p className="text-[11px] text-red-700 pt-1 font-semibold">
+                    Esta solicitação será removida da fila e registrada no indicador histórico de solicitações canceladas.
+                  </p>
+                </div>
+
+                <form onSubmit={handleCancelRequestConfirm} className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Motivo do Cancelamento (Opcional)</label>
+                    <textarea 
+                      rows="2"
+                      placeholder="Ex: Demanda cancelada pela engenharia / Atividade adiada..." 
+                      value={cancelReason}
+                      onChange={(e) => setCancelReason(e.target.value)}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-xs"
+                    ></textarea>
+                  </div>
+
+                  <div className="flex justify-end space-x-2 pt-2 border-t border-slate-100">
+                    <button type="button" onClick={() => setCancelModalReq(null)} className="px-3 py-1.5 border rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-50">Voltar</button>
+                    <button 
+                      type="submit" 
+                      disabled={isCancelling}
+                      className="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold transition shadow"
+                    >
+                      {isCancelling ? 'Cancelando...' : 'Confirmar Cancelamento'}
+                    </button>
+                  </div>
+                </form>
               </div>
             </div>
           )}
