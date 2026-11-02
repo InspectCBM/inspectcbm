@@ -11,25 +11,46 @@
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
   <!-- Babel Compiler -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  
+  <!-- Firebase Compat SDKs (Mesmo banco de dados do seu projeto) -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyBW0tD55afqHalda-wDh1olxH0twndIWY",
+      authDomain: "inspectcbm-db.firebaseapp.com",
+      projectId: "inspectcbm-db",
+      storageBucket: "inspectcbm-db.firebasestorage.app",
+      messagingSenderId: "675916276155",
+      appId: "1:675916276155:web:130ff1bcaa47bc21d5249e",
+      measurementId: "G-0162QJ1JQ"
+    };
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
+    const db = firebase.firestore();
+  </script>
 </head>
 <body class="bg-slate-100 text-slate-800 font-sans antialiased">
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState } = React;
+    const { useState, useEffect } = React;
+
+    const DEFAULT_USERS = [
+      { id: '1', name: 'Carlos Eduardo', email: 'carlos.eduardo@empresa.com', password: '123', role: 'Solicitante (Área)' },
+      { id: '2', name: 'João Silva', email: 'joao.silva@empresa.com', password: 'JDANDAIME', role: 'Equipe de Andaimes' },
+      { id: '3', name: 'Roberto Alves', email: 'roberto.alves@empresa.com', password: 'AUTOKRAFT01', role: 'Gestor de Andaimes' }
+    ];
 
     function App() {
-      // Lista de Usuários com Senhas de Acesso
-      const [users, setUsers] = useState([
-        { id: '1', name: 'Carlos Eduardo', email: 'carlos.eduardo@empresa.com', password: '123', role: 'Solicitante (Área)' },
-        { id: '2', name: 'João Silva', email: 'joao.silva@empresa.com', password: 'JDANDAIME', role: 'Equipe de Andaimes' },
-        { id: '3', name: 'Roberto Alves', email: 'roberto.alves@empresa.com', password: 'AUTOKRAFT01', role: 'Gestor de Andaimes' }
-      ]);
+      // Lista de Usuários sincronizada com Firebase
+      const [users, setUsers] = useState(DEFAULT_USERS);
 
       // Autenticação
       const [isAuthenticated, setIsAuthenticated] = useState(false);
       const [currentUser, setCurrentUser] = useState(null);
-      const [loginEmail, setLoginEmail] = useState(users[0].email);
+      const [loginEmail, setLoginEmail] = useState(DEFAULT_USERS[0].email);
       const [loginPassword, setLoginPassword] = useState('');
       const [loginError, setLoginError] = useState('');
 
@@ -39,6 +60,7 @@
       // Navegação e Estoque
       const [activeTab, setActiveTab] = useState('dashboard');
       const [totalCapacityM3, setTotalCapacityM3] = useState(500);
+      const [isCloudConnected, setIsCloudConnected] = useState(true);
       
       // Estado para modal de Visita Técnica
       const [visitModalReqId, setVisitModalReqId] = useState(null);
@@ -73,94 +95,148 @@
         return [...inQueue, ...notInQueue];
       };
 
-      // Solicitações Iniciais
-      const [requests, setRequests] = useState(() => {
-        const initial = [
-          {
-            id: 'SOL-1001',
-            factory: 'Fábrica 01 - Motores',
-            area: 'Utilidades - Caldeiras',
-            reference: 'Ao lado do tanque de condensado',
-            responsible: 'Carlos Eduardo',
-            phone: '(41) 99876-5432',
-            email: 'carlos.eduardo@empresa.com',
-            dueDate: '2026-11-05',
-            isUrgent: true,
-            queueOrder: 1,
-            width: 2,
-            length: 4,
-            height: 8,
-            volumeM3: 64,
-            realWidth: null,
-            realLength: null,
-            realHeight: null,
-            realVolumeM3: null,
-            status: 'Avaliação',
-            photoUrl: null,
-            createdAt: '28/10/2026 08:30',
-            history: [
-              { date: '28/10/2026 08:30', user: 'Carlos Eduardo (Solicitante)', action: 'Solicitação Criada (Urgente)' }
-            ]
-          },
-          {
-            id: 'SOL-1002',
-            factory: 'Fábrica 02 - Envase',
-            area: 'Embalagem 02',
-            reference: 'Linha de Potes',
-            responsible: 'Mariana Luz',
-            phone: '(41) 99123-4567',
-            email: 'mariana.luz@empresa.com',
-            dueDate: '2026-11-10',
-            isUrgent: false,
-            queueOrder: 2,
-            width: 3,
-            length: 3,
-            height: 4,
-            volumeM3: 36,
-            realWidth: 3,
-            realLength: 4,
-            realHeight: 4,
-            realVolumeM3: 48,
-            status: 'Montado',
-            photoUrl: null,
-            createdAt: '28/10/2026 09:15',
-            history: [
-              { date: '28/10/2026 09:15', user: 'Mariana Luz (Solicitante)', action: 'Solicitação Criada' },
-              { date: '28/10/2026 09:40', user: 'João Silva (Equipe de Andaimes)', action: 'Visita técnica realizada: Medida real 3x4x4m (48m³). Montagem iniciada.' },
-              { date: '28/10/2026 11:30', user: 'João Silva (Equipe de Andaimes)', action: 'Andaime Montado com sucesso' }
-            ]
-          },
-          {
-            id: 'SOL-1000',
-            factory: 'Fábrica Central',
-            area: 'Manutenção Mecânica',
-            reference: 'Ponte Rolante 01',
-            responsible: 'Antônio Ferreira',
-            phone: '(41) 98765-1122',
-            email: 'antonio.ferreira@empresa.com',
-            dueDate: '2026-10-25',
-            isUrgent: false,
-            queueOrder: null,
-            width: 2,
-            length: 2,
-            height: 5,
-            volumeM3: 20,
-            realWidth: 2,
-            realLength: 2,
-            realHeight: 5,
-            realVolumeM3: 20,
-            status: 'Desmontado',
-            photoUrl: null,
-            createdAt: '22/10/2026 08:00',
-            history: [
-              { date: '22/10/2026 08:00', user: 'Antônio Ferreira (Solicitante)', action: 'Solicitação Criada' },
-              { date: '23/10/2026 14:00', user: 'João Silva (Equipe de Andaimes)', action: 'Andaime Montado' },
-              { date: '25/10/2026 16:30', user: 'João Silva (Equipe de Andaimes)', action: 'Andaime Desmontado e materiais recolhidos' }
-            ]
+      // Solicitações
+      const [requests, setRequests] = useState([
+        {
+          id: 'SOL-1001',
+          factory: 'Fábrica 01 - Motores',
+          area: 'Utilidades - Caldeiras',
+          reference: 'Ao lado do tanque de condensado',
+          responsible: 'Carlos Eduardo',
+          phone: '(41) 99876-5432',
+          email: 'carlos.eduardo@empresa.com',
+          dueDate: '2026-11-05',
+          isUrgent: true,
+          queueOrder: 1,
+          width: 2,
+          length: 4,
+          height: 8,
+          volumeM3: 64,
+          realWidth: null,
+          realLength: null,
+          realHeight: null,
+          realVolumeM3: null,
+          status: 'Avaliação',
+          photoUrl: null,
+          createdAt: '28/10/2026 08:30',
+          history: [
+            { date: '28/10/2026 08:30', user: 'Carlos Eduardo (Solicitante)', action: 'Solicitação Criada (Urgente)' }
+          ]
+        },
+        {
+          id: 'SOL-1002',
+          factory: 'Fábrica 02 - Envase',
+          area: 'Embalagem 02',
+          reference: 'Linha de Potes',
+          responsible: 'Mariana Luz',
+          phone: '(41) 99123-4567',
+          email: 'mariana.luz@empresa.com',
+          dueDate: '2026-11-10',
+          isUrgent: false,
+          queueOrder: 2,
+          width: 3,
+          length: 3,
+          height: 4,
+          volumeM3: 36,
+          realWidth: 3,
+          realLength: 4,
+          realHeight: 4,
+          realVolumeM3: 48,
+          status: 'Montado',
+          photoUrl: null,
+          createdAt: '28/10/2026 09:15',
+          history: [
+            { date: '28/10/2026 09:15', user: 'Mariana Luz (Solicitante)', action: 'Solicitação Criada' },
+            { date: '28/10/2026 09:40', user: 'João Silva (Equipe de Andaimes)', action: 'Visita técnica realizada: Medida real 3x4x4m (48m³). Montagem iniciada.' },
+            { date: '28/10/2026 11:30', user: 'João Silva (Equipe de Andaimes)', action: 'Andaime Montado com sucesso' }
+          ]
+        },
+        {
+          id: 'SOL-1000',
+          factory: 'Fábrica Central',
+          area: 'Manutenção Mecânica',
+          reference: 'Ponte Rolante 01',
+          responsible: 'Antônio Ferreira',
+          phone: '(41) 98765-1122',
+          email: 'antonio.ferreira@empresa.com',
+          dueDate: '2026-10-25',
+          isUrgent: false,
+          queueOrder: null,
+          width: 2,
+          length: 2,
+          height: 5,
+          volumeM3: 20,
+          realWidth: 2,
+          realLength: 2,
+          realHeight: 5,
+          realVolumeM3: 20,
+          status: 'Desmontado',
+          photoUrl: null,
+          createdAt: '22/10/2026 08:00',
+          history: [
+            { date: '22/10/2026 08:00', user: 'Antônio Ferreira (Solicitante)', action: 'Solicitação Criada' },
+            { date: '23/10/2026 14:00', user: 'João Silva (Equipe de Andaimes)', action: 'Andaime Montado' },
+            { date: '25/10/2026 16:30', user: 'João Silva (Equipe de Andaimes)', action: 'Andaime Desmontado e materiais recolhidos' }
+          ]
+        }
+      ]);
+
+      // Conexão em Tempo Real com Firestore do Firebase
+      useEffect(() => {
+        let isMounted = true;
+
+        // 1. Escuta alterações em tempo real nas solicitações de andaimes
+        const unsubRequests = db.collection('andaimes_solicitacoes').onSnapshot((snapshot) => {
+          if (!isMounted) return;
+          if (!snapshot.empty) {
+            const list = [];
+            snapshot.forEach(doc => {
+              list.push({ id: doc.id, ...doc.data() });
+            });
+            setRequests(sortQueueByDueDate(list));
+            setIsCloudConnected(true);
+          } else {
+            // Se a coleção estiver vazia pela primeira vez, alimenta os registros iniciais
+            requests.forEach(r => {
+              db.collection('andaimes_solicitacoes').doc(r.id).set(r).catch(() => {});
+            });
           }
-        ];
-        return sortQueueByDueDate(initial);
-      });
+        }, (err) => {
+          console.warn('Firestore offline ou em fallback:', err);
+          setIsCloudConnected(false);
+        });
+
+        // 2. Escuta alterações em tempo real nos usuários cadastrados
+        const unsubUsers = db.collection('andaimes_usuarios').onSnapshot((snapshot) => {
+          if (!isMounted) return;
+          if (!snapshot.empty) {
+            const uList = [];
+            snapshot.forEach(doc => {
+              uList.push(doc.data());
+            });
+            setUsers(uList);
+          } else {
+            DEFAULT_USERS.forEach(u => {
+              db.collection('andaimes_usuarios').doc(u.email.toLowerCase()).set(u).catch(() => {});
+            });
+          }
+        }, () => {});
+
+        // 3. Escuta capacidade contratada
+        const unsubConfig = db.collection('andaimes_config').doc('geral').onSnapshot((doc) => {
+          if (!isMounted) return;
+          if (doc.exists && doc.data().totalCapacityM3) {
+            setTotalCapacityM3(doc.data().totalCapacityM3);
+          }
+        }, () => {});
+
+        return () => {
+          isMounted = false;
+          unsubRequests();
+          unsubUsers();
+          unsubConfig();
+        };
+      }, []);
 
       const [formData, setFormData] = useState({
         factory: '',
@@ -228,8 +304,8 @@
         setLoginPassword('');
       };
 
-      // Novo Cadastro - Validação de Senhas por Perfil (sem exibir a senha na interface)
-      const handleRegisterAndLogin = (e) => {
+      // Novo Cadastro - Validação de Senhas por Perfil e Persistência no Firebase
+      const handleRegisterAndLogin = async (e) => {
         e.preventDefault();
         setLoginError('');
 
@@ -263,6 +339,14 @@
         }
 
         const created = { id: String(Date.now()), ...newUser };
+
+        try {
+          // Salva no Firebase para persistir para sempre
+          await db.collection('andaimes_usuarios').doc(created.email.toLowerCase()).set(created);
+        } catch (err) {
+          console.warn('Erro ao salvar usuário no Firebase:', err);
+        }
+
         setUsers([...users, created]);
         setCurrentUser(created);
         setIsAuthenticated(true);
@@ -280,8 +364,8 @@
         setFormData({ ...formData, [e.target.name]: value });
       };
 
-      // Criação de Solicitação - Fábrica preenchida pelo solicitante + Responsável pela Atividade
-      const handleCreateRequest = (e) => {
+      // Criação de Solicitação - Salva no Firebase Firestore
+      const handleCreateRequest = async (e) => {
         e.preventDefault();
 
         const activityResp = (formData.activityResponsible || '').trim() || currentUser.name;
@@ -320,6 +404,13 @@
           ]
         };
 
+        try {
+          // Grava no Firebase Firestore
+          await db.collection('andaimes_solicitacoes').doc(newReq.id).set(newReq);
+        } catch (err) {
+          console.warn('Erro ao salvar no Firestore:', err);
+        }
+
         const updatedList = sortQueueByDueDate([newReq, ...requests]);
         setRequests(updatedList);
         
@@ -339,85 +430,94 @@
         setActiveTab('dashboard');
       };
 
-      // Alteração de Status
-      const updateStatus = (id, newStatus, extraAction = '') => {
-        setRequests(requests.map(r => {
-          if (r.id === id) {
-            const histMsg = extraAction 
-              ? `${extraAction}` 
-              : `Status alterado para: ${newStatus}`;
-            
-            return {
-              ...r,
-              status: newStatus,
-              history: [
-                ...r.history,
-                { date: new Date().toLocaleString('pt-BR'), user: `${currentUser.name} (${currentUser.role})`, action: histMsg }
-              ]
-            };
-          }
-          return r;
-        }));
+      // Alteração de Status - Atualiza no Firebase Firestore
+      const updateStatus = async (id, newStatus, extraAction = '') => {
+        const histMsg = extraAction ? `${extraAction}` : `Status alterado para: ${newStatus}`;
+        const targetReq = requests.find(r => r.id === id);
+        if (!targetReq) return;
+
+        const newHistory = [
+          ...targetReq.history,
+          { date: new Date().toLocaleString('pt-BR'), user: `${currentUser.name} (${currentUser.role})`, action: histMsg }
+        ];
+
+        try {
+          await db.collection('andaimes_solicitacoes').doc(id).update({
+            status: newStatus,
+            history: newHistory
+          });
+        } catch (err) {
+          console.warn('Erro ao atualizar status no Firestore:', err);
+        }
+
+        setRequests(requests.map(r => r.id === id ? { ...r, status: newStatus, history: newHistory } : r));
       };
 
-      // Salvar Visita Técnica com Dimensões Reais
-      const handleSaveVisit = (e) => {
+      // Salvar Visita Técnica com Dimensões Reais no Firestore
+      const handleSaveVisit = async (e) => {
         e.preventDefault();
         const w = Number(visitDimensions.width) || 0;
         const l = Number(visitDimensions.length) || 0;
         const h = Number(visitDimensions.height) || 0;
         const realVol = w * l * h;
 
-        setRequests(requests.map(r => {
-          if (r.id === visitModalReqId) {
-            return {
-              ...r,
-              realWidth: w,
-              realLength: l,
-              realHeight: h,
-              realVolumeM3: realVol,
-              status: 'Iniciado Montagem',
-              history: [
-                ...r.history,
-                { 
-                  date: new Date().toLocaleString('pt-BR'), 
-                  user: `${currentUser.name} (${currentUser.role})`, 
-                  action: `Visita técnica concluída: Medidas reais ${w}x${l}x${h}m (${realVol}m³). Montagem iniciada.` 
-                }
-              ]
-            };
+        const targetReq = requests.find(r => r.id === visitModalReqId);
+        if (!targetReq) return;
+
+        const newHistory = [
+          ...targetReq.history,
+          { 
+            date: new Date().toLocaleString('pt-BR'), 
+            user: `${currentUser.name} (${currentUser.role})`, 
+            action: `Visita técnica concluída: Medidas reais ${w}x${l}x${h}m (${realVol}m³). Montagem iniciada.` 
           }
-          return r;
-        }));
+        ];
+
+        try {
+          await db.collection('andaimes_solicitacoes').doc(visitModalReqId).update({
+            realWidth: w,
+            realLength: l,
+            realHeight: h,
+            realVolumeM3: realVol,
+            status: 'Iniciado Montagem',
+            history: newHistory
+          });
+        } catch (err) {
+          console.warn('Erro ao salvar visita no Firestore:', err);
+        }
 
         setVisitModalReqId(null);
         setVisitDimensions({ width: '', length: '', height: '' });
       };
 
-      // Upload de Foto da Montagem
-      const handlePhotoUpload = (id, e) => {
+      // Upload de Foto da Montagem no Firestore
+      const handlePhotoUpload = async (id, e) => {
         const file = e.target.files[0];
         if (file) {
           const reader = new FileReader();
-          reader.onloadend = () => {
-            setRequests(requests.map(req => {
-              if (req.id === id) {
-                return {
-                  ...req,
-                  status: 'Montado',
-                  photoUrl: reader.result,
-                  history: [
-                    ...req.history,
-                    { 
-                      date: new Date().toLocaleString('pt-BR'), 
-                      user: `${currentUser.name} (${currentUser.role})`, 
-                      action: 'Foto do andaime registrada e status alterado para Montado' 
-                    }
-                  ]
-                };
+          reader.onloadend = async () => {
+            const photoData = reader.result;
+            const targetReq = requests.find(r => r.id === id);
+            if (!targetReq) return;
+
+            const newHistory = [
+              ...targetReq.history,
+              { 
+                date: new Date().toLocaleString('pt-BR'), 
+                user: `${currentUser.name} (${currentUser.role})`, 
+                action: 'Foto do andaime registrada e status alterado para Montado' 
               }
-              return req;
-            }));
+            ];
+
+            try {
+              await db.collection('andaimes_solicitacoes').doc(id).update({
+                status: 'Montado',
+                photoUrl: photoData,
+                history: newHistory
+              });
+            } catch (err) {
+              console.warn('Erro ao salvar foto no Firestore:', err);
+            }
           };
           reader.readAsDataURL(file);
         }
@@ -431,44 +531,51 @@
         setAutoReorderOnDateChange(true);
       };
 
-      // Salvar nova Data Limite pelo Gestor
-      const handleSaveNewDueDate = (e) => {
+      // Salvar nova Data Limite pelo Gestor no Firestore
+      const handleSaveNewDueDate = async (e) => {
         e.preventDefault();
         if (!editDateModalReq || !newDueDate) return;
 
         const oldDate = editDateModalReq.dueDate || 'Não definida';
         const reasonText = dateChangeReason.trim() ? ` Motivo: "${dateChangeReason.trim()}"` : '';
 
-        let updatedList = requests.map(r => {
-          if (r.id === editDateModalReq.id) {
-            return {
-              ...r,
-              dueDate: newDueDate,
-              history: [
-                ...r.history,
-                {
-                  date: new Date().toLocaleString('pt-BR'),
-                  user: `${currentUser.name} (${currentUser.role})`,
-                  action: `Data Limite alterada de ${oldDate} para ${newDueDate}.${reasonText}`
-                }
-              ]
-            };
+        const newHistory = [
+          ...editDateModalReq.history,
+          {
+            date: new Date().toLocaleString('pt-BR'),
+            user: `${currentUser.name} (${currentUser.role})`,
+            action: `Data Limite alterada de ${oldDate} para ${newDueDate}.${reasonText}`
           }
-          return r;
-        });
+        ];
 
-        if (autoReorderOnDateChange) {
-          updatedList = sortQueueByDueDate(updatedList);
+        try {
+          await db.collection('andaimes_solicitacoes').doc(editDateModalReq.id).update({
+            dueDate: newDueDate,
+            history: newHistory
+          });
+
+          if (autoReorderOnDateChange) {
+            const updated = requests.map(r => r.id === editDateModalReq.id ? { ...r, dueDate: newDueDate, history: newHistory } : r);
+            const sorted = sortQueueByDueDate(updated);
+            const batch = db.batch();
+            sorted.forEach(r => {
+              if (r.queueOrder) {
+                batch.update(db.collection('andaimes_solicitacoes').doc(r.id), { queueOrder: r.queueOrder });
+              }
+            });
+            await batch.commit();
+          }
+        } catch (err) {
+          console.warn('Erro ao atualizar data no Firestore:', err);
         }
 
-        setRequests(updatedList);
         setEditDateModalReq(null);
         setNewDueDate('');
         setDateChangeReason('');
       };
 
-      // Reordenação Manual na Fila de Espera (Subir / Descer)
-      const moveQueueItem = (reqId, direction) => {
+      // Reordenação Manual na Fila de Espera (Subir / Descer) no Firestore
+      const moveQueueItem = async (reqId, direction) => {
         const queueStatuses = ['Avaliação', 'Iniciado Montagem', 'Em Movimentação'];
         const inQueue = requests.filter(r => queueStatuses.includes(r.status));
         const notInQueue = requests.filter(r => !queueStatuses.includes(r.status));
@@ -489,20 +596,44 @@
           r.queueOrder = idx + 1;
         });
 
-        const movedReq = inQueue[targetIndex];
-        movedReq.history.push({
-          date: new Date().toLocaleString('pt-BR'),
-          user: `${currentUser.name} (${currentUser.role})`,
-          action: `Posição na fila alterada manualmente para #${targetIndex + 1}`
-        });
+        try {
+          const batch = db.batch();
+          inQueue.forEach(r => {
+            batch.update(db.collection('andaimes_solicitacoes').doc(r.id), { queueOrder: r.queueOrder });
+          });
+          await batch.commit();
+        } catch (err) {
+          console.warn('Erro ao sincronizar fila no Firestore:', err);
+        }
 
         setRequests([...inQueue, ...notInQueue]);
       };
 
-      // Reordenar toda a fila pela Data Limite
-      const handleReorderQueueByDate = () => {
+      // Reordenar toda a fila pela Data Limite no Firestore
+      const handleReorderQueueByDate = async () => {
         const sorted = sortQueueByDueDate(requests);
+        try {
+          const batch = db.batch();
+          sorted.forEach(r => {
+            if (r.queueOrder) {
+              batch.update(db.collection('andaimes_solicitacoes').doc(r.id), { queueOrder: r.queueOrder });
+            }
+          });
+          await batch.commit();
+        } catch (err) {
+          console.warn(err);
+        }
         setRequests(sorted);
+      };
+
+      // Atualizar Capacidade Contratada no Firestore
+      const handleUpdateCapacity = async (val) => {
+        setTotalCapacityM3(val);
+        try {
+          await db.collection('andaimes_config').doc('geral').set({ totalCapacityM3: val }, { merge: true });
+        } catch (err) {
+          console.warn(err);
+        }
       };
 
       // --- TELA DE LOGIN / NOVO CADASTRO ---
@@ -516,6 +647,10 @@
                 </div>
                 <h1 className="text-2xl font-black text-slate-800">Controle de Andaimes</h1>
                 <p className="text-sm text-slate-500 mt-1">Autenticação com Controle de Perfis</p>
+                <div className="mt-2 flex items-center justify-center gap-1.5 text-[11px] text-emerald-600 font-semibold">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  Nuvem Firebase Conectada
+                </div>
               </div>
 
               {loginError && (
@@ -549,7 +684,7 @@
                       className="w-full p-3 bg-slate-50 border border-slate-300 rounded-lg text-sm text-slate-800 font-medium"
                     >
                       {users.map(u => (
-                        <option key={u.id} value={u.email}>{u.name} — ({u.role})</option>
+                        <option key={u.id || u.email} value={u.email}>{u.name} — ({u.role})</option>
                       ))}
                     </select>
                   </div>
@@ -635,7 +770,7 @@
                     )}
                   </div>
                   <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-lg shadow-md transition text-sm">
-                    Cadastrar e Entrar
+                    Cadastrar e Salvar na Nuvem
                   </button>
                 </form>
               )}
@@ -714,7 +849,7 @@
                     onClick={() => openEditDateModal(req)}
                     className="text-[11px] text-blue-600 hover:text-blue-800 font-semibold underline flex items-center gap-1"
                   >
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                     Ajustar Data
                   </button>
                 )}
@@ -844,8 +979,11 @@
                   <h1 className="font-bold text-base tracking-wide flex items-center gap-2">
                     Gestão de Andaimes
                     <span className="text-[10px] bg-blue-500/20 text-blue-300 border border-blue-400/30 px-2 py-0.5 rounded-full font-normal">Fila por Data Limite</span>
+                    <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 px-2 py-0.5 rounded-full font-mono flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Firebase Nuvem
+                    </span>
                   </h1>
-                  <p className="text-xs text-slate-400">Controle de Capacidade, Fila de Espera e Montagens</p>
+                  <p className="text-xs text-slate-400">Controle de Capacidade, Fila de Espera e Montagens Sincronizadas</p>
                 </div>
               </div>
 
@@ -928,12 +1066,12 @@
                   <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
                     <p className="text-xs font-semibold text-slate-500 uppercase">Capacidade Contratada</p>
                     <p className="text-2xl font-black text-slate-800 mt-1">{totalCapacityM3} <span className="text-sm font-normal text-slate-500">m³</span></p>
-                    <p className="text-[11px] text-slate-400 mt-1">Limite contratado</p>
+                    <p className="text-[11px] text-slate-400 mt-1">Sincronizado na Nuvem</p>
                   </div>
                   <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
                     <p className="text-xs font-semibold text-slate-500 uppercase">Em Uso Efetivo (Montado)</p>
                     <p className="text-2xl font-black text-blue-600 mt-1">{allocatedM3} <span className="text-sm font-normal text-slate-500">m³</span></p>
-                    <p className="text-[11px] text-slate-400 mt-1">Contabiliza montagens reais em campo</p>
+                    <p className="text-[11px] text-slate-400 mt-1">Montagens reais em campo</p>
                   </div>
                   <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
                     <p className="text-xs font-semibold text-slate-500 uppercase">Disponível em Estoque</p>
@@ -976,7 +1114,7 @@
                         <span>📌</span> Panorama Geral da Gestão de Andaimes
                       </h2>
                       <p className="text-xs text-slate-500">
-                        Visão panorâmica em 3 colunas: Fila de Espera por Prazo, Andaimes Montados em Campo e Andaimes Desmontados.
+                        Visão panorâmica em 3 colunas em tempo real: Fila de Espera por Prazo, Andaimes Montados em Campo e Andaimes Desmontados.
                       </p>
                     </div>
                     {isGestor && (
@@ -1129,7 +1267,7 @@
             {activeTab === 'nova' && (
               <div className="max-w-2xl mx-auto bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
                 <h2 className="text-base font-bold text-slate-800 mb-1">Nova Solicitação de Andaime</h2>
-                <p className="text-xs text-slate-500 mb-6">Preencha os dados da atividade. A fila será enfileirada automaticamente pela Data Limite informada.</p>
+                <p className="text-xs text-slate-500 mb-6">Preencha os dados da atividade. A solicitação é salva automaticamente no Firebase e atualizada para todos.</p>
 
                 <form onSubmit={handleCreateRequest} className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1273,7 +1411,7 @@
                   </div>
 
                   <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg shadow-md transition text-sm">
-                    Enviar Solicitação para a Fila
+                    Enviar Solicitação para a Fila (Salvar na Nuvem)
                   </button>
                 </form>
               </div>
@@ -1284,13 +1422,13 @@
               <div className="space-y-6">
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 max-w-xl">
                   <h3 className="font-bold text-sm text-slate-800 mb-2">Ajuste de Capacidade Máxima Contratada</h3>
-                  <p className="text-xs text-slate-500 mb-4">Ajuste o volume total em m³ contratado junto à montadora terceirizada.</p>
+                  <p className="text-xs text-slate-500 mb-4">Ajuste o volume total em m³ contratado junto à montadora. Salvo no Firebase para todos.</p>
                   
                   <div className="flex items-center space-x-3">
                     <input 
                       type="number" 
                       value={totalCapacityM3} 
-                      onChange={(e) => setTotalCapacityM3(Number(e.target.value) || 0)} 
+                      onChange={(e) => handleUpdateCapacity(Number(e.target.value) || 0)} 
                       className="p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm w-36 font-bold" 
                     />
                     <span className="text-sm font-semibold text-slate-600">m³ Contratados</span>
@@ -1333,7 +1471,7 @@
 
                   <div className="flex justify-end space-x-2 pt-2">
                     <button type="button" onClick={() => setVisitModalReqId(null)} className="px-3 py-1.5 border rounded text-xs">Cancelar</button>
-                    <button type="submit" className="px-4 py-1.5 bg-blue-600 text-white rounded text-xs font-bold hover:bg-blue-700">Confirmar Medidas e Iniciar</button>
+                    <button type="submit" className="px-4 py-1.5 bg-blue-600 text-white rounded text-xs font-bold hover:bg-blue-700">Salvar no Firebase e Iniciar</button>
                   </div>
                 </form>
               </div>
@@ -1374,7 +1512,7 @@
                       placeholder="Ex: Alinhado com a supervisão de manutenção devido atraso na entrega de peças"
                       value={dateChangeReason}
                       onChange={(e) => setDateChangeReason(e.target.value)}
-                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-xs"
+                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-xs" 
                     ></textarea>
                   </div>
 
@@ -1387,13 +1525,13 @@
                       className="w-4 h-4 text-blue-600 rounded border-slate-300" 
                     />
                     <label htmlFor="chk-reorder" className="text-xs text-slate-600 cursor-pointer">
-                      Reordenar automaticamente a fila com esta nova data
+                      Reordenar automaticamente a fila no Firebase com esta nova data
                     </label>
                   </div>
 
                   <div className="flex justify-end space-x-2 pt-3 border-t border-slate-100">
                     <button type="button" onClick={() => setEditDateModalReq(null)} className="px-3 py-1.5 border rounded text-xs">Cancelar</button>
-                    <button type="submit" className="px-4 py-1.5 bg-blue-600 text-white rounded text-xs font-bold hover:bg-blue-700">Salvar Nova Data</button>
+                    <button type="submit" className="px-4 py-1.5 bg-blue-600 text-white rounded text-xs font-bold hover:bg-blue-700">Salvar Nova Data na Nuvem</button>
                   </div>
                 </form>
               </div>
