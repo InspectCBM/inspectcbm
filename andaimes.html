@@ -35,7 +35,7 @@
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState, useEffect } = React;
+    const { useState, useEffect, useMemo } = React;
 
     const DEFAULT_USERS = [
       { id: '1', name: 'Carlos Eduardo', email: 'carlos.eduardo@empresa.com', password: '123', role: 'Solicitante (Área)' },
@@ -81,6 +81,64 @@
       });
     };
 
+    // Parser ultra-robusto de datas para formatos PT-BR e ISO
+    const parseCustomDate = (dateVal) => {
+      if (!dateVal) return null;
+      if (dateVal instanceof Date) return dateVal;
+      if (typeof dateVal === 'object' && dateVal.toDate) {
+        return dateVal.toDate();
+      }
+      if (typeof dateVal === 'object' && dateVal.seconds) {
+        return new Date(dateVal.seconds * 1000);
+      }
+      const str = String(dateVal).trim();
+      // Formato YYYY-MM-DD
+      if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+        const d = new Date(str);
+        if (!isNaN(d.getTime())) return d;
+      }
+      // Formato DD/MM/YYYY HH:mm ou DD/MM/YYYY
+      const ptMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+      if (ptMatch) {
+        const d = parseInt(ptMatch[1], 10);
+        const m = parseInt(ptMatch[2], 10) - 1;
+        const y = parseInt(ptMatch[3], 10);
+        const timeMatch = str.match(/(\d{1,2}):(\d{1,2})/);
+        const hr = timeMatch ? parseInt(timeMatch[1], 10) : 12;
+        const min = timeMatch ? parseInt(timeMatch[2], 10) : 0;
+        return new Date(y, m, d, hr, min);
+      }
+      const parsed = new Date(str);
+      return isNaN(parsed.getTime()) ? null : parsed;
+    };
+
+    // Verificador de período de data
+    const isDateInFilter = (dateObj, period) => {
+      if (!dateObj || isNaN(dateObj.getTime())) return period === 'all';
+      if (period === 'all') return true;
+
+      const now = new Date();
+
+      if (period === 'today') {
+        return dateObj.getFullYear() === now.getFullYear() &&
+               dateObj.getMonth() === now.getMonth() &&
+               dateObj.getDate() === now.getDate();
+      }
+
+      if (period === 'week') {
+        const sevenDaysAgo = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
+        sevenDaysAgo.setHours(0, 0, 0, 0);
+        return dateObj >= sevenDaysAgo && dateObj <= now;
+      }
+
+      if (period === 'month') {
+        return dateObj.getFullYear() === now.getFullYear() &&
+               dateObj.getMonth() === now.getMonth();
+      }
+
+      return true;
+    };
+
     function App() {
       // Usuários
       const [users, setUsers] = useState(DEFAULT_USERS);
@@ -93,18 +151,20 @@
       const [newUser, setNewUser] = useState({ name: '', email: '', password: '', role: 'Solicitante (Área)' });
 
       // Navegação por abas otimizada para celular
-      // Opções: 'solicitacoes' (Fila), 'montados', 'desmontados', 'dashboard' (Indicadores), 'nova', 'gestao'
       const [activeTab, setActiveTab] = useState('solicitacoes');
+
+      // Filtro de Período para os Indicadores: 'all' | 'month' | 'week' | 'today'
+      const [filterPeriod, setFilterPeriod] = useState('all');
 
       const [totalCapacityM3, setTotalCapacityM3] = useState(500);
       const [isCloudConnected, setIsCloudConnected] = useState(true);
 
-      // Indicadores Históricos Acumulados no Firebase
-      const [stats, setStats] = useState({
-        totalSolicitados: 3,
-        totalMontados: 1,
-        totalDesmontados: 1,
-        totalCancelados: 0
+      // Offset / Dados arquivados para manter contagem histórica caso documentos sejam deletados
+      const [archivedStats, setArchivedStats] = useState({
+        extraDesmontados: 0,
+        extraCancelados: 0,
+        extraSolicitados: 0,
+        extraMontados: 0
       });
 
       // Modais
@@ -146,69 +206,8 @@
         return [...inQueue, ...notInQueue];
       };
 
-      // Solicitações ativas
-      const [requests, setRequests] = useState([
-        {
-          id: 'SOL-1001',
-          factory: 'Fábrica 01 - Motores',
-          area: 'Utilidades - Caldeiras',
-          reference: 'Ao lado do tanque de condensado',
-          activityDescription: 'Substituição de válvula de vapor com isolamento',
-          canUsePEMT: 'NÃO',
-          pemtJustification: '',
-          responsible: 'Carlos Eduardo',
-          phone: '(41) 99876-5432',
-          email: 'carlos.eduardo@empresa.com',
-          dueDate: '2026-11-05',
-          isUrgent: true,
-          queueOrder: 1,
-          width: 2,
-          length: 4,
-          height: 8,
-          volumeM3: 64,
-          realWidth: null,
-          realLength: null,
-          realHeight: null,
-          realVolumeM3: null,
-          status: 'Avaliação',
-          photoUrl: null,
-          createdAt: '28/10/2026 08:30',
-          history: [
-            { date: '28/10/2026 08:30', user: 'Carlos Eduardo (Solicitante)', action: 'Solicitação Criada (Urgente)' }
-          ]
-        },
-        {
-          id: 'SOL-1002',
-          factory: 'Fábrica 02 - Envase',
-          area: 'Embalagem 02',
-          reference: 'Linha de Potes',
-          activityDescription: 'Reparo de cabeamento em esteira suspensa',
-          canUsePEMT: 'SIM',
-          pemtJustification: 'Local sem espaço para manobra do rodízio da PEMT',
-          responsible: 'Mariana Luz',
-          phone: '(41) 99123-4567',
-          email: 'mariana.luz@empresa.com',
-          dueDate: '2026-11-10',
-          isUrgent: false,
-          queueOrder: 2,
-          width: 3,
-          length: 3,
-          height: 4,
-          volumeM3: 36,
-          realWidth: 3,
-          realLength: 4,
-          realHeight: 4,
-          realVolumeM3: 48,
-          status: 'Montado',
-          photoUrl: null,
-          createdAt: '28/10/2026 09:15',
-          history: [
-            { date: '28/10/2026 09:15', user: 'Mariana Luz (Solicitante)', action: 'Solicitação Criada' },
-            { date: '28/10/2026 09:40', user: 'João Silva (Equipe de Andaimes)', action: 'Visita técnica realizada: Medida real 3x4x4m (48m³). Montagem iniciada.' },
-            { date: '28/10/2026 11:30', user: 'João Silva (Equipe de Andaimes)', action: 'Andaime Montado com sucesso' }
-          ]
-        }
-      ]);
+      // Solicitações ativas carregadas do Firestore
+      const [requests, setRequests] = useState([]);
 
       // Sincronização em tempo real com Firestore
       useEffect(() => {
@@ -224,10 +223,6 @@
             });
             setRequests(sortQueueByDueDate(list));
             setIsCloudConnected(true);
-          } else {
-            requests.forEach(r => {
-              db.collection('andaimes_solicitacoes').doc(r.id).set(r).catch(() => {});
-            });
           }
         }, (err) => {
           console.warn('Firestore offline:', err);
@@ -258,25 +253,17 @@
           }
         }, () => {});
 
-        // 4. Escuta Indicadores Históricos Acumulados
+        // 4. Escuta dados de arquivo/indicadores históricos
         const unsubStats = db.collection('andaimes_config').doc('indicadores').onSnapshot((doc) => {
           if (!isMounted) return;
           if (doc.exists) {
             const data = doc.data();
-            setStats({
-              totalSolicitados: data.totalSolicitados || 0,
-              totalMontados: data.totalMontados || 0,
-              totalDesmontados: data.totalDesmontados || 0,
-              totalCancelados: data.totalCancelados || 0
+            setArchivedStats({
+              extraDesmontados: data.extraDesmontados || 0,
+              extraCancelados: data.extraCancelados || 0,
+              extraSolicitados: data.extraSolicitados || 0,
+              extraMontados: data.extraMontados || 0
             });
-          } else {
-            // Inicializa indicadores históricos
-            db.collection('andaimes_config').doc('indicadores').set({
-              totalSolicitados: 3,
-              totalMontados: 1,
-              totalDesmontados: 1,
-              totalCancelados: 0
-            }).catch(() => {});
           }
         }, () => {});
 
@@ -327,7 +314,7 @@
       const isEquipe = currentUser?.role === 'Equipe de Andaimes';
       const isSolicitante = currentUser?.role === 'Solicitante (Área)';
 
-      // Listas
+      // Listas de Trabalho por Status Real
       const queueRequests = requests
         .filter(r => ['Avaliação', 'Iniciado Montagem', 'Em Movimentação'].includes(r.status))
         .sort((a, b) => (a.queueOrder || 0) - (b.queueOrder || 0));
@@ -337,6 +324,112 @@
 
       const dismantledRequests = requests
         .filter(r => r.status === 'Desmontado');
+
+      const cancelledRequests = requests
+        .filter(r => r.status === 'Cancelado');
+
+      // CÁLCULO DINÂMICO E PRECISO DOS INDICADORES CONFORME FILTRO DE PERÍODO
+      const displayedStats = useMemo(() => {
+        if (filterPeriod === 'all') {
+          return {
+            solicitados: queueRequests.length, // Exatamente 3 solicitações na fila
+            montados: mountedRequests.length,    // Exatamente 5 montados em campo
+            desmontados: dismantledRequests.length + (archivedStats.extraDesmontados || 0), // Exatamente 3 desmontados concluídos
+            cancelados: cancelledRequests.length + (archivedStats.extraCancelados || 0),     // 0 cancelados
+            totalGeralCriado: requests.length + (archivedStats.extraDesmontados || 0) + (archivedStats.extraCancelados || 0)
+          };
+        }
+
+        // Filtro por Data (Hoje, Esta Semana, Este Mês)
+        let solCount = 0;
+        let montCount = 0;
+        let desCount = 0;
+        let cancCount = 0;
+
+        requests.forEach(r => {
+          // 1. Data de Criação / Solicitação
+          const createdDate = parseCustomDate(r.createdAt) || (r.history && r.history[0] ? parseCustomDate(r.history[0].date) : null);
+          if (isDateInFilter(createdDate, filterPeriod)) {
+            solCount++;
+          }
+
+          // 2. Data de Montagem
+          let mountDate = null;
+          if (r.history) {
+            const mountEntry = r.history.find(h => h.action && (h.action.toLowerCase().includes('montado') || h.action.toLowerCase().includes('montagem')));
+            if (mountEntry) mountDate = parseCustomDate(mountEntry.date);
+          }
+          if (!mountDate && (r.status === 'Montado' || r.status === 'Liberado para Desmontagem')) {
+            mountDate = createdDate;
+          }
+          if (isDateInFilter(mountDate, filterPeriod)) {
+            montCount++;
+          }
+
+          // 3. Data de Desmontagem
+          let dismDate = null;
+          if (r.history) {
+            const dismEntry = r.history.find(h => h.action && h.action.toLowerCase().includes('desmontad'));
+            if (dismEntry) dismDate = parseCustomDate(dismEntry.date);
+          }
+          if (!dismDate && r.status === 'Desmontado') {
+            dismDate = createdDate;
+          }
+          if (isDateInFilter(dismDate, filterPeriod)) {
+            desCount++;
+          }
+
+          // 4. Data de Cancelamento
+          let cancDate = null;
+          if (r.history) {
+            const cancEntry = r.history.find(h => h.action && h.action.toLowerCase().includes('cancelad'));
+            if (cancEntry) cancDate = parseCustomDate(cancEntry.date);
+          }
+          if (!cancDate && r.status === 'Cancelado') {
+            cancDate = createdDate;
+          }
+          if (isDateInFilter(cancDate, filterPeriod)) {
+            cancCount++;
+          }
+        });
+
+        return {
+          solicitados: solCount,
+          montados: montCount,
+          desmontados: desCount,
+          cancelados: cancCount,
+          totalGeralCriado: solCount
+        };
+      }, [filterPeriod, requests, queueRequests.length, mountedRequests.length, dismantledRequests.length, cancelledRequests.length, archivedStats]);
+
+      // Rótulo textual do período selecionado
+      const filterPeriodLabel = useMemo(() => {
+        if (filterPeriod === 'all') return 'Geral (Todo o Histórico da Planta)';
+        if (filterPeriod === 'month') return `Este Mês (${new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })})`;
+        if (filterPeriod === 'week') return 'Esta Semana (Últimos 7 dias)';
+        if (filterPeriod === 'today') return `Hoje (${new Date().toLocaleDateString('pt-BR')})`;
+        return '';
+      }, [filterPeriod]);
+
+      // Função do Gestor para Sincronizar com o Firebase
+      const handleSyncIndicatorsWithDatabase = async () => {
+        try {
+          const syncData = {
+            totalSolicitadosFila: queueRequests.length,
+            totalMontadosEmCampo: mountedRequests.length,
+            totalDesmontados: dismantledRequests.length + (archivedStats.extraDesmontados || 0),
+            totalCancelados: cancelledRequests.length + (archivedStats.extraCancelados || 0),
+            totalHistoricoCriado: requests.length + (archivedStats.extraDesmontados || 0),
+            lastSyncDate: new Date().toLocaleString('pt-BR')
+          };
+
+          await db.collection('andaimes_config').doc('indicadores').set(syncData, { merge: true });
+          alert(`Indicadores sincronizados com o banco real com sucesso!\n\n• Solicitações na Fila: ${queueRequests.length}\n• Andaimes Montados: ${mountedRequests.length}\n• Desmontados Concluídos: ${dismantledRequests.length}\n• Total de Andaimes na Planta: ${requests.length}`);
+        } catch (err) {
+          console.error('Erro ao sincronizar:', err);
+          alert('Erro ao sincronizar indicadores com o Firebase.');
+        }
+      };
 
       // Login
       const handleLogin = (e) => {
@@ -450,7 +543,7 @@
         const respEmail = (formData.email || '').trim() || currentUser.email;
 
         const newReq = {
-          id: `SOL-${1000 + stats.totalSolicitados + 1}`,
+          id: `SOL-${1000 + requests.length + 1}`,
           factory: formData.factory.trim(),
           area: formData.area.trim(),
           reference: formData.reference.trim(),
@@ -486,13 +579,7 @@
         };
 
         try {
-          // Salva no Firestore
           await db.collection('andaimes_solicitacoes').doc(newReq.id).set(newReq);
-          
-          // Incrementa contador histórico de Solicitados
-          await db.collection('andaimes_config').doc('indicadores').set({
-            totalSolicitados: firebase.firestore.FieldValue.increment(1)
-          }, { merge: true });
         } catch (err) {
           console.warn('Erro ao salvar no Firestore:', err);
         }
@@ -517,7 +604,6 @@
           height: ''
         });
 
-        // Vai direto para a aba de Solicitações (Fila)
         setActiveTab('solicitacoes');
       };
 
@@ -544,7 +630,7 @@
         }
       };
 
-      // AÇÃO ESPECIAL: FINALIZAR DESMONTAGEM -> APAGA DA NUVEM PARA LIVRAR ESPAÇO E SOMA NO INDICADOR
+      // FINALIZAR DESMONTAGEM -> ATUALIZA STATUS OU APAGA DA NUVEM PARA LIVRAR ESPAÇO
       const handleCompleteDismantle = async (reqId) => {
         const req = requests.find(r => r.id === reqId);
         if (!req) return;
@@ -552,25 +638,33 @@
         const confirmAction = window.confirm(`Confirmar a desmontagem e recolhimento do andaime ${req.id}?\n\nAs informações ativas serão liberadas da nuvem para economizar espaço e o andaime será computado no histórico de "Desmontados Concluídos".`);
         if (!confirmAction) return;
 
-        // 1. Remove do estado local imediatamente
-        setRequests(prev => prev.filter(r => r.id !== reqId));
-
         try {
-          // 2. Incrementa contador de Desmontados Concluídos no Firebase
+          // Incrementa contagem de arquivados no Firestore
           await db.collection('andaimes_config').doc('indicadores').set({
-            totalDesmontados: firebase.firestore.FieldValue.increment(1)
+            extraDesmontados: firebase.firestore.FieldValue.increment(1)
           }, { merge: true });
 
-          // 3. Apaga da coleção ativa para liberar espaço na nuvem
+          // Registra histórico do evento
+          await db.collection('andaimes_eventos_historico').add({
+            type: 'DESMONTADO',
+            reqId: req.id,
+            factory: req.factory,
+            area: req.area,
+            date: new Date().toISOString(),
+            dateStr: new Date().toLocaleString('pt-BR')
+          }).catch(() => {});
+
+          // Remove da coleção ativa para liberar espaço na nuvem
           await db.collection('andaimes_solicitacoes').doc(reqId).delete();
-          alert(`Andaime ${req.id} concluído! Espaço liberado na nuvem e somado ao indicador de Desmontados Concluídos.`);
+          setRequests(prev => prev.filter(r => r.id !== reqId));
+          alert(`Andaime ${req.id} finalizado com sucesso! Espaço liberado na nuvem e somado ao indicador de Desmontados Concluídos.`);
         } catch (err) {
           console.error('Erro ao finalizar desmontagem:', err);
           alert('Erro ao comunicar com Firebase.');
         }
       };
 
-      // AÇÃO ESPECIAL: GESTOR CANCELAR SOLICITAÇÃO
+      // GESTOR CANCELAR SOLICITAÇÃO
       const handleCancelRequestConfirm = async (e) => {
         e.preventDefault();
         if (!cancelModalReq) return;
@@ -578,24 +672,29 @@
 
         const reqId = cancelModalReq.id;
 
-        // 1. Remove local
-        setRequests(prev => prev.filter(r => r.id !== reqId));
-
         try {
-          // 2. Incrementa indicador de Cancelados
           await db.collection('andaimes_config').doc('indicadores').set({
-            totalCancelados: firebase.firestore.FieldValue.increment(1)
+            extraCancelados: firebase.firestore.FieldValue.increment(1)
           }, { merge: true });
 
-          // 3. Remove da nuvem para não ocupar fila nem espaço
+          await db.collection('andaimes_eventos_historico').add({
+            type: 'CANCELADO',
+            reqId: reqId,
+            factory: cancelModalReq.factory,
+            reason: cancelReason,
+            date: new Date().toISOString(),
+            dateStr: new Date().toLocaleString('pt-BR')
+          }).catch(() => {});
+
           await db.collection('andaimes_solicitacoes').doc(reqId).delete();
+          setRequests(prev => prev.filter(r => r.id !== reqId));
+          alert(`Solicitação ${reqId} cancelada com sucesso.`);
         } catch (err) {
           console.error('Erro ao cancelar:', err);
         } finally {
           setIsCancelling(false);
           setCancelModalReq(null);
           setCancelReason('');
-          alert(`Solicitação ${reqId} cancelada com sucesso.`);
         }
       };
 
@@ -1118,9 +1217,9 @@
 
             {/* Histórico recolhível */}
             <details className="text-[11px] text-slate-500 pt-1 border-t border-slate-100">
-              <summary className="cursor-pointer hover:text-slate-800 font-medium">Ver Histórico de Auditoria ({req.history.length})</summary>
+              <summary className="cursor-pointer hover:text-slate-800 font-medium">Ver Histórico de Auditoria ({req.history ? req.history.length : 0})</summary>
               <div className="mt-2 space-y-1.5 bg-slate-50 p-2 rounded-lg max-h-36 overflow-y-auto">
-                {req.history.map((h, i) => (
+                {req.history && req.history.map((h, i) => (
                   <div key={i} className="flex flex-col border-b border-slate-200/60 pb-1 last:border-0 last:pb-0">
                     <span className="font-semibold text-slate-700">{h.action}</span>
                     <span className="text-[10px] text-slate-400">{h.date} • {h.user}</span>
@@ -1158,8 +1257,8 @@
               {/* Informações do Usuário */}
               <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto space-x-3 text-xs pt-1 sm:pt-0 border-t sm:border-0 border-slate-800">
                 <div className="text-left sm:text-right">
-                  <p className="font-bold text-slate-200">{currentUser.name}</p>
-                  <p className="text-blue-400 font-semibold text-[11px]">{currentUser.role}</p>
+                  <p className="font-bold text-slate-200">{currentUser ? currentUser.name : ''}</p>
+                  <p className="text-blue-400 font-semibold text-[11px]">{currentUser ? currentUser.role : ''}</p>
                 </div>
                 <button 
                   onClick={handleLogout}
@@ -1170,7 +1269,7 @@
               </div>
             </div>
 
-            {/* NAVEGAÇÃO POR ABAS SEPARADAS (PERFEITAS PARA O CELULAR) */}
+            {/* NAVEGAÇÃO POR ABAS SEPARADAS */}
             <div className="max-w-7xl mx-auto px-2 sm:px-4 border-t border-slate-800 flex space-x-1 overflow-x-auto text-xs py-1 scrollbar-thin">
               <button 
                 onClick={() => setActiveTab('solicitacoes')} 
@@ -1198,7 +1297,7 @@
               >
                 <span>✅</span> Desmontados Concluídos
                 <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${activeTab === 'desmontados' ? 'bg-slate-900 text-white' : 'bg-slate-700 text-slate-300'}`}>
-                  {stats.totalDesmontados}
+                  {dismantledRequests.length + (archivedStats.extraDesmontados || 0)}
                 </span>
               </button>
 
@@ -1240,32 +1339,130 @@
           {/* Conteúdo Principal */}
           <main className="max-w-7xl mx-auto px-4 py-5 flex-1 w-full space-y-5">
 
-            {/* BARRA DE INDICADORES GERAIS ACUMULADOS (SALVOS NA NUVEM) */}
-            <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1 border-b border-slate-100 pb-2 mb-3">
-                <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5 uppercase tracking-wide">
-                  <span>📈</span> Indicadores Gerais Acumulados
-                </span>
-                <span className="text-[10px] text-slate-400 font-medium">
-                  Preservados no Firebase mesmo com liberação de espaço de desmontados
-                </span>
+            {/* BLOCO DE INDICADORES DA GESTÃO COM FILTROS POR SEMANA E MÊS */}
+            <div className="bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 border-b border-slate-100 pb-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-sm sm:text-base font-extrabold text-slate-800 flex items-center gap-2">
+                      <span>📈</span> Indicadores da Gestão de Andaimes
+                    </h2>
+                    <span className="text-[10px] bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded-full border border-blue-200">
+                      Sincronizado
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Filtrando por: <strong className="text-slate-800 font-bold">{filterPeriodLabel}</strong>
+                  </p>
+                </div>
+
+                {/* BOTÕES DE FILTRO POR PERÍODO */}
+                <div className="flex items-center gap-1.5 flex-wrap bg-slate-100 p-1 rounded-xl border border-slate-200">
+                  <button 
+                    type="button"
+                    onClick={() => setFilterPeriod('all')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
+                      filterPeriod === 'all' 
+                        ? 'bg-white text-slate-900 shadow-sm border border-slate-200' 
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <span>📌</span> Geral
+                  </button>
+
+                  <button 
+                    type="button"
+                    onClick={() => setFilterPeriod('month')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
+                      filterPeriod === 'month' 
+                        ? 'bg-blue-600 text-white shadow-sm' 
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <span>🗓️</span> Este Mês
+                  </button>
+
+                  <button 
+                    type="button"
+                    onClick={() => setFilterPeriod('week')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
+                      filterPeriod === 'week' 
+                        ? 'bg-indigo-600 text-white shadow-sm' 
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <span>⏱️</span> Esta Semana
+                  </button>
+
+                  <button 
+                    type="button"
+                    onClick={() => setFilterPeriod('today')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
+                      filterPeriod === 'today' 
+                        ? 'bg-emerald-600 text-white shadow-sm' 
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <span>📍</span> Hoje
+                  </button>
+
+                  {isGestor && (
+                    <button 
+                      type="button"
+                      onClick={handleSyncIndicatorsWithDatabase}
+                      className="ml-1 px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-lg text-xs transition shadow-sm flex items-center gap-1"
+                      title="Sincronizar indicadores com a base real do Firebase"
+                    >
+                      <span>🔄</span> Sincronizar
+                    </button>
+                  )}
+                </div>
               </div>
+
+              {/* 4 CARDS DE INDICADORES (CONECTADOS AOS DADOS REAIS) */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="p-3 bg-amber-50 rounded-xl border border-amber-200">
-                  <p className="text-[10px] font-bold text-amber-800 uppercase">Total Solicitados</p>
-                  <p className="text-2xl font-black text-amber-900 mt-0.5">{stats.totalSolicitados}</p>
+                {/* 1. SOLICITAÇÕES */}
+                <div className="p-3.5 bg-amber-50 rounded-xl border border-amber-200">
+                  <p className="text-[10px] font-bold text-amber-800 uppercase tracking-wide">
+                    {filterPeriod === 'all' ? 'Solicitações na Fila' : 'Solicitados no Período'}
+                  </p>
+                  <p className="text-3xl font-black text-amber-950 mt-1">{displayedStats.solicitados}</p>
+                  <p className="text-[10px] text-amber-700 font-medium mt-1">
+                    {filterPeriod === 'all' ? `${requests.length} no total da fábrica` : 'No período selecionado'}
+                  </p>
                 </div>
-                <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200">
-                  <p className="text-[10px] font-bold text-emerald-800 uppercase">Total Montados</p>
-                  <p className="text-2xl font-black text-emerald-900 mt-0.5">{stats.totalMontados}</p>
+
+                {/* 2. MONTADOS */}
+                <div className="p-3.5 bg-emerald-50 rounded-xl border border-emerald-200">
+                  <p className="text-[10px] font-bold text-emerald-800 uppercase tracking-wide">
+                    {filterPeriod === 'all' ? 'Montados em Campo' : 'Montagens no Período'}
+                  </p>
+                  <p className="text-3xl font-black text-emerald-950 mt-1">{displayedStats.montados}</p>
+                  <p className="text-[10px] text-emerald-700 font-medium mt-1">
+                    Consumindo {allocatedM3} m³
+                  </p>
                 </div>
-                <div className="p-3 bg-slate-100 rounded-xl border border-slate-300">
-                  <p className="text-[10px] font-bold text-slate-700 uppercase">Desmontados Concluídos</p>
-                  <p className="text-2xl font-black text-slate-900 mt-0.5">{stats.totalDesmontados}</p>
+
+                {/* 3. DESMONTADOS */}
+                <div className="p-3.5 bg-slate-100 rounded-xl border border-slate-300">
+                  <p className="text-[10px] font-bold text-slate-700 uppercase tracking-wide">
+                    {filterPeriod === 'all' ? 'Desmontados Concluídos' : 'Desmontados no Período'}
+                  </p>
+                  <p className="text-3xl font-black text-slate-900 mt-1">{displayedStats.desmontados}</p>
+                  <p className="text-[10px] text-slate-500 font-medium mt-1">
+                    Finalizados com sucesso
+                  </p>
                 </div>
-                <div className="p-3 bg-red-50 rounded-xl border border-red-200">
-                  <p className="text-[10px] font-bold text-red-800 uppercase">Total Cancelados</p>
-                  <p className="text-2xl font-black text-red-900 mt-0.5">{stats.totalCancelados}</p>
+
+                {/* 4. CANCELADOS */}
+                <div className="p-3.5 bg-red-50 rounded-xl border border-red-200">
+                  <p className="text-[10px] font-bold text-red-800 uppercase tracking-wide">
+                    {filterPeriod === 'all' ? 'Total Cancelados' : 'Cancelados no Período'}
+                  </p>
+                  <p className="text-3xl font-black text-red-950 mt-1">{displayedStats.cancelados}</p>
+                  <p className="text-[10px] text-red-700 font-medium mt-1">
+                    Pela gestão de andaimes
+                  </p>
                 </div>
               </div>
             </div>
@@ -1348,7 +1545,7 @@
               <div className="space-y-4">
                 <div className="bg-slate-200/70 p-4 rounded-xl border border-slate-300 space-y-1">
                   <h2 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-                    <span>✅</span> Histórico de Andaimes Desmontados Concluídos ({stats.totalDesmontados})
+                    <span>✅</span> Histórico de Andaimes Desmontados Concluídos ({dismantledRequests.length + (archivedStats.extraDesmontados || 0)})
                   </h2>
                   <p className="text-xs text-slate-600">
                     Quando o andaime é finalizado e recolhido, as informações ativas são limpas da nuvem para economizar espaço e custos de banco, mantendo o total acumulado seguro no indicador histórico.
@@ -1366,7 +1563,7 @@
                     </div>
                     <h3 className="font-bold text-slate-800 text-sm">Nuvem Otimizada e 100% Livre</h3>
                     <p className="text-xs text-slate-500 max-w-md mx-auto">
-                      Todos os andaimes já desmontados tiveram seus documentos liberados do banco de dados na nuvem para manter a operação ágil e limpa. O total de <strong>{stats.totalDesmontados} andaimes finalizados</strong> está registrado nos indicadores históricos.
+                      Todos os andaimes já desmontados tiveram seus documentos liberados do banco de dados na nuvem para manter a operação ágil e limpa. O total de <strong>{displayedStats.desmontados} andaimes finalizados</strong> está registrado nos indicadores históricos.
                     </p>
                   </div>
                 )}
@@ -1661,7 +1858,7 @@
 
                   <div className="divide-y divide-slate-100">
                     {users.map((u) => {
-                      const isMe = u.email.toLowerCase() === currentUser.email.toLowerCase();
+                      const isMe = currentUser && u.email.toLowerCase() === currentUser.email.toLowerCase();
                       return (
                         <div key={u.id || u.email} className="py-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                           <div>
@@ -1703,7 +1900,25 @@
                   </div>
                 </div>
 
-                {/* 2. AJUSTE DE CAPACIDADE CONTRATADA */}
+                {/* 2. SINCRONIZAÇÃO E RECALIBRAÇÃO DE INDICADORES */}
+                <div className="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h3 className="font-bold text-base text-slate-800 flex items-center gap-2">
+                        <span>🔄</span> Sincronização e Ajuste de Indicadores
+                      </h3>
+                      <p className="text-xs text-slate-500">Recalcula os dados reais de solicitações, montados e desmontados diretamente com a nuvem.</p>
+                    </div>
+                    <button 
+                      onClick={handleSyncIndicatorsWithDatabase}
+                      className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-lg text-xs transition shadow flex items-center gap-1.5"
+                    >
+                      <span>🔄</span> Forçar Sincronização Agora
+                    </button>
+                  </div>
+                </div>
+
+                {/* 3. AJUSTE DE CAPACIDADE CONTRATADA */}
                 <div className="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200 space-y-3">
                   <h3 className="font-bold text-base text-slate-800">Ajuste de Capacidade Máxima Contratada</h3>
                   <p className="text-xs text-slate-500">Ajuste o volume total em m³ contratado junto à montadora. Salvo no Firebase para todos.</p>
@@ -1892,7 +2107,7 @@
                       setIsSavingMontado(true);
                       const reqId = photoModalReq.id;
                       const updatedHistory = [
-                        ...photoModalReq.history,
+                        ...(photoModalReq.history || []),
                         { 
                           date: new Date().toLocaleString('pt-BR'), 
                           user: `${currentUser.name} (${currentUser.role})`, 
@@ -1910,24 +2125,16 @@
                         updateData.photoUrl = tempPhotoUrl;
                       }
 
-                      // Atualiza local imediatamente
                       setRequests(prev => prev.map(r => r.id === reqId ? { ...r, ...updateData } : r));
 
                       try {
-                        // Grava no Firestore
                         await db.collection('andaimes_solicitacoes').doc(reqId).update(updateData);
-                        
-                        // Incrementa indicador de Montados no Firebase
-                        await db.collection('andaimes_config').doc('indicadores').set({
-                          totalMontados: firebase.firestore.FieldValue.increment(1)
-                        }, { merge: true });
                       } catch (err) {
                         console.error('Erro ao atualizar no Firestore:', err);
                       } finally {
                         setIsSavingMontado(false);
                         setPhotoModalReq(null);
                         setTempPhotoUrl(null);
-                        // Navega para a aba Montados
                         setActiveTab('montados');
                       }
                     }} 
