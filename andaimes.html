@@ -1,0 +1,1410 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestão e Controle de Andaimes</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- React & ReactDOM -->
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <!-- Babel Compiler -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans antialiased">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState } = React;
+
+    function App() {
+      // Lista de Usuários com Senhas de Acesso
+      const [users, setUsers] = useState([
+        { id: '1', name: 'Carlos Eduardo', email: 'carlos.eduardo@empresa.com', password: '123', role: 'Solicitante (Área)' },
+        { id: '2', name: 'João Silva', email: 'joao.silva@empresa.com', password: 'JDANDAIME', role: 'Equipe de Andaimes' },
+        { id: '3', name: 'Roberto Alves', email: 'roberto.alves@empresa.com', password: 'AUTOKRAFT01', role: 'Gestor de Andaimes' }
+      ]);
+
+      // Autenticação
+      const [isAuthenticated, setIsAuthenticated] = useState(false);
+      const [currentUser, setCurrentUser] = useState(null);
+      const [loginEmail, setLoginEmail] = useState(users[0].email);
+      const [loginPassword, setLoginPassword] = useState('');
+      const [loginError, setLoginError] = useState('');
+
+      const [loginMode, setLoginMode] = useState('select');
+      const [newUser, setNewUser] = useState({ name: '', email: '', password: '', role: 'Solicitante (Área)' });
+
+      // Navegação e Estoque
+      const [activeTab, setActiveTab] = useState('dashboard');
+      const [totalCapacityM3, setTotalCapacityM3] = useState(500);
+      
+      // Estado para modal de Visita Técnica
+      const [visitModalReqId, setVisitModalReqId] = useState(null);
+      const [visitDimensions, setVisitDimensions] = useState({ width: '', length: '', height: '' });
+
+      // Estado para modal de Alteração de Data Limite pelo Gestor
+      const [editDateModalReq, setEditDateModalReq] = useState(null);
+      const [newDueDate, setNewDueDate] = useState('');
+      const [dateChangeReason, setDateChangeReason] = useState('');
+      const [autoReorderOnDateChange, setAutoReorderOnDateChange] = useState(true);
+
+      // Função de ordenação da fila de espera pela Data Limite (dueDate)
+      const sortQueueByDueDate = (reqList) => {
+        const queueStatuses = ['Avaliação', 'Iniciado Montagem', 'Em Movimentação'];
+        const inQueue = reqList.filter(r => queueStatuses.includes(r.status));
+        const notInQueue = reqList.filter(r => !queueStatuses.includes(r.status));
+
+        // Ordena a fila: Data Limite mais próxima primeiro
+        inQueue.sort((a, b) => {
+          const dateA = a.dueDate || '9999-99-99';
+          const dateB = b.dueDate || '9999-99-99';
+          if (dateA !== dateB) return dateA.localeCompare(dateB);
+          if (a.isUrgent !== b.isUrgent) return a.isUrgent ? -1 : 1;
+          return (a.id || '').localeCompare(b.id || '');
+        });
+
+        // Atribui queueOrder sequencial (1, 2, 3...)
+        inQueue.forEach((r, idx) => {
+          r.queueOrder = idx + 1;
+        });
+
+        return [...inQueue, ...notInQueue];
+      };
+
+      // Solicitações Iniciais
+      const [requests, setRequests] = useState(() => {
+        const initial = [
+          {
+            id: 'SOL-1001',
+            factory: 'Fábrica 01 - Motores',
+            area: 'Utilidades - Caldeiras',
+            reference: 'Ao lado do tanque de condensado',
+            responsible: 'Carlos Eduardo',
+            phone: '(41) 99876-5432',
+            email: 'carlos.eduardo@empresa.com',
+            dueDate: '2026-11-05',
+            isUrgent: true,
+            queueOrder: 1,
+            width: 2,
+            length: 4,
+            height: 8,
+            volumeM3: 64,
+            realWidth: null,
+            realLength: null,
+            realHeight: null,
+            realVolumeM3: null,
+            status: 'Avaliação',
+            photoUrl: null,
+            createdAt: '28/10/2026 08:30',
+            history: [
+              { date: '28/10/2026 08:30', user: 'Carlos Eduardo (Solicitante)', action: 'Solicitação Criada (Urgente)' }
+            ]
+          },
+          {
+            id: 'SOL-1002',
+            factory: 'Fábrica 02 - Envase',
+            area: 'Embalagem 02',
+            reference: 'Linha de Potes',
+            responsible: 'Mariana Luz',
+            phone: '(41) 99123-4567',
+            email: 'mariana.luz@empresa.com',
+            dueDate: '2026-11-10',
+            isUrgent: false,
+            queueOrder: 2,
+            width: 3,
+            length: 3,
+            height: 4,
+            volumeM3: 36,
+            realWidth: 3,
+            realLength: 4,
+            realHeight: 4,
+            realVolumeM3: 48,
+            status: 'Montado',
+            photoUrl: null,
+            createdAt: '28/10/2026 09:15',
+            history: [
+              { date: '28/10/2026 09:15', user: 'Mariana Luz (Solicitante)', action: 'Solicitação Criada' },
+              { date: '28/10/2026 09:40', user: 'João Silva (Equipe de Andaimes)', action: 'Visita técnica realizada: Medida real 3x4x4m (48m³). Montagem iniciada.' },
+              { date: '28/10/2026 11:30', user: 'João Silva (Equipe de Andaimes)', action: 'Andaime Montado com sucesso' }
+            ]
+          },
+          {
+            id: 'SOL-1000',
+            factory: 'Fábrica Central',
+            area: 'Manutenção Mecânica',
+            reference: 'Ponte Rolante 01',
+            responsible: 'Antônio Ferreira',
+            phone: '(41) 98765-1122',
+            email: 'antonio.ferreira@empresa.com',
+            dueDate: '2026-10-25',
+            isUrgent: false,
+            queueOrder: null,
+            width: 2,
+            length: 2,
+            height: 5,
+            volumeM3: 20,
+            realWidth: 2,
+            realLength: 2,
+            realHeight: 5,
+            realVolumeM3: 20,
+            status: 'Desmontado',
+            photoUrl: null,
+            createdAt: '22/10/2026 08:00',
+            history: [
+              { date: '22/10/2026 08:00', user: 'Antônio Ferreira (Solicitante)', action: 'Solicitação Criada' },
+              { date: '23/10/2026 14:00', user: 'João Silva (Equipe de Andaimes)', action: 'Andaime Montado' },
+              { date: '25/10/2026 16:30', user: 'João Silva (Equipe de Andaimes)', action: 'Andaime Desmontado e materiais recolhidos' }
+            ]
+          }
+        ];
+        return sortQueueByDueDate(initial);
+      });
+
+      const [formData, setFormData] = useState({
+        factory: '',
+        area: '',
+        reference: '',
+        activityResponsible: '',
+        email: '',
+        phone: '',
+        dueDate: '',
+        isUrgent: false,
+        width: '',
+        length: '',
+        height: ''
+      });
+
+      const calcBaseArea = (Number(formData.width) || 0) * (Number(formData.length) || 0);
+      const calcVolume = calcBaseArea * (Number(formData.height) || 0);
+
+      // MÉTRICA: CONTABILIZA APENAS O QUE ESTÁ MONTADO (MEDIDA REAL)
+      const allocatedM3 = requests
+        .filter(r => r.status === 'Montado' || r.status === 'Liberado para Desmontagem')
+        .reduce((acc, curr) => {
+          const volumeEfetivo = (curr.realVolumeM3 !== null && curr.realVolumeM3 !== undefined) ? curr.realVolumeM3 : curr.volumeM3;
+          return acc + volumeEfetivo;
+        }, 0);
+      
+      const availableM3 = totalCapacityM3 - allocatedM3;
+
+      const todayStr = new Date().toISOString().split('T')[0];
+      const delayedRequests = requests.filter(r => r.status !== 'Desmontado' && r.dueDate && r.dueDate < todayStr);
+
+      const isGestor = currentUser?.role === 'Gestor de Andaimes';
+      const isEquipe = currentUser?.role === 'Equipe de Andaimes';
+      const isSolicitante = currentUser?.role === 'Solicitante (Área)';
+
+      // Listas filtradas para as colunas e abas
+      const queueRequests = requests
+        .filter(r => ['Avaliação', 'Iniciado Montagem', 'Em Movimentação'].includes(r.status))
+        .sort((a, b) => (a.queueOrder || 0) - (b.queueOrder || 0));
+
+      const mountedRequests = requests
+        .filter(r => ['Montado', 'Liberado para Desmontagem'].includes(r.status));
+
+      const dismantledRequests = requests
+        .filter(r => r.status === 'Desmontado');
+
+      // Autenticação com Senha
+      const handleLogin = (e) => {
+        e.preventDefault();
+        setLoginError('');
+        const found = users.find(u => u.email.toLowerCase() === loginEmail.toLowerCase());
+        
+        if (!found) {
+          setLoginError('E-mail não encontrado.');
+          return;
+        }
+
+        if (found.password !== loginPassword) {
+          setLoginError('Senha incorreta.');
+          return;
+        }
+
+        setCurrentUser(found);
+        setIsAuthenticated(true);
+        setLoginPassword('');
+      };
+
+      // Novo Cadastro - Validação de Senhas por Perfil (sem exibir a senha na interface)
+      const handleRegisterAndLogin = (e) => {
+        e.preventDefault();
+        setLoginError('');
+
+        if (users.some(u => u.email.toLowerCase() === newUser.email.toLowerCase())) {
+          setLoginError('Este e-mail já está cadastrado.');
+          return;
+        }
+
+        if (!newUser.name.trim() || !newUser.email.trim()) {
+          setLoginError('Por favor, preencha o nome completo e o e-mail corporativo.');
+          return;
+        }
+
+        // Validação de senhas por perfil de acesso conforme regras de segurança
+        if (newUser.role === 'Gestor de Andaimes') {
+          if (newUser.password !== 'AUTOKRAFT01') {
+            setLoginError('Senha de segurança incorreta para o perfil Gestor de Andaimes. Acesso não autorizado.');
+            return;
+          }
+        } else if (newUser.role === 'Equipe de Andaimes') {
+          if (newUser.password !== 'JDANDAIME') {
+            setLoginError('Senha de segurança incorreta para o perfil Equipe de Andaimes. Acesso não autorizado.');
+            return;
+          }
+        } else {
+          // Solicitante (Área): ele mesmo escolhe a senha livremente
+          if (!newUser.password || newUser.password.trim() === '') {
+            setLoginError('Por favor, informe uma senha para o seu cadastro.');
+            return;
+          }
+        }
+
+        const created = { id: String(Date.now()), ...newUser };
+        setUsers([...users, created]);
+        setCurrentUser(created);
+        setIsAuthenticated(true);
+        setNewUser({ name: '', email: '', password: '', role: 'Solicitante (Área)' });
+      };
+
+      const handleLogout = () => {
+        setIsAuthenticated(false);
+        setCurrentUser(null);
+        setLoginError('');
+      };
+
+      const handleInputChange = (e) => {
+        const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
+        setFormData({ ...formData, [e.target.name]: value });
+      };
+
+      // Criação de Solicitação - Fábrica preenchida pelo solicitante + Responsável pela Atividade
+      const handleCreateRequest = (e) => {
+        e.preventDefault();
+
+        const activityResp = (formData.activityResponsible || '').trim() || currentUser.name;
+        const respEmail = (formData.email || '').trim() || currentUser.email;
+
+        const newReq = {
+          id: `SOL-${1000 + requests.length + 1}`,
+          factory: formData.factory.trim(),
+          area: formData.area.trim(),
+          reference: formData.reference.trim(),
+          responsible: activityResp,
+          email: respEmail,
+          requesterName: currentUser.name,
+          requesterEmail: currentUser.email,
+          phone: formData.phone.trim(),
+          dueDate: formData.dueDate,
+          isUrgent: formData.isUrgent,
+          queueOrder: 999,
+          width: Number(formData.width) || 0,
+          length: Number(formData.length) || 0,
+          height: Number(formData.height) || 0,
+          volumeM3: calcVolume,
+          realWidth: null,
+          realLength: null,
+          realHeight: null,
+          realVolumeM3: null,
+          status: 'Avaliação',
+          photoUrl: null,
+          createdAt: new Date().toLocaleString('pt-BR'),
+          history: [
+            { 
+              date: new Date().toLocaleString('pt-BR'), 
+              user: `${currentUser.name} (${currentUser.role})`, 
+              action: `Solicitação Criada${formData.isUrgent ? ' (Urgente)' : ''} | Resp. Atividade: ${activityResp} | E-mail: ${respEmail}` 
+            }
+          ]
+        };
+
+        const updatedList = sortQueueByDueDate([newReq, ...requests]);
+        setRequests(updatedList);
+        
+        setFormData({
+          factory: '',
+          area: '',
+          reference: '',
+          activityResponsible: '',
+          email: '',
+          phone: '',
+          dueDate: '',
+          isUrgent: false,
+          width: '',
+          length: '',
+          height: ''
+        });
+        setActiveTab('dashboard');
+      };
+
+      // Alteração de Status
+      const updateStatus = (id, newStatus, extraAction = '') => {
+        setRequests(requests.map(r => {
+          if (r.id === id) {
+            const histMsg = extraAction 
+              ? `${extraAction}` 
+              : `Status alterado para: ${newStatus}`;
+            
+            return {
+              ...r,
+              status: newStatus,
+              history: [
+                ...r.history,
+                { date: new Date().toLocaleString('pt-BR'), user: `${currentUser.name} (${currentUser.role})`, action: histMsg }
+              ]
+            };
+          }
+          return r;
+        }));
+      };
+
+      // Salvar Visita Técnica com Dimensões Reais
+      const handleSaveVisit = (e) => {
+        e.preventDefault();
+        const w = Number(visitDimensions.width) || 0;
+        const l = Number(visitDimensions.length) || 0;
+        const h = Number(visitDimensions.height) || 0;
+        const realVol = w * l * h;
+
+        setRequests(requests.map(r => {
+          if (r.id === visitModalReqId) {
+            return {
+              ...r,
+              realWidth: w,
+              realLength: l,
+              realHeight: h,
+              realVolumeM3: realVol,
+              status: 'Iniciado Montagem',
+              history: [
+                ...r.history,
+                { 
+                  date: new Date().toLocaleString('pt-BR'), 
+                  user: `${currentUser.name} (${currentUser.role})`, 
+                  action: `Visita técnica concluída: Medidas reais ${w}x${l}x${h}m (${realVol}m³). Montagem iniciada.` 
+                }
+              ]
+            };
+          }
+          return r;
+        }));
+
+        setVisitModalReqId(null);
+        setVisitDimensions({ width: '', length: '', height: '' });
+      };
+
+      // Upload de Foto da Montagem
+      const handlePhotoUpload = (id, e) => {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            setRequests(requests.map(req => {
+              if (req.id === id) {
+                return {
+                  ...req,
+                  status: 'Montado',
+                  photoUrl: reader.result,
+                  history: [
+                    ...req.history,
+                    { 
+                      date: new Date().toLocaleString('pt-BR'), 
+                      user: `${currentUser.name} (${currentUser.role})`, 
+                      action: 'Foto do andaime registrada e status alterado para Montado' 
+                    }
+                  ]
+                };
+              }
+              return req;
+            }));
+          };
+          reader.readAsDataURL(file);
+        }
+      };
+
+      // Abertura do modal de alteração de Data Limite pelo Gestor
+      const openEditDateModal = (req) => {
+        setEditDateModalReq(req);
+        setNewDueDate(req.dueDate || '');
+        setDateChangeReason('');
+        setAutoReorderOnDateChange(true);
+      };
+
+      // Salvar nova Data Limite pelo Gestor
+      const handleSaveNewDueDate = (e) => {
+        e.preventDefault();
+        if (!editDateModalReq || !newDueDate) return;
+
+        const oldDate = editDateModalReq.dueDate || 'Não definida';
+        const reasonText = dateChangeReason.trim() ? ` Motivo: "${dateChangeReason.trim()}"` : '';
+
+        let updatedList = requests.map(r => {
+          if (r.id === editDateModalReq.id) {
+            return {
+              ...r,
+              dueDate: newDueDate,
+              history: [
+                ...r.history,
+                {
+                  date: new Date().toLocaleString('pt-BR'),
+                  user: `${currentUser.name} (${currentUser.role})`,
+                  action: `Data Limite alterada de ${oldDate} para ${newDueDate}.${reasonText}`
+                }
+              ]
+            };
+          }
+          return r;
+        });
+
+        if (autoReorderOnDateChange) {
+          updatedList = sortQueueByDueDate(updatedList);
+        }
+
+        setRequests(updatedList);
+        setEditDateModalReq(null);
+        setNewDueDate('');
+        setDateChangeReason('');
+      };
+
+      // Reordenação Manual na Fila de Espera (Subir / Descer)
+      const moveQueueItem = (reqId, direction) => {
+        const queueStatuses = ['Avaliação', 'Iniciado Montagem', 'Em Movimentação'];
+        const inQueue = requests.filter(r => queueStatuses.includes(r.status));
+        const notInQueue = requests.filter(r => !queueStatuses.includes(r.status));
+
+        inQueue.sort((a, b) => (a.queueOrder || 0) - (b.queueOrder || 0));
+
+        const currentIndex = inQueue.findIndex(r => r.id === reqId);
+        if (currentIndex === -1) return;
+
+        const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+        if (targetIndex < 0 || targetIndex >= inQueue.length) return;
+
+        const temp = inQueue[currentIndex];
+        inQueue[currentIndex] = inQueue[targetIndex];
+        inQueue[targetIndex] = temp;
+
+        inQueue.forEach((r, idx) => {
+          r.queueOrder = idx + 1;
+        });
+
+        const movedReq = inQueue[targetIndex];
+        movedReq.history.push({
+          date: new Date().toLocaleString('pt-BR'),
+          user: `${currentUser.name} (${currentUser.role})`,
+          action: `Posição na fila alterada manualmente para #${targetIndex + 1}`
+        });
+
+        setRequests([...inQueue, ...notInQueue]);
+      };
+
+      // Reordenar toda a fila pela Data Limite
+      const handleReorderQueueByDate = () => {
+        const sorted = sortQueueByDueDate(requests);
+        setRequests(sorted);
+      };
+
+      // --- TELA DE LOGIN / NOVO CADASTRO ---
+      if (!isAuthenticated) {
+        return (
+          <div className="min-h-screen flex items-center justify-center p-4 bg-slate-900">
+            <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full space-y-6">
+              <div className="text-center">
+                <div className="inline-flex p-3 bg-blue-50 text-blue-600 rounded-xl mb-3">
+                  <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+                </div>
+                <h1 className="text-2xl font-black text-slate-800">Controle de Andaimes</h1>
+                <p className="text-sm text-slate-500 mt-1">Autenticação com Controle de Perfis</p>
+              </div>
+
+              {loginError && (
+                <div className="p-3 bg-red-50 text-red-700 text-xs rounded-lg border border-red-200 font-medium">
+                  {loginError}
+                </div>
+              )}
+
+              <div className="flex border-b border-slate-200 text-sm">
+                <button 
+                  onClick={() => { setLoginMode('select'); setLoginError(''); }}
+                  className={`flex-1 py-2 font-semibold text-center border-b-2 ${loginMode === 'select' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                >
+                  Entrar
+                </button>
+                <button 
+                  onClick={() => { setLoginMode('register'); setLoginError(''); }}
+                  className={`flex-1 py-2 font-semibold text-center border-b-2 ${loginMode === 'register' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                >
+                  Novo Cadastro
+                </button>
+              </div>
+
+              {loginMode === 'select' ? (
+                <form onSubmit={handleLogin} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Selecionar Usuário</label>
+                    <select 
+                      value={loginEmail} 
+                      onChange={(e) => setLoginEmail(e.target.value)}
+                      className="w-full p-3 bg-slate-50 border border-slate-300 rounded-lg text-sm text-slate-800 font-medium"
+                    >
+                      {users.map(u => (
+                        <option key={u.id} value={u.email}>{u.name} — ({u.role})</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Senha de Acesso</label>
+                    <input 
+                      type="password"
+                      placeholder="Digite sua senha de acesso"
+                      value={loginPassword}
+                      onChange={(e) => setLoginPassword(e.target.value)}
+                      className="w-full p-3 bg-slate-50 border border-slate-300 rounded-lg text-sm"
+                      required
+                    />
+                  </div>
+
+                  <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg shadow-md transition text-sm">
+                    Entrar no Sistema
+                  </button>
+                </form>
+              ) : (
+                <form onSubmit={handleRegisterAndLogin} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Nome Completo</label>
+                    <input 
+                      type="text" 
+                      placeholder="Ex: Roberto Alves" 
+                      value={newUser.name} 
+                      onChange={(e) => setNewUser({...newUser, name: e.target.value})} 
+                      className="w-full p-3 bg-slate-50 border border-slate-300 rounded-lg text-sm" 
+                      required 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">E-mail corporativo</label>
+                    <input 
+                      type="email" 
+                      placeholder="usuario@empresa.com" 
+                      value={newUser.email} 
+                      onChange={(e) => setNewUser({...newUser, email: e.target.value})} 
+                      className="w-full p-3 bg-slate-50 border border-slate-300 rounded-lg text-sm" 
+                      required 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Função / Perfil</label>
+                    <select 
+                      value={newUser.role} 
+                      onChange={(e) => setNewUser({...newUser, role: e.target.value, password: ''})} 
+                      className="w-full p-3 bg-slate-50 border border-slate-300 rounded-lg text-sm font-semibold text-slate-800"
+                    >
+                      <option value="Solicitante (Área)">Solicitante (Área)</option>
+                      <option value="Equipe de Andaimes">Equipe de Andaimes</option>
+                      <option value="Gestor de Andaimes">Gestor de Andaimes</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">
+                      {newUser.role === 'Solicitante (Área)' 
+                        ? 'Criar Senha de Acesso' 
+                        : 'Senha de Acesso'}
+                    </label>
+                    <input 
+                      type="password" 
+                      placeholder={
+                        newUser.role === 'Solicitante (Área)'
+                          ? 'Crie uma senha de acesso'
+                          : 'Digite a senha de segurança do perfil'
+                      } 
+                      value={newUser.password} 
+                      onChange={(e) => setNewUser({...newUser, password: e.target.value})} 
+                      className="w-full p-3 bg-slate-50 border border-slate-300 rounded-lg text-sm" 
+                      required 
+                    />
+                    {newUser.role !== 'Solicitante (Área)' ? (
+                      <p className="text-[11px] text-slate-500 mt-1.5">
+                        Perfil restrito. Informe a chave corporativa autorizada correspondente à função.
+                      </p>
+                    ) : (
+                      <p className="text-[11px] text-slate-500 mt-1.5">
+                        Como solicitante da fábrica, você escolhe livremente sua senha pessoal.
+                      </p>
+                    )}
+                  </div>
+                  <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-lg shadow-md transition text-sm">
+                    Cadastrar e Entrar
+                  </button>
+                </form>
+              )}
+            </div>
+          </div>
+        );
+      }
+
+      // Renderização do Card de Solicitação
+      const renderCard = (req) => {
+        const isLate = req.status !== 'Desmontado' && req.dueDate && req.dueDate < todayStr;
+        const hasReal = req.realVolumeM3 !== null && req.realVolumeM3 !== undefined;
+        const isInQueue = ['Avaliação', 'Iniciado Montagem', 'Em Movimentação'].includes(req.status);
+
+        return (
+          <div key={req.id} className={`bg-white rounded-xl p-4 shadow-sm border ${req.isUrgent ? 'border-red-300 bg-red-50/20' : 'border-slate-200'} space-y-3`}>
+            <div className="flex justify-between items-start gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-bold text-sm text-slate-900">{req.id}</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700 max-w-[130px] truncate" title={req.factory}>
+                  {req.factory}
+                </span>
+                
+                {/* Badge de Posição na Fila */}
+                {isInQueue && req.queueOrder && (
+                  <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-500 text-slate-950 shadow-sm flex items-center gap-1">
+                    <span>#{req.queueOrder} na Fila</span>
+                  </span>
+                )}
+                
+                {req.isUrgent && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-red-100 text-red-700 border border-red-200">URGENTE</span>
+                )}
+                {isLate && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-red-600 text-white animate-pulse">ATRASADO</span>
+                )}
+              </div>
+
+              {/* Botões de Subir e Descer na Fila (Gestor e Equipe) */}
+              {isInQueue && (isGestor || isEquipe) && (
+                <div className="flex items-center space-x-1 bg-slate-100 p-1 rounded-lg border border-slate-200">
+                  <button 
+                    onClick={() => moveQueueItem(req.id, 'up')}
+                    title="Subir na fila de prioridade"
+                    className="p-1 hover:bg-white rounded text-slate-600 hover:text-blue-600 transition"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 15l7-7 7 7"></path></svg>
+                  </button>
+                  <button 
+                    onClick={() => moveQueueItem(req.id, 'down')}
+                    title="Descer na fila de prioridade"
+                    className="p-1 hover:bg-white rounded text-slate-600 hover:text-blue-600 transition"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7"></path></svg>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="text-xs text-slate-600 space-y-1">
+              <p><span className="font-semibold text-slate-700">Área:</span> {req.area}</p>
+              <p><span className="font-semibold text-slate-700">Ponto de Ref:</span> {req.reference}</p>
+              <p><span className="font-semibold text-slate-700">Resp. da Atividade:</span> {req.responsible} {req.phone ? `(${req.phone})` : ''}</p>
+              <p><span className="font-semibold text-slate-700">E-mail:</span> {req.email || 'Não informado'}</p>
+              {req.requesterName && req.requesterName !== req.responsible && (
+                <p className="text-[11px] text-slate-500 italic"><span className="font-semibold">Solicitante:</span> {req.requesterName}</p>
+              )}
+              
+              <div className="flex items-center justify-between pt-1">
+                <p className={isLate ? 'text-red-600 font-bold' : ''}>
+                  <span className="font-semibold text-slate-700">Data Limite:</span> {req.dueDate || 'Não definida'}
+                </p>
+                {/* Botão de Alinhamento / Ajuste de Data Limite pelo Gestor */}
+                {isGestor && (
+                  <button 
+                    onClick={() => openEditDateModal(req)}
+                    className="text-[11px] text-blue-600 hover:text-blue-800 font-semibold underline flex items-center gap-1"
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                    Ajustar Data
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Volume e Dimensões */}
+            <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100 flex justify-between items-center text-xs">
+              <div>
+                <span className="text-[10px] text-slate-500 block uppercase">Estimado (Área)</span>
+                <span className="font-semibold">{req.width}x{req.length}x{req.height}m ({req.volumeM3}m³)</span>
+              </div>
+              <div className="text-right">
+                <span className="text-[10px] text-slate-500 block uppercase">Real (Visita)</span>
+                {hasReal ? (
+                  <span className="font-bold text-blue-600">{req.realWidth}x{req.realLength}x{req.realHeight}m ({req.realVolumeM3}m³)</span>
+                ) : (
+                  <span className="text-slate-400 italic">Pendente</span>
+                )}
+              </div>
+            </div>
+
+            {/* Foto registrada (se houver) */}
+            {req.photoUrl && (
+              <div>
+                <img src={req.photoUrl} alt="Foto Andaime" className="w-full h-24 object-cover rounded-lg border border-slate-200" />
+              </div>
+            )}
+
+            {/* Status Atual */}
+            <div className="flex items-center justify-between pt-1">
+              <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${
+                req.status === 'Avaliação' ? 'bg-amber-100 text-amber-800' :
+                req.status === 'Iniciado Montagem' ? 'bg-blue-100 text-blue-800' :
+                req.status === 'Em Movimentação' ? 'bg-indigo-100 text-indigo-800' :
+                req.status === 'Montado' ? 'bg-emerald-100 text-emerald-800' :
+                req.status === 'Liberado para Desmontagem' ? 'bg-purple-100 text-purple-800' :
+                'bg-slate-200 text-slate-700'
+              }`}>
+                {req.status}
+              </span>
+
+              {/* Ações permitidas conforme Perfil */}
+              <div className="flex space-x-1.5">
+                {/* Avaliação -> Visita Técnica / Iniciar */}
+                {req.status === 'Avaliação' && (isEquipe || isGestor) && (
+                  <button 
+                    onClick={() => {
+                      setVisitModalReqId(req.id);
+                      setVisitDimensions({ width: req.width, length: req.length, height: req.height });
+                    }}
+                    className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shadow transition"
+                  >
+                    Visita Técnica
+                  </button>
+                )}
+
+                {/* Iniciado Montagem -> Movimentação */}
+                {req.status === 'Iniciado Montagem' && (isEquipe || isGestor) && (
+                  <button 
+                    onClick={() => updateStatus(req.id, 'Em Movimentação', 'Movimentação dos materiais iniciada')}
+                    className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg shadow transition"
+                  >
+                    Movimentar
+                  </button>
+                )}
+
+                {/* Em Movimentação -> Registrar Foto e Concluir Montagem */}
+                {req.status === 'Em Movimentação' && (isEquipe || isGestor) && (
+                  <label className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg shadow transition cursor-pointer flex items-center gap-1">
+                    <input type="file" accept="image/*" capture="environment" onChange={(e) => handlePhotoUpload(req.id, e)} className="hidden" />
+                    <span>📸 Montado</span>
+                  </label>
+                )}
+
+                {/* Solicitante: Liberar para desmontagem */}
+                {req.status === 'Montado' && (isSolicitante || isGestor) && (
+                  <button 
+                    onClick={() => updateStatus(req.id, 'Liberado para Desmontagem', 'Solicitada a desmontagem pela área')}
+                    className="px-2.5 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold rounded-lg shadow transition"
+                  >
+                    Liberar Desmontagem
+                  </button>
+                )}
+
+                {/* Equipe / Gestor: Finalizar desmontagem */}
+                {req.status === 'Liberado para Desmontagem' && (isEquipe || isGestor) && (
+                  <button 
+                    onClick={() => updateStatus(req.id, 'Desmontado', 'Andaime desmontado e recolhido')}
+                    className="px-2.5 py-1 bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold rounded-lg shadow transition"
+                  >
+                    Desmontado
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Histórico recolhível */}
+            <details className="text-[11px] text-slate-500 pt-1 border-t border-slate-100">
+              <summary className="cursor-pointer hover:text-slate-800 font-medium">Ver Histórico de Auditoria ({req.history.length})</summary>
+              <div className="mt-2 space-y-1.5 bg-slate-50 p-2 rounded-lg max-h-36 overflow-y-auto">
+                {req.history.map((h, i) => (
+                  <div key={i} className="flex flex-col border-b border-slate-200/60 pb-1 last:border-0 last:pb-0">
+                    <span className="font-semibold text-slate-700">{h.action}</span>
+                    <span className="text-[10px] text-slate-400">{h.date} • {h.user}</span>
+                  </div>
+                ))}
+              </div>
+            </details>
+          </div>
+        );
+      };
+
+      return (
+        <div className="min-h-screen flex flex-col">
+          {/* Top Bar Corporativa */}
+          <header className="bg-slate-900 text-white shadow-lg sticky top-0 z-40">
+            <div className="max-w-7xl mx-auto px-4 py-3 flex flex-col md:flex-row justify-between items-center gap-3">
+              <div className="flex items-center space-x-3">
+                <a href="/" className="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-2.5 py-1.5 rounded-lg border border-slate-700 transition" title="Ir para InspectCBM SCADA">
+                  ← InspectCBM
+                </a>
+                <div className="p-2 bg-blue-600 rounded-lg">
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+                </div>
+                <div>
+                  <h1 className="font-bold text-base tracking-wide flex items-center gap-2">
+                    Gestão de Andaimes
+                    <span className="text-[10px] bg-blue-500/20 text-blue-300 border border-blue-400/30 px-2 py-0.5 rounded-full font-normal">Fila por Data Limite</span>
+                  </h1>
+                  <p className="text-xs text-slate-400">Controle de Capacidade, Fila de Espera e Montagens</p>
+                </div>
+              </div>
+
+              {/* Informações do Usuário Conectado */}
+              <div className="flex items-center space-x-3 text-xs">
+                <div className="text-right">
+                  <p className="font-bold text-slate-200">{currentUser.name}</p>
+                  <p className="text-blue-400 font-semibold">{currentUser.role}</p>
+                </div>
+                <button 
+                  onClick={handleLogout}
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 transition"
+                >
+                  Sair
+                </button>
+              </div>
+            </div>
+
+            {/* Menu de Abas */}
+            <div className="max-w-7xl mx-auto px-4 border-t border-slate-800 flex space-x-1 overflow-x-auto text-xs">
+              <button 
+                onClick={() => setActiveTab('dashboard')} 
+                className={`py-3 px-4 font-semibold border-b-2 flex items-center gap-1.5 transition whitespace-nowrap ${activeTab === 'dashboard' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'}`}
+              >
+                Visão Geral
+              </button>
+              <button 
+                onClick={() => setActiveTab('fila')} 
+                className={`py-3 px-4 font-semibold border-b-2 flex items-center gap-1.5 transition whitespace-nowrap ${activeTab === 'fila' ? 'border-amber-500 text-amber-400' : 'border-transparent text-slate-400 hover:text-slate-200'}`}
+              >
+                Fila de Espera (Prioridade)
+                <span className="ml-1 px-1.5 py-0.2 bg-amber-500/20 text-amber-300 rounded-full text-[10px]">
+                  {queueRequests.length}
+                </span>
+              </button>
+              <button 
+                onClick={() => setActiveTab('montados')} 
+                className={`py-3 px-4 font-semibold border-b-2 flex items-center gap-1.5 transition whitespace-nowrap ${activeTab === 'montados' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-slate-400 hover:text-slate-200'}`}
+              >
+                Montados em Campo
+                <span className="ml-1 px-1.5 py-0.2 bg-emerald-500/20 text-emerald-300 rounded-full text-[10px]">
+                  {mountedRequests.length}
+                </span>
+              </button>
+              <button 
+                onClick={() => setActiveTab('nova')} 
+                className={`py-3 px-4 font-semibold border-b-2 flex items-center gap-1.5 transition whitespace-nowrap ${activeTab === 'nova' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'}`}
+              >
+                + Nova Solicitação
+              </button>
+              {isGestor && (
+                <button 
+                  onClick={() => setActiveTab('gestao')} 
+                  className={`py-3 px-4 font-semibold border-b-2 flex items-center gap-1.5 transition whitespace-nowrap ${activeTab === 'gestao' ? 'border-purple-500 text-purple-400' : 'border-transparent text-slate-400 hover:text-slate-200'}`}
+                >
+                  Gestão & Estoque M³
+                </button>
+              )}
+            </div>
+          </header>
+
+          {/* Banner de Andaimes Atrasados (se houver) */}
+          {delayedRequests.length > 0 && (
+            <div className="bg-red-500 text-white px-4 py-2 text-xs font-semibold flex items-center justify-between shadow">
+              <div className="max-w-7xl mx-auto w-full flex items-center justify-between">
+                <span>⚠️ Atenção: Existem {delayedRequests.length} andaime(s) com Data Limite Ultrapassada precisando de alinhamento com as áreas!</span>
+                <button onClick={() => setActiveTab('fila')} className="underline hover:text-red-100">Ver Fila</button>
+              </div>
+            </div>
+          )}
+
+          {/* Conteúdo Principal */}
+          <main className="max-w-7xl mx-auto px-4 py-6 flex-1 w-full space-y-6">
+
+            {/* ABA: VISÃO GERAL (INCLUI MÉTRICAS E O PANORAMA GERAL EM 3 COLUNAS) */}
+            {activeTab === 'dashboard' && (
+              <div className="space-y-6">
+                {/* Cartões de Capacidade e Estoque M3 */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                    <p className="text-xs font-semibold text-slate-500 uppercase">Capacidade Contratada</p>
+                    <p className="text-2xl font-black text-slate-800 mt-1">{totalCapacityM3} <span className="text-sm font-normal text-slate-500">m³</span></p>
+                    <p className="text-[11px] text-slate-400 mt-1">Limite contratado</p>
+                  </div>
+                  <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                    <p className="text-xs font-semibold text-slate-500 uppercase">Em Uso Efetivo (Montado)</p>
+                    <p className="text-2xl font-black text-blue-600 mt-1">{allocatedM3} <span className="text-sm font-normal text-slate-500">m³</span></p>
+                    <p className="text-[11px] text-slate-400 mt-1">Contabiliza montagens reais em campo</p>
+                  </div>
+                  <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                    <p className="text-xs font-semibold text-slate-500 uppercase">Disponível em Estoque</p>
+                    <p className={`text-2xl font-black mt-1 ${availableM3 < 50 ? 'text-red-600' : 'text-emerald-600'}`}>
+                      {availableM3} <span className="text-sm font-normal text-slate-500">m³</span>
+                    </p>
+                    <p className="text-[11px] text-slate-400 mt-1">{((availableM3 / totalCapacityM3) * 100).toFixed(1)}% livre</p>
+                  </div>
+                  <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                    <p className="text-xs font-semibold text-slate-500 uppercase">Aguardando na Fila</p>
+                    <p className="text-2xl font-black text-amber-600 mt-1">
+                      {queueRequests.length}
+                    </p>
+                    <p className="text-[11px] text-slate-400 mt-1">Ordenados por Data Limite</p>
+                  </div>
+                </div>
+
+                {/* Barra de Progresso Visual de Uso de M3 */}
+                <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 space-y-2">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-bold text-slate-700">Taxa de Ocupação de Andaimes da Planta</span>
+                    <span className="font-bold text-slate-700">{((allocatedM3 / totalCapacityM3) * 100).toFixed(1)}%</span>
+                  </div>
+                  <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
+                    <div 
+                      className={`h-full transition-all duration-500 ${
+                        (allocatedM3 / totalCapacityM3) > 0.85 ? 'bg-red-500' :
+                        (allocatedM3 / totalCapacityM3) > 0.65 ? 'bg-amber-500' : 'bg-blue-600'
+                      }`}
+                      style={{ width: `${Math.min(100, (allocatedM3 / totalCapacityM3) * 100)}%` }}
+                    ></div>
+                  </div>
+                </div>
+
+                {/* PANORAMA GERAL DA GESTÃO DOS ANDAIMES (3 COLUNAS) */}
+                <div className="space-y-4 pt-4 border-t border-slate-200">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                    <div>
+                      <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                        <span>📌</span> Panorama Geral da Gestão de Andaimes
+                      </h2>
+                      <p className="text-xs text-slate-500">
+                        Visão panorâmica em 3 colunas: Fila de Espera por Prazo, Andaimes Montados em Campo e Andaimes Desmontados.
+                      </p>
+                    </div>
+                    {isGestor && (
+                      <button 
+                        onClick={handleReorderQueueByDate}
+                        className="bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-bold px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 shadow-sm"
+                        title="Reordenar todas as solicitações em aberto pela Data Limite"
+                      >
+                        <span>⚡</span> Reordenar Fila por Prazo
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+                    
+                    {/* COLUNA 1: SOLICITAÇÕES NA FILA DE ESPERA */}
+                    <div className="bg-slate-200/60 p-4 rounded-xl space-y-4 border border-slate-300/70 min-h-[500px]">
+                      <div className="flex justify-between items-center border-b border-slate-300 pb-2">
+                        <div>
+                          <h3 className="font-bold text-slate-800 text-sm flex items-center gap-1.5">
+                            <span>📋</span> 1. Fila de Espera & Solicitações
+                          </h3>
+                          <span className="text-[10px] text-slate-500 font-medium">Prioridade por Data Limite</span>
+                        </div>
+                        <span className="bg-amber-100 text-amber-800 border border-amber-300 font-extrabold text-xs px-2.5 py-0.5 rounded-full">
+                          {queueRequests.length}
+                        </span>
+                      </div>
+
+                      <div className="space-y-3">
+                        {queueRequests.length > 0 ? (
+                          queueRequests.map(renderCard)
+                        ) : (
+                          <div className="text-center py-12 bg-white/60 rounded-xl border border-dashed border-slate-300 text-xs text-slate-400">
+                            Nenhuma solicitação aguardando na fila.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* COLUNA 2: ANDAIMES MONTADOS */}
+                    <div className="bg-emerald-50/70 p-4 rounded-xl space-y-4 border border-emerald-200 min-h-[500px]">
+                      <div className="flex justify-between items-center border-b border-emerald-200 pb-2">
+                        <div>
+                          <h3 className="font-bold text-emerald-900 text-sm flex items-center gap-1.5">
+                            <span>🏗️</span> 2. Andaimes Montados
+                          </h3>
+                          <span className="text-[10px] text-emerald-700 font-medium">Consumindo estoque ({allocatedM3} m³)</span>
+                        </div>
+                        <span className="bg-emerald-200 text-emerald-900 border border-emerald-300 font-extrabold text-xs px-2.5 py-0.5 rounded-full">
+                          {mountedRequests.length}
+                        </span>
+                      </div>
+
+                      <div className="space-y-3">
+                        {mountedRequests.length > 0 ? (
+                          mountedRequests.map(renderCard)
+                        ) : (
+                          <div className="text-center py-12 bg-white/60 rounded-xl border border-dashed border-emerald-200 text-xs text-emerald-600/70">
+                            Nenhum andaime montado em campo no momento.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* COLUNA 3: ANDAIMES DESMONTADOS */}
+                    <div className="bg-slate-100/70 p-4 rounded-xl space-y-4 border border-slate-200 min-h-[500px]">
+                      <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+                        <div>
+                          <h3 className="font-bold text-slate-700 text-sm flex items-center gap-1.5">
+                            <span>✓</span> 3. Andaimes Desmontados
+                          </h3>
+                          <span className="text-[10px] text-slate-500 font-medium">Histórico finalizado</span>
+                        </div>
+                        <span className="bg-slate-200 text-slate-700 border border-slate-300 font-extrabold text-xs px-2.5 py-0.5 rounded-full">
+                          {dismantledRequests.length}
+                        </span>
+                      </div>
+
+                      <div className="space-y-3">
+                        {dismantledRequests.length > 0 ? (
+                          dismantledRequests.map(renderCard)
+                        ) : (
+                          <div className="text-center py-12 bg-white/60 rounded-xl border border-dashed border-slate-200 text-xs text-slate-400">
+                            Nenhum andaime desmontado registrado ainda.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ABA: FILA DE ESPERA (PRIORIDADE) */}
+            {activeTab === 'fila' && (
+              <div className="space-y-4">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-amber-50 p-4 rounded-xl border border-amber-200">
+                  <div>
+                    <h2 className="font-bold text-amber-900 text-sm">Fila de Prioridade dos Andaimes</h2>
+                    <p className="text-xs text-amber-700 mt-0.5">
+                      Fila organizada automaticamente com base na <strong>Data Limite de Finalização</strong> (a data mais urgente/próxima é atendida primeiro).
+                    </p>
+                  </div>
+                  {isGestor && (
+                    <button 
+                      onClick={handleReorderQueueByDate}
+                      className="px-3 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-lg shadow transition flex items-center gap-1.5"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                      Reorganizar Automaticamente por Data Limite
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {queueRequests.map(renderCard)}
+                </div>
+
+                {queueRequests.length === 0 && (
+                  <div className="text-center py-12 bg-white rounded-xl border border-slate-200">
+                    <p className="text-sm text-slate-500">Nenhum andaime aguardando na fila de montagem no momento.</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ABA: MONTADOS EM CAMPO */}
+            {activeTab === 'montados' && (
+              <div className="space-y-4">
+                <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-200">
+                  <h2 className="font-bold text-emerald-900 text-sm">Andaimes Montados em Campo</h2>
+                  <p className="text-xs text-emerald-700 mt-0.5">Estes andaimes estão consumindo a cota contratada ({allocatedM3} m³ de {totalCapacityM3} m³).</p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {mountedRequests.map(renderCard)}
+                </div>
+
+                {mountedRequests.length === 0 && (
+                  <div className="text-center py-12 bg-white rounded-xl border border-slate-200">
+                    <p className="text-sm text-slate-500">Não há andaimes montados em campo no momento.</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ABA: NOVA SOLICITAÇÃO (CAMPO FÁBRICA PREENCHIDO PELO SOLICITANTE) */}
+            {activeTab === 'nova' && (
+              <div className="max-w-2xl mx-auto bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <h2 className="text-base font-bold text-slate-800 mb-1">Nova Solicitação de Andaime</h2>
+                <p className="text-xs text-slate-500 mb-6">Preencha os dados da atividade. A fila será enfileirada automaticamente pela Data Limite informada.</p>
+
+                <form onSubmit={handleCreateRequest} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Planta / Fábrica *</label>
+                      <input 
+                        type="text" 
+                        name="factory" 
+                        placeholder="Digite o nome da fábrica (Ex: Fábrica 01, Fábrica de Motores...)" 
+                        value={formData.factory} 
+                        onChange={handleInputChange} 
+                        required 
+                        className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm font-medium focus:outline-none focus:border-blue-500" 
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Área / Setor *</label>
+                      <input 
+                        type="text" 
+                        name="area" 
+                        placeholder="Ex: Caldeiras, Linha de Envase" 
+                        value={formData.area} 
+                        onChange={handleInputChange} 
+                        required 
+                        className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm" 
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Ponto de Referência / Local Exato *</label>
+                    <input 
+                      type="text" 
+                      name="reference" 
+                      placeholder="Ex: Ao lado do tanque T-102" 
+                      value={formData.reference} 
+                      onChange={handleInputChange} 
+                      required 
+                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm" 
+                    />
+                  </div>
+
+                  {/* RESPONSÁVEL PELA ATIVIDADE (DONO DA ATIVIDADE), E-MAIL E TELEFONE */}
+                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-slate-700 uppercase tracking-wide flex items-center gap-1.5">
+                        <span>👷</span> Responsável pela Atividade (Dono do Serviço no Local) *
+                      </label>
+                      <span className="text-[10px] text-slate-500 font-medium">Pode ser diferente do solicitante logado</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Nome do Responsável *</label>
+                        <input 
+                          type="text" 
+                          name="activityResponsible" 
+                          placeholder="Nome do dono da atividade" 
+                          value={formData.activityResponsible} 
+                          onChange={handleInputChange} 
+                          required 
+                          className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-sm" 
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">E-mail do Responsável *</label>
+                        <input 
+                          type="email" 
+                          name="email" 
+                          placeholder="responsavel@empresa.com" 
+                          value={formData.email} 
+                          onChange={handleInputChange} 
+                          required 
+                          className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-sm" 
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Telefone / Ramal *</label>
+                        <input 
+                          type="text" 
+                          name="phone" 
+                          placeholder="(XX) 99999-9999" 
+                          value={formData.phone} 
+                          onChange={handleInputChange} 
+                          required 
+                          className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-sm" 
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Data Limite de Finalização *</label>
+                      <input 
+                        type="date" 
+                        name="dueDate" 
+                        value={formData.dueDate} 
+                        onChange={handleInputChange} 
+                        required 
+                        className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm font-semibold" 
+                      />
+                      <p className="text-[10px] text-slate-400 mt-1">Define automaticamente a posição na fila de prioridade.</p>
+                    </div>
+                    <div className="flex items-center pt-6">
+                      <label className="flex items-center space-x-2 cursor-pointer">
+                        <input 
+                          type="checkbox" 
+                          name="isUrgent" 
+                          checked={formData.isUrgent} 
+                          onChange={handleInputChange} 
+                          className="w-4 h-4 text-red-600 rounded border-slate-300" 
+                        />
+                        <span className="text-xs font-bold text-red-600">Marcar como URGÊNCIA OPERACIONAL</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Dimensões Estimadas */}
+                  <div className="border-t border-slate-200 pt-4">
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Dimensões Estimadas (Metros)</label>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <span className="text-[11px] text-slate-500">Largura (m)</span>
+                        <input type="number" step="0.1" name="width" placeholder="Ex: 2" value={formData.width} onChange={handleInputChange} required className="w-full p-2 bg-slate-50 border border-slate-300 rounded text-sm" />
+                      </div>
+                      <div>
+                        <span className="text-[11px] text-slate-500">Comprimento (m)</span>
+                        <input type="number" step="0.1" name="length" placeholder="Ex: 3" value={formData.length} onChange={handleInputChange} required className="w-full p-2 bg-slate-50 border border-slate-300 rounded text-sm" />
+                      </div>
+                      <div>
+                        <span className="text-[11px] text-slate-500">Altura (m)</span>
+                        <input type="number" step="0.1" name="height" placeholder="Ex: 4" value={formData.height} onChange={handleInputChange} required className="w-full p-2 bg-slate-50 border border-slate-300 rounded text-sm" />
+                      </div>
+                    </div>
+
+                    <div className="mt-3 p-3 bg-slate-50 rounded-lg flex justify-between text-xs font-semibold text-slate-700">
+                      <span>Área de Base Estimada: {calcBaseArea.toFixed(1)} m²</span>
+                      <span className="text-blue-600">Volume Total Estimado: {calcVolume.toFixed(1)} m³</span>
+                    </div>
+                  </div>
+
+                  <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg shadow-md transition text-sm">
+                    Enviar Solicitação para a Fila
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {/* ABA: GESTÃO & ESTOQUE M3 (EXCLUSIVO GESTOR) */}
+            {activeTab === 'gestao' && isGestor && (
+              <div className="space-y-6">
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 max-w-xl">
+                  <h3 className="font-bold text-sm text-slate-800 mb-2">Ajuste de Capacidade Máxima Contratada</h3>
+                  <p className="text-xs text-slate-500 mb-4">Ajuste o volume total em m³ contratado junto à montadora terceirizada.</p>
+                  
+                  <div className="flex items-center space-x-3">
+                    <input 
+                      type="number" 
+                      value={totalCapacityM3} 
+                      onChange={(e) => setTotalCapacityM3(Number(e.target.value) || 0)} 
+                      className="p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm w-36 font-bold" 
+                    />
+                    <span className="text-sm font-semibold text-slate-600">m³ Contratados</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+          </main>
+
+          {/* MODAL: VISITA TÉCNICA E DIMENSÃO REAL */}
+          {visitModalReqId && (
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full space-y-4">
+                <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                  <h3 className="font-bold text-sm text-slate-800">Visita Técnica — Medição Real</h3>
+                  <button onClick={() => setVisitModalReqId(null)} className="text-slate-400 hover:text-slate-600 font-bold">&times;</button>
+                </div>
+                <p className="text-xs text-slate-500">Informe as dimensões conferidas no local para iniciar a montagem:</p>
+
+                <form onSubmit={handleSaveVisit} className="space-y-3">
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="text-[10px] text-slate-500">Largura (m)</label>
+                      <input type="number" step="0.1" value={visitDimensions.width} onChange={(e) => setVisitDimensions({...visitDimensions, width: e.target.value})} required className="w-full p-2 border rounded text-xs" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-500">Comprimento (m)</label>
+                      <input type="number" step="0.1" value={visitDimensions.length} onChange={(e) => setVisitDimensions({...visitDimensions, length: e.target.value})} required className="w-full p-2 border rounded text-xs" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-500">Altura (m)</label>
+                      <input type="number" step="0.1" value={visitDimensions.height} onChange={(e) => setVisitDimensions({...visitDimensions, height: e.target.value})} required className="w-full p-2 border rounded text-xs" />
+                    </div>
+                  </div>
+
+                  <div className="p-2.5 bg-blue-50 text-blue-900 rounded text-xs font-semibold">
+                    Volume Real: {((Number(visitDimensions.width) || 0) * (Number(visitDimensions.length) || 0) * (Number(visitDimensions.height) || 0)).toFixed(1)} m³
+                  </div>
+
+                  <div className="flex justify-end space-x-2 pt-2">
+                    <button type="button" onClick={() => setVisitModalReqId(null)} className="px-3 py-1.5 border rounded text-xs">Cancelar</button>
+                    <button type="submit" className="px-4 py-1.5 bg-blue-600 text-white rounded text-xs font-bold hover:bg-blue-700">Confirmar Medidas e Iniciar</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* MODAL: ALINHAMENTO E AJUSTE DE DATA LIMITE PELO GESTOR */}
+          {editDateModalReq && (
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full space-y-4">
+                <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                  <h3 className="font-bold text-sm text-slate-800">Alinhamento de Prazo — {editDateModalReq.id}</h3>
+                  <button onClick={() => setEditDateModalReq(null)} className="text-slate-400 hover:text-slate-600 font-bold">&times;</button>
+                </div>
+
+                <div className="text-xs text-slate-600 space-y-1">
+                  <p><span className="font-semibold">Local:</span> {editDateModalReq.factory} - {editDateModalReq.area}</p>
+                  <p><span className="font-semibold">Responsável:</span> {editDateModalReq.responsible}</p>
+                  <p><span className="font-semibold">Data Atual:</span> {editDateModalReq.dueDate || 'Não definida'}</p>
+                </div>
+
+                <form onSubmit={handleSaveNewDueDate} className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Nova Data Limite de Finalização</label>
+                    <input 
+                      type="date" 
+                      value={newDueDate} 
+                      onChange={(e) => setNewDueDate(e.target.value)} 
+                      required 
+                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm font-semibold" 
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Motivo do Alinhamento com a Área (Opcional)</label>
+                    <textarea 
+                      rows="2"
+                      placeholder="Ex: Alinhado com a supervisão de manutenção devido atraso na entrega de peças"
+                      value={dateChangeReason}
+                      onChange={(e) => setDateChangeReason(e.target.value)}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-xs"
+                    ></textarea>
+                  </div>
+
+                  <div className="flex items-center space-x-2 pt-1">
+                    <input 
+                      type="checkbox" 
+                      id="chk-reorder" 
+                      checked={autoReorderOnDateChange} 
+                      onChange={(e) => setAutoReorderOnDateChange(e.target.checked)}
+                      className="w-4 h-4 text-blue-600 rounded border-slate-300" 
+                    />
+                    <label htmlFor="chk-reorder" className="text-xs text-slate-600 cursor-pointer">
+                      Reordenar automaticamente a fila com esta nova data
+                    </label>
+                  </div>
+
+                  <div className="flex justify-end space-x-2 pt-3 border-t border-slate-100">
+                    <button type="button" onClick={() => setEditDateModalReq(null)} className="px-3 py-1.5 border rounded text-xs">Cancelar</button>
+                    <button type="submit" className="px-4 py-1.5 bg-blue-600 text-white rounded text-xs font-bold hover:bg-blue-700">Salvar Nova Data</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+        </div>
+      );
+    }
+
+    ReactDOM.render(<App />, document.getElementById('root'));
+  </script>
+</body>
+</html>
