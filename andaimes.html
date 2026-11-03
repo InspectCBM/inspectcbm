@@ -200,6 +200,11 @@
       const [filterPeriod, setFilterPeriod] = useState('all');
 
       const [totalCapacityM3, setTotalCapacityM3] = useState(500);
+
+      // Metragem total de andaimes desmontados guardados em fábricas
+      const totalMetersStored = useMemo(() => {
+        return dismantledStorageList.reduce((acc, curr) => acc + (Number(curr.linearMeters) || 0), 0);
+      }, [dismantledStorageList]);
       const [isCloudConnected, setIsCloudConnected] = useState(true);
 
       // Offset / Dados arquivados para manter contagem histórica caso documentos sejam deletados
@@ -220,6 +225,7 @@
 
       const [editDateModalReq, setEditDateModalReq] = useState(null);
       const [newDueDate, setNewDueDate] = useState('');
+      const [newExpectedDismantleDate, setNewExpectedDismantleDate] = useState('');
       const [dateChangeReason, setDateChangeReason] = useState('');
       const [autoReorderOnDateChange, setAutoReorderOnDateChange] = useState(true);
 
@@ -231,6 +237,30 @@
       const [cancelModalReq, setCancelModalReq] = useState(null);
       const [cancelReason, setCancelReason] = useState('');
       const [isCancelling, setIsCancelling] = useState(false);
+
+      // Estado para Estoque de Andaimes Desmontados em Fábricas (Equipe de Andaimes)
+      const [dismantledStorageList, setDismantledStorageList] = useState([]);
+      const [isStorageModalOpen, setIsStorageModalOpen] = useState(false);
+      const [editingStorageItem, setEditingStorageItem] = useState(null);
+      const [storageFilterFactory, setStorageFilterFactory] = useState('ALL');
+      const [storageSearchTerm, setStorageSearchTerm] = useState('');
+      const [storageFormData, setStorageFormData] = useState({
+        factory: '',
+        exactLocation: '',
+        linearMeters: '',
+        volumeM3: '',
+        materialType: 'Torres Tubulares Completas',
+        status: 'Disponível para Reuso',
+        notes: ''
+      });
+
+      // Estado para Gerador de Planilha Excel Diária para a Chefia
+      const [isExcelModalOpen, setIsExcelModalOpen] = useState(false);
+      const [excelDatePeriod, setExcelDatePeriod] = useState('all');
+      const [excelCustomStart, setExcelCustomStart] = useState('');
+      const [excelCustomEnd, setExcelCustomEnd] = useState('');
+      const [excelStatusFilter, setExcelStatusFilter] = useState('ALL');
+      const [excelFactoryFilter, setExcelFactoryFilter] = useState('ALL');
 
       // Ordenar fila de espera pela data limite
       const sortQueueByDueDate = (reqList) => {
@@ -324,6 +354,19 @@
           }
         }, () => {});
 
+        // 6. Escuta estoque de materiais desmontados em fábricas (Equipe de Andaimes)
+        const unsubStorage = db.collection('andaimes_materiais_desmontados').onSnapshot((snapshot) => {
+          if (!isMounted) return;
+          const list = [];
+          snapshot.forEach(doc => {
+            list.push({ id: doc.id, ...doc.data() });
+          });
+          list.sort((a, b) => (a.factory || '').localeCompare(b.factory || '') || (b.updatedAt || '').localeCompare(a.updatedAt || ''));
+          setDismantledStorageList(list);
+        }, (err) => {
+          console.warn('Erro ao escutar materiais desmontados:', err);
+        });
+
         return () => {
           isMounted = false;
           unsubRequests();
@@ -331,6 +374,7 @@
           unsubConfig();
           unsubStats();
           unsubFactories();
+          unsubStorage();
         };
       }, []);
 
@@ -382,7 +426,8 @@
         activityResponsible: '',
         email: '',
         phone: '',
-        dueDate: '',
+        dueDate: '', // Data prevista para montagem
+        expectedDismantleDate: '', // Data prevista para desmontagem
         isUrgent: false,
         width: '',
         length: '',
@@ -679,6 +724,7 @@
           requesterEmail: currentUser.email,
           phone: formData.phone.trim(),
           dueDate: formData.dueDate,
+          expectedDismantleDate: formData.expectedDismantleDate || '',
           isUrgent: formData.isUrgent,
           queueOrder: 999,
           width: Number(formData.width) || 0,
@@ -696,7 +742,7 @@
             { 
               date: new Date().toLocaleString('pt-BR'), 
               user: `${currentUser.name} (${currentUser.role})`, 
-              action: `Solicitação Criada${formData.isUrgent ? ' (Urgente)' : ''} | Atividade: ${formData.activityDescription} | PEMT: ${formData.canUsePEMT}` 
+              action: `Solicitação Criada${formData.isUrgent ? ' (Urgente)' : ''} | Prev. Montagem: ${formData.dueDate || 'N/A'}${formData.expectedDismantleDate ? ` | Prev. Desmontagem: ${formData.expectedDismantleDate}` : ''} | Atividade: ${formData.activityDescription} | PEMT: ${formData.canUsePEMT}` 
             }
           ]
         };
@@ -721,6 +767,7 @@
           email: '',
           phone: '',
           dueDate: '',
+          expectedDismantleDate: '',
           isUrgent: false,
           width: '',
           length: '',
@@ -867,10 +914,11 @@
         setVisitDimensions({ width: '', length: '', height: '' });
       };
 
-      // Alterar Data Limite
+      // Alterar Prazos (Montagem e Desmontagem)
       const openEditDateModal = (req) => {
         setEditDateModalReq(req);
         setNewDueDate(req.dueDate || '');
+        setNewExpectedDismantleDate(req.expectedDismantleDate || '');
         setDateChangeReason('');
         setAutoReorderOnDateChange(true);
       };
@@ -880,13 +928,14 @@
         if (!editDateModalReq) return;
 
         const reqId = editDateModalReq.id;
-        const oldDate = editDateModalReq.dueDate || 'Não definida';
+        const oldDueDate = editDateModalReq.dueDate || 'Não definida';
+        const oldDismantle = editDateModalReq.expectedDismantleDate || 'A definir';
         const reasonText = dateChangeReason.trim() ? ` Motivo: "${dateChangeReason.trim()}"` : '';
 
         const newHistoryItem = {
           date: new Date().toLocaleString('pt-BR'),
           user: `${currentUser.name} (${currentUser.role})`,
-          action: `Data Limite alinhada: alterada de ${oldDate} para ${newDueDate}.${reasonText}`
+          action: `Prazos alinhados: Montagem de ${oldDueDate} para ${newDueDate || 'N/A'} | Desmontagem de ${oldDismantle} para ${newExpectedDismantleDate || 'A definir'}.${reasonText}`
         };
 
         let updatedList = requests.map(r => {
@@ -894,6 +943,7 @@
             return {
               ...r,
               dueDate: newDueDate,
+              expectedDismantleDate: newExpectedDismantleDate,
               history: [...r.history, newHistoryItem]
             };
           }
@@ -910,6 +960,7 @@
           const targetUpdated = updatedList.find(r => r.id === reqId);
           await db.collection('andaimes_solicitacoes').doc(reqId).update({
             dueDate: newDueDate,
+            expectedDismantleDate: newExpectedDismantleDate,
             queueOrder: targetUpdated.queueOrder || null,
             history: targetUpdated.history
           });
@@ -925,10 +976,286 @@
             await batch.commit();
           }
         } catch (err) {
-          console.error('Erro ao atualizar data limite:', err);
+          console.error('Erro ao atualizar prazos:', err);
         }
 
         setEditDateModalReq(null);
+      };
+
+      // -------------------------------------------------------------
+      // MÓDULO 1: ESTOQUE DE ANDAIMES DESMONTADOS EM FÁBRICAS (EQUIPE)
+      // -------------------------------------------------------------
+      const handleSaveStorageItem = async (e) => {
+        e.preventDefault();
+        if (!storageFormData.factory || !storageFormData.exactLocation || !storageFormData.linearMeters) {
+          alert('Por favor, informe a Fábrica, o Local Exato e a Metragem do andaime desmontado.');
+          return;
+        }
+
+        const isEdit = !!editingStorageItem;
+        const itemId = isEdit ? editingStorageItem.id : `MAT-${Date.now()}`;
+        const itemData = {
+          factory: storageFormData.factory.trim().toUpperCase(),
+          exactLocation: storageFormData.exactLocation.trim(),
+          linearMeters: Number(storageFormData.linearMeters) || 0,
+          volumeM3: Number(storageFormData.volumeM3) || 0,
+          materialType: storageFormData.materialType || 'Torres Tubulares Completas',
+          status: storageFormData.status || 'Disponível para Reuso',
+          notes: (storageFormData.notes || '').trim(),
+          responsible: currentUser ? currentUser.name : 'Equipe de Andaimes',
+          updatedAt: new Date().toLocaleString('pt-BR')
+        };
+
+        try {
+          await db.collection('andaimes_materiais_desmontados').doc(itemId).set(itemData, { merge: true });
+          setIsStorageModalOpen(false);
+          setEditingStorageItem(null);
+          setStorageFormData({
+            factory: '',
+            exactLocation: '',
+            linearMeters: '',
+            volumeM3: '',
+            materialType: 'Torres Tubulares Completas',
+            status: 'Disponível para Reuso',
+            notes: ''
+          });
+        } catch (err) {
+          console.error('Erro ao salvar material desmontado:', err);
+          alert('Erro ao salvar no Firebase.');
+        }
+      };
+
+      const handleDeleteStorageItem = async (item) => {
+        if (!window.confirm(`Confirma a baixa/remoção do registro de andaime desmontado no local "${item.exactLocation}" (${item.factory})?`)) {
+          return;
+        }
+        try {
+          await db.collection('andaimes_materiais_desmontados').doc(item.id).delete();
+        } catch (err) {
+          console.error('Erro ao excluir material desmontado:', err);
+          alert('Erro ao excluir do Firebase.');
+        }
+      };
+
+      const handleQuickAdjustMeters = async (item, delta) => {
+        const currentM = Number(item.linearMeters) || 0;
+        const newM = Math.max(0, currentM + delta);
+        try {
+          await db.collection('andaimes_materiais_desmontados').doc(item.id).update({
+            linearMeters: newM,
+            updatedAt: new Date().toLocaleString('pt-BR'),
+            responsible: currentUser ? currentUser.name : item.responsible
+          });
+        } catch (err) {
+          console.error('Erro ao ajustar metros:', err);
+        }
+      };
+
+      const handleOpenEditStorageModal = (item) => {
+        setEditingStorageItem(item);
+        setStorageFormData({
+          factory: item.factory || '',
+          exactLocation: item.exactLocation || '',
+          linearMeters: item.linearMeters || '',
+          volumeM3: item.volumeM3 || '',
+          materialType: item.materialType || 'Torres Tubulares Completas',
+          status: item.status || 'Disponível para Reuso',
+          notes: item.notes || ''
+        });
+        setIsStorageModalOpen(true);
+      };
+
+      // -------------------------------------------------------------
+      // MÓDULO 2: GERADOR DE EXCEL DIÁRIO COM FILTRO DE DATAS PARA CHEFIA
+      // -------------------------------------------------------------
+      const handleExportExcelDaily = () => {
+        let filtered = [...requests];
+
+        if (excelFactoryFilter !== 'ALL') {
+          filtered = filtered.filter(r => (r.factory || '').toUpperCase() === excelFactoryFilter.toUpperCase());
+        }
+
+        if (excelStatusFilter !== 'ALL') {
+          filtered = filtered.filter(r => r.status === excelStatusFilter);
+        }
+
+        if (excelDatePeriod === 'today') {
+          filtered = filtered.filter(r => {
+            const d = parseCustomDate(r.createdAt) || (r.history && r.history[0] ? parseCustomDate(r.history[0].date) : null);
+            return isDateInFilter(d, 'today');
+          });
+        } else if (excelDatePeriod === 'week') {
+          filtered = filtered.filter(r => {
+            const d = parseCustomDate(r.createdAt) || (r.history && r.history[0] ? parseCustomDate(r.history[0].date) : null);
+            return isDateInFilter(d, 'week');
+          });
+        } else if (excelDatePeriod === 'month') {
+          filtered = filtered.filter(r => {
+            const d = parseCustomDate(r.createdAt) || (r.history && r.history[0] ? parseCustomDate(r.history[0].date) : null);
+            return isDateInFilter(d, 'month');
+          });
+        } else if (excelDatePeriod === 'custom' && excelCustomStart && excelCustomEnd) {
+          const start = new Date(excelCustomStart + 'T00:00:00');
+          const end = new Date(excelCustomEnd + 'T23:59:59');
+          filtered = filtered.filter(r => {
+            const d = parseCustomDate(r.createdAt) || (r.history && r.history[0] ? parseCustomDate(r.history[0].date) : null);
+            return d && d >= start && d <= end;
+          });
+        }
+
+        const getHumanStatus = (st) => {
+          switch (st) {
+            case 'Avaliação': return '1 - Nova Solicitação (Fila de Espera)';
+            case 'Iniciado Montagem': return '2 - Visita Técnica Realizada';
+            case 'Em Movimentação': return '3 - Andaime em Transporte / Movimentação';
+            case 'Montado': return '4 - Montado em Campo';
+            case 'Liberado para Desmontagem': return '5 - Solicitado Desmontagem pela Área';
+            case 'Desmontado': return '6 - Desmontado Concluído';
+            case 'Cancelado': return 'Cancelado pela Gestão';
+            default: return st || 'Não definido';
+          }
+        };
+
+        const escapeCell = (val) => {
+          if (val === null || val === undefined) return '""';
+          const str = String(val).replace(/"/g, '""').replace(/[
+]+/g, ' ');
+          return `"${str}"`;
+        };
+
+        const headers = [
+          'Código da Solicitação',
+          'Data do Registro',
+          'Status da Solicitação',
+          'Fábrica / Planta',
+          'Área / Setor',
+          'Ponto de Referência / Local Exato',
+          'Atividade a Realizar',
+          'PEMT Possível?',
+          'Justificativa PEMT',
+          'Responsável pela Atividade',
+          'E-mail do Responsável',
+          'Telefone / Ramal',
+          'Solicitante (Cadastrado)',
+          'Data Prevista para Montagem',
+          'Data Prevista para Desmontagem',
+          'Urgência Operacional',
+          'Dimensões Estimadas (LxCxA em m)',
+          'Volume Estimado (m³)',
+          'Dimensões Reais da Visita (LxCxA em m)',
+          'Volume Real da Visita (m³)',
+          'Histórico e Auditoria de Ações'
+        ];
+
+        const rows = filtered.map(r => {
+          const dimEst = `${r.width || 0} x ${r.length || 0} x ${r.height || 0}m`;
+          const volEst = r.volumeM3 ? Number(r.volumeM3).toFixed(1) : '0.0';
+          const dimReal = (r.realWidth !== null && r.realWidth !== undefined) ? `${r.realWidth} x ${r.realLength} x ${r.realHeight}m` : 'Pendente visita';
+          const volReal = (r.realVolumeM3 !== null && r.realVolumeM3 !== undefined) ? Number(r.realVolumeM3).toFixed(1) : '-';
+          const historySummary = Array.isArray(r.history) 
+            ? r.history.map(h => `[${h.date}] ${h.user}: ${h.action}`).join(' | ') 
+            : '';
+
+          return [
+            escapeCell(r.id),
+            escapeCell(r.createdAt),
+            escapeCell(getHumanStatus(r.status)),
+            escapeCell(r.factory),
+            escapeCell(r.area),
+            escapeCell(r.reference),
+            escapeCell(r.activityDescription),
+            escapeCell(r.canUsePEMT || 'NÃO'),
+            escapeCell(r.pemtJustification || '-'),
+            escapeCell(r.responsible),
+            escapeCell(r.email),
+            escapeCell(r.phone),
+            escapeCell(r.requesterName ? `${r.requesterName} (${r.requesterEmail || ''})` : '-'),
+            escapeCell(r.dueDate || 'Não informada'),
+            escapeCell(r.expectedDismantleDate || 'A definir'),
+            escapeCell(r.isUrgent ? 'SIM (URGENTE)' : 'NÃO'),
+            escapeCell(dimEst),
+            escapeCell(volEst),
+            escapeCell(dimReal),
+            escapeCell(volReal),
+            escapeCell(historySummary)
+          ].join(';');
+        });
+
+        const csvContent = '\uFEFF' + headers.map(h => `"${h}"`).join(';') + '\n' + rows.join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const nowStr = new Date().toISOString().split('T')[0];
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `Relatorio_Andaimes_Chefia_${nowStr}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setIsExcelModalOpen(false);
+      };
+
+      // Download do Backup Completo JSON
+      const handleDownloadBackupJSON = () => {
+        const backupData = {
+          exportDate: new Date().toISOString(),
+          app: 'InspectCBM - Gestão de Andaimes',
+          totalCapacityM3,
+          requests,
+          users,
+          factories,
+          dismantledStorageList,
+          archivedStats
+        };
+        const str = JSON.stringify(backupData, null, 2);
+        const blob = new Blob([str], { type: 'application/json' });
+        const nowStr = new Date().toISOString().split('T')[0];
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `backup_andaimes_firestore_${nowStr}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      };
+
+      // Restaurar Backup do Banco de Dados JSON
+      const handleRestoreBackupJSON = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = async (evt) => {
+          try {
+            const data = JSON.parse(evt.target.result);
+            if (!data.requests || !Array.isArray(data.requests)) {
+              alert('Arquivo de backup inválido: lista de solicitações não encontrada.');
+              return;
+            }
+            if (!window.confirm(`Tem certeza que deseja restaurar o backup com ${data.requests.length} solicitações? Isso sincronizará os dados na nuvem.`)) {
+              return;
+            }
+            const batch = db.batch();
+            data.requests.forEach(r => {
+              const ref = db.collection('andaimes_solicitacoes').doc(r.id);
+              batch.set(ref, r, { merge: true });
+            });
+            if (data.totalCapacityM3) {
+              batch.set(db.collection('andaimes_config').doc('geral'), { totalCapacityM3: data.totalCapacityM3 }, { merge: true });
+            }
+            if (data.factories && Array.isArray(data.factories)) {
+              batch.set(db.collection('andaimes_config').doc('fabricas'), { list: data.factories }, { merge: true });
+            }
+            if (data.dismantledStorageList && Array.isArray(data.dismantledStorageList)) {
+              data.dismantledStorageList.forEach(item => {
+                const sRef = db.collection('andaimes_materiais_desmontados').doc(item.id);
+                batch.set(sRef, item, { merge: true });
+              });
+            }
+            await batch.commit();
+            alert('Backup restaurado com sucesso na nuvem Firebase!');
+          } catch (err) {
+            console.error('Erro ao restaurar backup:', err);
+            alert('Erro ao restaurar arquivo de backup.');
+          }
+        };
+        reader.readAsText(file);
       };
 
       // Mover Item na Fila
@@ -1201,20 +1528,25 @@
               <p><span className="font-semibold text-slate-700">Resp. Atividade:</span> {req.responsible} {req.phone ? `(${req.phone})` : ''}</p>
               <p><span className="font-semibold text-slate-700">E-mail:</span> {req.email || 'Não informado'}</p>
               
-              <div className="flex items-center justify-between pt-1">
-                <p className={isLate ? 'text-red-600 font-bold' : ''}>
-                  <span className="font-semibold text-slate-700">Data Limite:</span> {req.dueDate || 'Não definida'}
-                </p>
-                {/* Gestor Alinhar Data */}
-                {isGestor && (
-                  <button 
-                    onClick={() => openEditDateModal(req)}
-                    className="text-[11px] text-blue-600 hover:text-blue-800 font-semibold underline flex items-center gap-1"
-                  >
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
-                    Ajustar Data
-                  </button>
-                )}
+              {/* Prazos de Montagem e Desmontagem */}
+              <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200 text-xs space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className={isLate ? 'text-red-600 font-bold' : 'text-slate-700'}>
+                    <strong className="font-semibold text-slate-800">📅 Prev. Montagem:</strong> {req.dueDate || 'Não definida'}
+                  </span>
+                  {isGestor && (
+                    <button 
+                      onClick={() => openEditDateModal(req)}
+                      className="text-[11px] text-blue-600 hover:text-blue-800 font-bold underline flex items-center gap-1"
+                    >
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                      Ajustar Prazos
+                    </button>
+                  )}
+                </div>
+                <div className="text-slate-600">
+                  <strong className="font-semibold text-slate-800">🏁 Prev. Desmontagem:</strong> {req.expectedDismantleDate || 'A definir'}
+                </div>
               </div>
             </div>
 
@@ -1391,8 +1723,17 @@
               </div>
             </div>
 
-            {/* NAVEGAÇÃO POR ABAS SEPARADAS */}
+            {/* NAVEGAÇÃO POR ABAS SEPARADAS (NOVA SOLICITAÇÃO NA PRIMEIRA ABA PARA O CELULAR) */}
             <div className="max-w-7xl mx-auto px-2 sm:px-4 border-t border-slate-800 flex space-x-1 overflow-x-auto text-xs py-1 scrollbar-thin app-nav">
+              {/* 1. NOVA SOLICITAÇÃO - PRIMEIRA ABA PARA ACESSO IMEDIATO NO CELULAR */}
+              <button 
+                onClick={() => setActiveTab('nova')} 
+                className={`py-2 px-3 font-bold rounded-lg flex items-center gap-1.5 transition whitespace-nowrap shadow-sm ${activeTab === 'nova' ? 'bg-blue-500 text-white shadow' : 'bg-blue-600/20 text-blue-300 hover:bg-blue-600/30 border border-blue-500/30'}`}
+              >
+                <span>➕</span> Nova Solicitação
+              </button>
+
+              {/* 2. SOLICITAÇÕES (FILA) */}
               <button 
                 onClick={() => setActiveTab('solicitacoes')} 
                 className={`py-2 px-3 font-bold rounded-lg flex items-center gap-1.5 transition whitespace-nowrap ${activeTab === 'solicitacoes' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-300 hover:bg-slate-800'}`}
@@ -1403,6 +1744,7 @@
                 </span>
               </button>
 
+              {/* 3. MONTADOS */}
               <button 
                 onClick={() => setActiveTab('montados')} 
                 className={`py-2 px-3 font-bold rounded-lg flex items-center gap-1.5 transition whitespace-nowrap ${activeTab === 'montados' ? 'bg-emerald-600 text-white shadow' : 'text-slate-300 hover:bg-slate-800'}`}
@@ -1413,6 +1755,7 @@
                 </span>
               </button>
 
+              {/* 4. DESMONTADOS CONCLUÍDOS */}
               <button 
                 onClick={() => setActiveTab('desmontados')} 
                 className={`py-2 px-3 font-bold rounded-lg flex items-center gap-1.5 transition whitespace-nowrap ${activeTab === 'desmontados' ? 'bg-slate-200 text-slate-900 shadow' : 'text-slate-300 hover:bg-slate-800'}`}
@@ -1423,26 +1766,32 @@
                 </span>
               </button>
 
+              {/* 5. ABA DA EQUIPE: DESMONTADOS EM FÁBRICAS (ESTOQUE) */}
+              <button 
+                onClick={() => setActiveTab('estoque_fabricas')} 
+                className={`py-2 px-3 font-bold rounded-lg flex items-center gap-1.5 transition whitespace-nowrap ${activeTab === 'estoque_fabricas' ? 'bg-cyan-600 text-white shadow' : 'text-cyan-300 hover:bg-slate-800'}`}
+              >
+                <span>📦</span> Desmontados em Fábricas
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${activeTab === 'estoque_fabricas' ? 'bg-white text-cyan-900' : 'bg-cyan-500/30 text-cyan-200'}`}>
+                  {totalMetersStored}m
+                </span>
+              </button>
+
+              {/* 6. INDICADORES & RELATÓRIOS (EXCEL + PDF) */}
               <button 
                 onClick={() => setActiveTab('dashboard')} 
-                className={`py-2 px-3 font-semibold rounded-lg flex items-center gap-1.5 transition whitespace-nowrap ${activeTab === 'dashboard' ? 'bg-blue-600 text-white shadow' : 'text-slate-300 hover:bg-slate-800'}`}
+                className={`py-2 px-3 font-semibold rounded-lg flex items-center gap-1.5 transition whitespace-nowrap ${activeTab === 'dashboard' ? 'bg-indigo-600 text-white shadow' : 'text-slate-300 hover:bg-slate-800'}`}
               >
-                <span>📊</span> Indicadores & Estoque
+                <span>📊</span> Indicadores & Relatórios
               </button>
 
-              <button 
-                onClick={() => setActiveTab('nova')} 
-                className={`py-2 px-3 font-bold rounded-lg flex items-center gap-1.5 transition whitespace-nowrap ${activeTab === 'nova' ? 'bg-blue-500 text-white shadow' : 'text-slate-300 hover:bg-slate-800'}`}
-              >
-                <span>➕</span> Nova Solicitação
-              </button>
-
+              {/* 7. GESTÃO, FÁBRICAS & LOGINS */}
               {isGestor && (
                 <button 
                   onClick={() => setActiveTab('gestao')} 
                   className={`py-2 px-3 font-bold rounded-lg flex items-center gap-1.5 transition whitespace-nowrap ${activeTab === 'gestao' ? 'bg-purple-600 text-white shadow' : 'text-purple-300 hover:bg-slate-800'}`}
                 >
-                  <span>⚙️</span> Gestão, Fábricas & Logins
+                  <span>⚙️</span> Gestão & Logins
                 </button>
               )}
             </div>
@@ -1460,141 +1809,6 @@
 
           {/* Conteúdo Principal */}
           <main className="max-w-7xl mx-auto px-4 py-5 flex-1 w-full space-y-5">
-
-            {/* BLOCO DE INDICADORES DA GESTÃO COM FILTROS POR SEMANA E MÊS E BOTÃO DE PDF */}
-            <div className="bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4 no-print">
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 border-b border-slate-100 pb-3">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-sm sm:text-base font-extrabold text-slate-800 flex items-center gap-2">
-                      <span>📈</span> Indicadores da Gestão de Andaimes
-                    </h2>
-                    <span className="text-[10px] bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded-full border border-blue-200">
-                      Sincronizado
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Filtrando por: <strong className="text-slate-800 font-bold">{filterPeriodLabel}</strong>
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-2 flex-wrap">
-                  {/* BOTÃO GERAR RELATÓRIO PDF */}
-                  <button
-                    type="button"
-                    onClick={() => setIsPdfModalOpen(true)}
-                    className="px-3.5 py-1.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs transition shadow flex items-center gap-1.5"
-                  >
-                    <span>📄</span> Gerar Relatório PDF por Fábrica
-                  </button>
-
-                  {/* BOTÕES DE FILTRO POR PERÍODO */}
-                  <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200">
-                    <button 
-                      type="button"
-                      onClick={() => setFilterPeriod('all')}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
-                        filterPeriod === 'all' 
-                          ? 'bg-white text-slate-900 shadow-sm border border-slate-200' 
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      <span>📌</span> Geral
-                    </button>
-
-                    <button 
-                      type="button"
-                      onClick={() => setFilterPeriod('month')}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
-                        filterPeriod === 'month' 
-                          ? 'bg-blue-600 text-white shadow-sm' 
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      <span>🗓️</span> Este Mês
-                    </button>
-
-                    <button 
-                      type="button"
-                      onClick={() => setFilterPeriod('week')}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
-                        filterPeriod === 'week' 
-                          ? 'bg-indigo-600 text-white shadow-sm' 
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      <span>⏱️</span> Esta Semana
-                    </button>
-
-                    <button 
-                      type="button"
-                      onClick={() => setFilterPeriod('today')}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
-                        filterPeriod === 'today' 
-                          ? 'bg-emerald-600 text-white shadow-sm' 
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      <span>📍</span> Hoje
-                    </button>
-
-                    {isGestor && (
-                      <button 
-                        type="button"
-                        onClick={handleSyncIndicatorsWithDatabase}
-                        className="ml-1 px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-lg text-xs transition shadow-sm flex items-center gap-1"
-                        title="Sincronizar indicadores com a base real do Firebase"
-                      >
-                        <span>🔄</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* 4 CARDS DE INDICADORES */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="p-3.5 bg-amber-50 rounded-xl border border-amber-200">
-                  <p className="text-[10px] font-bold text-amber-800 uppercase tracking-wide">
-                    {filterPeriod === 'all' ? 'Solicitações na Fila' : 'Solicitados no Período'}
-                  </p>
-                  <p className="text-3xl font-black text-amber-950 mt-1">{displayedStats.solicitados}</p>
-                  <p className="text-[10px] text-amber-700 font-medium mt-1">
-                    {filterPeriod === 'all' ? `${requests.length} no total da fábrica` : 'No período selecionado'}
-                  </p>
-                </div>
-
-                <div className="p-3.5 bg-emerald-50 rounded-xl border border-emerald-200">
-                  <p className="text-[10px] font-bold text-emerald-800 uppercase tracking-wide">
-                    {filterPeriod === 'all' ? 'Montados em Campo' : 'Montagens no Período'}
-                  </p>
-                  <p className="text-3xl font-black text-emerald-950 mt-1">{displayedStats.montados}</p>
-                  <p className="text-[10px] text-emerald-700 font-medium mt-1">
-                    Consumindo {allocatedM3} m³
-                  </p>
-                </div>
-
-                <div className="p-3.5 bg-slate-100 rounded-xl border border-slate-300">
-                  <p className="text-[10px] font-bold text-slate-700 uppercase tracking-wide">
-                    {filterPeriod === 'all' ? 'Desmontados Concluídos' : 'Desmontados no Período'}
-                  </p>
-                  <p className="text-3xl font-black text-slate-900 mt-1">{displayedStats.desmontados}</p>
-                  <p className="text-[10px] text-slate-500 font-medium mt-1">
-                    Finalizados com sucesso
-                  </p>
-                </div>
-
-                <div className="p-3.5 bg-red-50 rounded-xl border border-red-200">
-                  <p className="text-[10px] font-bold text-red-800 uppercase tracking-wide">
-                    {filterPeriod === 'all' ? 'Total Cancelados' : 'Cancelados no Período'}
-                  </p>
-                  <p className="text-3xl font-black text-red-950 mt-1">{displayedStats.cancelados}</p>
-                  <p className="text-[10px] text-red-700 font-medium mt-1">
-                    Pela gestão de andaimes
-                  </p>
-                </div>
-              </div>
-            </div>
 
             {/* ABA 1: SOLICITAÇÕES (FILA DE ESPERA POR DATA LIMITE) */}
             {activeTab === 'solicitacoes' && (
@@ -1699,9 +1913,393 @@
               </div>
             )}
 
-            {/* ABA 4: INDICADORES, CAPACIDADE E ESTOQUE M3 */}
+            {/* ABA: ANDAIMES DESMONTADOS EM FÁBRICAS (CONTROLE DE ESTOQUE DA EQUIPE) */}
+            {activeTab === 'estoque_fabricas' && (
+              <div className="space-y-5 animate-in fade-in">
+                {/* Cabeçalho do Estoque */}
+                <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-base font-extrabold text-slate-800 flex items-center gap-2">
+                        <span>📦</span> Andaimes Desmontados em Fábricas
+                      </h2>
+                      <span className="text-[10px] bg-cyan-100 text-cyan-800 font-bold px-2 py-0.5 rounded-full border border-cyan-200">
+                        Equipe em Campo
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Rastreamento de onde e quantos metros de andaime desmontado estão guardados em cada fábrica para a equipe nunca esquecer.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingStorageItem(null);
+                      setStorageFormData({
+                        factory: factories[0] || 'DRYMIX',
+                        exactLocation: '',
+                        linearMeters: '',
+                        volumeM3: '',
+                        materialType: 'Torres Tubulares Completas',
+                        status: 'Disponível para Reuso',
+                        notes: ''
+                      });
+                      setIsStorageModalOpen(true);
+                    }}
+                    className="px-4 py-2.5 bg-cyan-600 hover:bg-cyan-700 text-white font-bold rounded-xl text-xs transition shadow flex items-center gap-2"
+                  >
+                    <span>➕</span> Registrar Material Desmontado Guardado
+                  </button>
+                </div>
+
+                {/* Resumo de Metragem e Locais */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                    <p className="text-xs font-semibold text-slate-500 uppercase">Total Metros Desmontados</p>
+                    <p className="text-3xl font-black text-cyan-700 mt-1">{totalMetersStored} <span className="text-sm font-normal text-slate-500">metros</span></p>
+                    <p className="text-[11px] text-slate-400 mt-1">Armazenados e disponíveis nas fábricas</p>
+                  </div>
+
+                  <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                    <p className="text-xs font-semibold text-slate-500 uppercase">Locais / Pontos Mapeados</p>
+                    <p className="text-3xl font-black text-slate-800 mt-1">{dismantledStorageList.length} <span className="text-sm font-normal text-slate-500">pontos</span></p>
+                    <p className="text-[11px] text-slate-400 mt-1">Pontos de guarda cadastrados</p>
+                  </div>
+
+                  <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                    <p className="text-xs font-semibold text-slate-500 uppercase">Fábricas com Andaime</p>
+                    <p className="text-3xl font-black text-blue-600 mt-1">
+                      {new Set(dismantledStorageList.map(s => (s.factory || '').toUpperCase())).size} <span className="text-sm font-normal text-slate-500">fábricas</span>
+                    </p>
+                    <p className="text-[11px] text-slate-400 mt-1">Com material desmontado no local</p>
+                  </div>
+                </div>
+
+                {/* Filtro por Fábrica e Busca */}
+                <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-3">
+                  <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0 scrollbar-thin">
+                    <span className="text-xs font-bold text-slate-600 whitespace-nowrap">Fábrica:</span>
+                    <button
+                      type="button"
+                      onClick={() => setStorageFilterFactory('ALL')}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition whitespace-nowrap ${storageFilterFactory === 'ALL' ? 'bg-cyan-600 text-white shadow' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                    >
+                      Todas ({dismantledStorageList.length})
+                    </button>
+                    {factories.map((f, i) => {
+                      const count = dismantledStorageList.filter(s => (s.factory || '').toUpperCase() === f.toUpperCase()).length;
+                      return (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => setStorageFilterFactory(f)}
+                          className={`px-3 py-1 rounded-lg text-xs font-bold transition whitespace-nowrap ${storageFilterFactory === f ? 'bg-cyan-600 text-white shadow' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                        >
+                          {f} {count > 0 && `(${count})`}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="w-full sm:w-64">
+                    <input
+                      type="text"
+                      placeholder="Buscar local exato..."
+                      value={storageSearchTerm}
+                      onChange={(e) => setStorageSearchTerm(e.target.value)}
+                      className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg text-xs"
+                    />
+                  </div>
+                </div>
+
+                {/* Lista de Registros de Andaimes Desmontados em Campo */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {dismantledStorageList
+                    .filter(item => {
+                      if (storageFilterFactory !== 'ALL' && (item.factory || '').toUpperCase() !== storageFilterFactory.toUpperCase()) return false;
+                      if (storageSearchTerm.trim()) {
+                        const term = storageSearchTerm.toLowerCase();
+                        const matchLoc = (item.exactLocation || '').toLowerCase().includes(term);
+                        const matchFac = (item.factory || '').toLowerCase().includes(term);
+                        const matchNotes = (item.notes || '').toLowerCase().includes(term);
+                        if (!matchLoc && !matchFac && !matchNotes) return false;
+                      }
+                      return true;
+                    })
+                    .map((item) => (
+                      <div key={item.id} className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 space-y-3 hover:shadow-md transition">
+                        <div className="flex justify-between items-start gap-2 border-b border-slate-100 pb-2">
+                          <div>
+                            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-cyan-100 text-cyan-800 border border-cyan-200">
+                              {item.factory}
+                            </span>
+                            <h3 className="font-bold text-sm text-slate-800 mt-1 flex items-center gap-1">
+                              <span>📍</span> {item.exactLocation}
+                            </h3>
+                          </div>
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                            item.status === 'Disponível para Reuso' ? 'bg-emerald-100 text-emerald-800' :
+                            item.status === 'Em Manutenção' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'
+                          }`}>
+                            {item.status}
+                          </span>
+                        </div>
+
+                        {/* Metragem e Tipo */}
+                        <div className="bg-cyan-50/60 p-3 rounded-lg border border-cyan-100 flex justify-between items-center">
+                          <div>
+                            <span className="text-[10px] text-cyan-800 uppercase font-bold block">Metragem de Andaime</span>
+                            <span className="text-2xl font-black text-cyan-950">{item.linearMeters} <span className="text-xs font-semibold text-cyan-700">metros</span></span>
+                          </div>
+                          {item.volumeM3 ? (
+                            <div className="text-right">
+                              <span className="text-[10px] text-slate-500 uppercase font-semibold block">Volume Aprox.</span>
+                              <span className="text-sm font-bold text-slate-700">{item.volumeM3} m³</span>
+                            </div>
+                          ) : null}
+                        </div>
+
+                        <div className="text-xs text-slate-600 space-y-1">
+                          <p><strong className="text-slate-700">Tipo de Material:</strong> {item.materialType || 'Torres Tubulares'}</p>
+                          {item.notes && (
+                            <p className="italic text-slate-500 bg-slate-50 p-1.5 rounded text-[11px]">
+                              "{item.notes}"
+                            </p>
+                          )}
+                          <p className="text-[10px] text-slate-400 pt-1">
+                            Guardado por: <strong>{item.responsible || 'Equipe'}</strong> em {item.updatedAt || '-'}
+                          </p>
+                        </div>
+
+                        {/* Botões de Ação e Ajuste Rápido */}
+                        <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                          {/* Ajuste rápido de metros */}
+                          <div className="flex items-center gap-1">
+                            <span className="text-[10px] text-slate-400 font-semibold mr-1">Ajuste:</span>
+                            <button
+                              type="button"
+                              onClick={() => handleQuickAdjustMeters(item, -5)}
+                              className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-xs font-bold"
+                              title="Diminuir 5 metros"
+                            >
+                              -5m
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleQuickAdjustMeters(item, 5)}
+                              className="px-2 py-0.5 bg-cyan-100 hover:bg-cyan-200 text-cyan-800 rounded text-xs font-bold"
+                              title="Adicionar 5 metros"
+                            >
+                              +5m
+                            </button>
+                          </div>
+
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditStorageModal(item)}
+                              className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-xs font-semibold"
+                            >
+                              Editar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteStorageItem(item)}
+                              className="px-2 py-1 text-red-600 hover:bg-red-50 rounded text-xs font-bold"
+                              title="Dar baixa / remover registro deste local"
+                            >
+                              Dar Baixa
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+
+                  {dismantledStorageList.length === 0 && (
+                    <div className="col-span-full bg-white p-8 rounded-2xl border border-dashed border-slate-300 text-center space-y-2">
+                      <span className="text-3xl block">📦</span>
+                      <p className="font-bold text-sm text-slate-700">Nenhum andaime desmontado registrado ainda</p>
+                      <p className="text-xs text-slate-500 max-w-md mx-auto">
+                        Quando os andaimes forem desmontados e guardados nas fábricas, registre aqui o local exato e quantos metros estão disponíveis para a equipe localizar rapidamente.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* ABA: INDICADORES DA GESTÃO & RELATÓRIOS (EXCEL E PDF) - INDICADOR SOMENTE NESTA ABA */}
             {activeTab === 'dashboard' && (
-              <div className="space-y-6">
+              <div className="space-y-6 animate-in fade-in">
+
+                {/* BLOCO DE INDICADORES DA GESTÃO COM FILTROS POR SEMANA E MÊS E BOTÃO DE PDF E EXCEL */}
+                <div className="bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4 no-print">
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 border-b border-slate-100 pb-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-sm sm:text-base font-extrabold text-slate-800 flex items-center gap-2">
+                          <span>📈</span> Indicadores da Gestão de Andaimes
+                        </h2>
+                        <span className="text-[10px] bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded-full border border-blue-200">
+                          Sincronizado
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Filtrando por: <strong className="text-slate-800 font-bold">{filterPeriodLabel}</strong>
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {/* BOTÃO GERAR EXCEL DIÁRIO PARA A CHEFIA */}
+                      <button
+                        type="button"
+                        onClick={() => setIsExcelModalOpen(true)}
+                        className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition shadow flex items-center gap-1.5"
+                      >
+                        <span>📊</span> Exportar Excel para Chefia
+                      </button>
+
+                      {/* BOTÃO GERAR RELATÓRIO PDF */}
+                      <button
+                        type="button"
+                        onClick={() => setIsPdfModalOpen(true)}
+                        className="px-3.5 py-1.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs transition shadow flex items-center gap-1.5"
+                      >
+                        <span>📄</span> Gerar Relatório PDF por Fábrica
+                      </button>
+
+                      {/* BOTÕES DE FILTRO POR PERÍODO */}
+                      <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200">
+                        <button 
+                          type="button"
+                          onClick={() => setFilterPeriod('all')}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
+                            filterPeriod === 'all' 
+                              ? 'bg-white text-slate-900 shadow-sm border border-slate-200' 
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          <span>📌</span> Geral
+                        </button>
+
+                        <button 
+                          type="button"
+                          onClick={() => setFilterPeriod('month')}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
+                            filterPeriod === 'month' 
+                              ? 'bg-blue-600 text-white shadow-sm' 
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          <span>🗓️</span> Este Mês
+                        </button>
+
+                        <button 
+                          type="button"
+                          onClick={() => setFilterPeriod('week')}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
+                            filterPeriod === 'week' 
+                              ? 'bg-indigo-600 text-white shadow-sm' 
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          <span>⏱️</span> Esta Semana
+                        </button>
+
+                        <button 
+                          type="button"
+                          onClick={() => setFilterPeriod('today')}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
+                            filterPeriod === 'today' 
+                              ? 'bg-emerald-600 text-white shadow-sm' 
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          <span>📍</span> Hoje
+                        </button>
+
+                        {isGestor && (
+                          <button 
+                            type="button"
+                            onClick={handleSyncIndicatorsWithDatabase}
+                            className="ml-1 px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-lg text-xs transition shadow-sm flex items-center gap-1"
+                            title="Sincronizar indicadores com a base real do Firebase"
+                          >
+                            <span>🔄</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 4 CARDS DE INDICADORES */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="p-3.5 bg-amber-50 rounded-xl border border-amber-200">
+                      <p className="text-[10px] font-bold text-amber-800 uppercase tracking-wide">
+                        {filterPeriod === 'all' ? 'Solicitações na Fila' : 'Solicitados no Período'}
+                      </p>
+                      <p className="text-3xl font-black text-amber-950 mt-1">{displayedStats.solicitados}</p>
+                      <p className="text-[10px] text-amber-700 font-medium mt-1">
+                        {filterPeriod === 'all' ? `${requests.length} no total da fábrica` : 'No período selecionado'}
+                      </p>
+                    </div>
+
+                    <div className="p-3.5 bg-emerald-50 rounded-xl border border-emerald-200">
+                      <p className="text-[10px] font-bold text-emerald-800 uppercase tracking-wide">
+                        {filterPeriod === 'all' ? 'Montados em Campo' : 'Montagens no Período'}
+                      </p>
+                      <p className="text-3xl font-black text-emerald-950 mt-1">{displayedStats.montados}</p>
+                      <p className="text-[10px] text-emerald-700 font-medium mt-1">
+                        Consumindo {allocatedM3} m³
+                      </p>
+                    </div>
+
+                    <div className="p-3.5 bg-slate-100 rounded-xl border border-slate-300">
+                      <p className="text-[10px] font-bold text-slate-700 uppercase tracking-wide">
+                        {filterPeriod === 'all' ? 'Desmontados Concluídos' : 'Desmontados no Período'}
+                      </p>
+                      <p className="text-3xl font-black text-slate-900 mt-1">{displayedStats.desmontados}</p>
+                      <p className="text-[10px] text-slate-500 font-medium mt-1">
+                        Finalizados com sucesso
+                      </p>
+                    </div>
+
+                    <div className="p-3.5 bg-red-50 rounded-xl border border-red-200">
+                      <p className="text-[10px] font-bold text-red-800 uppercase tracking-wide">
+                        {filterPeriod === 'all' ? 'Total Cancelados' : 'Cancelados no Período'}
+                      </p>
+                      <p className="text-3xl font-black text-red-950 mt-1">{displayedStats.cancelados}</p>
+                      <p className="text-[10px] text-red-700 font-medium mt-1">
+                        Pela gestão de andaimes
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* PAINEL DE GERAÇÃO DIRETA DO EXCEL PARA APRESENTAR À CHEFIA */}
+                <div className="bg-emerald-50/70 p-5 rounded-2xl border border-emerald-200 space-y-3">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                    <div>
+                      <h3 className="font-extrabold text-sm text-emerald-950 flex items-center gap-2">
+                        <span>📊</span> Relatório Diário de Solicitações para Apresentação à Chefia
+                      </h3>
+                      <p className="text-xs text-emerald-800 mt-0.5">
+                        Exporta planilha do Excel (.csv) com todos os campos preenchidos pelo solicitante, status detalhados e histórico. Atualiza automaticamente a cada nova solicitação na nuvem.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleExportExcelDaily}
+                      className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition shadow flex items-center gap-2 whitespace-nowrap"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                      Baixar Excel Atualizado Agora
+                    </button>
+                  </div>
+                </div>
+
+                {/* CAPACIDADE CONTRATADA E ESTOQUE EM M3 */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
                     <p className="text-xs font-semibold text-slate-500 uppercase">Capacidade Contratada</p>
@@ -1957,32 +2555,49 @@
                     </div>
                   </div>
 
-                  {/* DATA LIMITE E URGÊNCIA */}
+                  {/* DATA PREVISTA PARA MONTAGEM E DESMONTAGEM */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Data Limite de Finalização *</label>
+                      <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">
+                        Data Prevista para Montagem *
+                      </label>
                       <input 
                         type="date" 
                         name="dueDate" 
                         value={formData.dueDate} 
                         onChange={handleInputChange} 
                         required 
-                        className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm font-semibold" 
+                        className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm font-semibold focus:outline-none focus:border-blue-500" 
                       />
-                      <p className="text-[10px] text-slate-400 mt-1">Define automaticamente a posição na fila de prioridade.</p>
+                      <p className="text-[10px] text-slate-400 mt-1">Define a prioridade na fila de montagem da equipe.</p>
                     </div>
-                    <div className="flex items-center pt-2 sm:pt-6">
-                      <label className="flex items-center space-x-2 cursor-pointer">
-                        <input 
-                          type="checkbox" 
-                          name="isUrgent" 
-                          checked={formData.isUrgent} 
-                          onChange={handleInputChange} 
-                          className="w-4 h-4 text-red-600 rounded border-slate-300" 
-                        />
-                        <span className="text-xs font-bold text-red-600">Marcar como URGÊNCIA OPERACIONAL</span>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">
+                        Data Prevista para Desmontagem
                       </label>
+                      <input 
+                        type="date" 
+                        name="expectedDismantleDate" 
+                        value={formData.expectedDismantleDate} 
+                        onChange={handleInputChange} 
+                        className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm font-semibold focus:outline-none focus:border-blue-500" 
+                      />
+                      <p className="text-[10px] text-slate-400 mt-1">Estimativa de liberação e desmontagem do andaime.</p>
                     </div>
+                  </div>
+
+                  <div className="flex items-center pt-1">
+                    <label className="flex items-center space-x-2 cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        name="isUrgent" 
+                        checked={formData.isUrgent} 
+                        onChange={handleInputChange} 
+                        className="w-4 h-4 text-red-600 rounded border-slate-300" 
+                      />
+                      <span className="text-xs font-bold text-red-600">Marcar como URGÊNCIA OPERACIONAL</span>
+                    </label>
                   </div>
 
                   {/* DIMENSÕES ESTIMADAS */}
@@ -2169,6 +2784,66 @@
                       className="p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm w-36 font-bold" 
                     />
                     <span className="text-sm font-semibold text-slate-600">m³ Contratados</span>
+                  </div>
+                </div>
+
+                {/* 5. BACKUP E SEGURANÇA DOS DADOS (EXPORTAR A CADA 2 DIAS) */}
+                <div className="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+                  <div className="border-b border-slate-100 pb-3">
+                    <h3 className="font-bold text-base text-slate-800 flex items-center gap-2">
+                      <span>💾</span> Cópia de Segurança e Backup do Banco de Dados
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Exporte o banco de dados completo a cada 2 dias para manter uma cópia offline salva no seu computador.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Exportação JSON */}
+                    <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+                      <p className="font-bold text-xs text-slate-800 flex items-center gap-1.5">
+                        <span>📥</span> Exportar Banco Completo (.json)
+                      </p>
+                      <p className="text-[11px] text-slate-500">
+                        Exporta todas as solicitações, histórico, usuários, estoques de fábricas e indicadores em formato padrão para restauração.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleDownloadBackupJSON}
+                        className="w-full py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-2"
+                      >
+                        Baixar Backup JSON Completo
+                      </button>
+                    </div>
+
+                    {/* Exportação Excel */}
+                    <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-200 space-y-2">
+                      <p className="font-bold text-xs text-emerald-950 flex items-center gap-1.5">
+                        <span>📊</span> Exportar Planilha Excel (.csv)
+                      </p>
+                      <p className="text-[11px] text-emerald-800">
+                        Gera planilha completa compatível com Microsoft Excel para relatórios operacionais da gerência e auditoria.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleExportExcelDaily}
+                        className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-2"
+                      >
+                        Baixar Planilha Excel (.csv)
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Restaurar Backup */}
+                  <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                    <div>
+                      <p className="font-bold text-xs text-amber-950">Restaurar Cópia de Segurança</p>
+                      <p className="text-[11px] text-amber-800">Se precisar recuperar dados anteriores, selecione o arquivo .json baixado anteriormente.</p>
+                    </div>
+                    <label className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold cursor-pointer transition">
+                      Selecionar Arquivo de Backup
+                      <input type="file" accept=".json" onChange={handleRestoreBackupJSON} className="hidden" />
+                    </label>
                   </div>
                 </div>
               </div>
@@ -2649,30 +3324,41 @@
             </div>
           )}
 
-          {/* MODAL: ALINHAMENTO E AJUSTE DE DATA LIMITE PELO GESTOR */}
+          {/* MODAL: ALINHAMENTO E AJUSTE DE PRAZOS PELO GESTOR */}
           {editDateModalReq && (
             <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
               <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full space-y-4">
                 <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-                  <h3 className="font-bold text-sm text-slate-800">Alinhamento de Prazo — {editDateModalReq.id}</h3>
+                  <h3 className="font-bold text-sm text-slate-800">Alinhamento de Prazos — {editDateModalReq.id}</h3>
                   <button onClick={() => setEditDateModalReq(null)} className="text-slate-400 hover:text-slate-600 font-bold">&times;</button>
                 </div>
 
-                <div className="text-xs text-slate-600 space-y-1">
-                  <p><span className="font-semibold">Local:</span> {editDateModalReq.factory} - {editDateModalReq.area}</p>
+                <div className="text-xs text-slate-600 space-y-1 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                  <p><span className="font-semibold">Fábrica / Área:</span> {editDateModalReq.factory} - {editDateModalReq.area}</p>
                   <p><span className="font-semibold">Responsável:</span> {editDateModalReq.responsible}</p>
-                  <p><span className="font-semibold">Data Atual:</span> {editDateModalReq.dueDate || 'Não definida'}</p>
+                  <p><span className="font-semibold">Prev. Montagem Atual:</span> {editDateModalReq.dueDate || 'Não definida'}</p>
+                  <p><span className="font-semibold">Prev. Desmontagem Atual:</span> {editDateModalReq.expectedDismantleDate || 'A definir'}</p>
                 </div>
 
                 <form onSubmit={handleSaveNewDueDate} className="space-y-3">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Nova Data Limite de Finalização</label>
+                    <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Nova Data Prevista para Montagem *</label>
                     <input 
                       type="date" 
                       value={newDueDate} 
                       onChange={(e) => setNewDueDate(e.target.value)} 
                       required 
-                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm font-semibold" 
+                      className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-sm font-semibold" 
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Nova Data Prevista para Desmontagem</label>
+                    <input 
+                      type="date" 
+                      value={newExpectedDismantleDate} 
+                      onChange={(e) => setNewExpectedDismantleDate(e.target.value)} 
+                      className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-sm font-semibold" 
                     />
                   </div>
 
@@ -2683,7 +3369,7 @@
                       placeholder="Ex: Alinhado com a supervisão de manutenção devido atraso na entrega de peças"
                       value={dateChangeReason}
                       onChange={(e) => setDateChangeReason(e.target.value)}
-                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-xs" 
+                      className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-xs" 
                     ></textarea>
                   </div>
 
@@ -2702,9 +3388,225 @@
 
                   <div className="flex justify-end space-x-2 pt-3 border-t border-slate-100">
                     <button type="button" onClick={() => setEditDateModalReq(null)} className="px-3 py-1.5 border rounded text-xs">Cancelar</button>
-                    <button type="submit" className="px-4 py-1.5 bg-blue-600 text-white rounded text-xs font-bold hover:bg-blue-700">Salvar Nova Data na Nuvem</button>
+                    <button type="submit" className="px-4 py-1.5 bg-blue-600 text-white rounded text-xs font-bold hover:bg-blue-700">Salvar Prazos na Nuvem</button>
                   </div>
                 </form>
+              </div>
+            </div>
+          )}
+
+          {/* MODAL: REGISTRAR / EDITAR ANDAIME DESMONTADO EM FÁBRICA (EQUIPE) */}
+          {isStorageModalOpen && (
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-lg w-full space-y-4 animate-in fade-in zoom-in">
+                <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                  <div>
+                    <h3 className="font-bold text-base text-cyan-900 flex items-center gap-2">
+                      <span>📦</span> {editingStorageItem ? 'Editar Local de Andaime Desmontado' : 'Registrar Andaime Desmontado Guardado'}
+                    </h3>
+                    <p className="text-xs text-slate-500">Mapeamento físico para a equipe de montagem localizar o material.</p>
+                  </div>
+                  <button onClick={() => setIsStorageModalOpen(false)} className="text-slate-400 hover:text-slate-600 font-bold">&times;</button>
+                </div>
+
+                <form onSubmit={handleSaveStorageItem} className="space-y-3 text-xs">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Fábrica / Planta *</label>
+                      <select
+                        value={storageFormData.factory}
+                        onChange={(e) => setStorageFormData({ ...storageFormData, factory: e.target.value })}
+                        required
+                        className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg font-bold"
+                      >
+                        <option value="">Selecione...</option>
+                        {factories.map((f, i) => (
+                          <option key={i} value={f}>{f}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Metros de Andaime *</label>
+                      <input
+                        type="number"
+                        step="0.5"
+                        placeholder="Ex: 50"
+                        value={storageFormData.linearMeters}
+                        onChange={(e) => setStorageFormData({ ...storageFormData, linearMeters: e.target.value })}
+                        required
+                        className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg font-bold text-cyan-800"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Local Exato / Ponto de Referência *</label>
+                    <input
+                      type="text"
+                      placeholder="Ex: Mezanino 250 atrás do compressor UC8014, Pátio externo caldeiras..."
+                      value={storageFormData.exactLocation}
+                      onChange={(e) => setStorageFormData({ ...storageFormData, exactLocation: e.target.value })}
+                      required
+                      className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg font-semibold"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Tipo de Material</label>
+                      <select
+                        value={storageFormData.materialType}
+                        onChange={(e) => setStorageFormData({ ...storageFormData, materialType: e.target.value })}
+                        className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg"
+                      >
+                        <option value="Torres Tubulares Completas">Torres Tubulares Completas</option>
+                        <option value="Tubos e Braçadeiras">Tubos e Braçadeiras</option>
+                        <option value="Pranchões e Plataformas">Pranchões e Plataformas</option>
+                        <option value="Andaime Fachadeiro">Andaime Fachadeiro</option>
+                        <option value="Material Misto Desmontado">Material Misto Desmontado</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Condição / Status</label>
+                      <select
+                        value={storageFormData.status}
+                        onChange={(e) => setStorageFormData({ ...storageFormData, status: e.target.value })}
+                        className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg font-semibold"
+                      >
+                        <option value="Disponível para Reuso">Disponível para Reuso</option>
+                        <option value="Aguardando Inspeção">Aguardando Inspeção</option>
+                        <option value="Em Manutenção">Em Manutenção</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Observações Adicionais (Opcional)</label>
+                    <textarea
+                      rows="2"
+                      placeholder="Ex: Peças limpas e amarradas, fácil acesso com carrinho..."
+                      value={storageFormData.notes}
+                      onChange={(e) => setStorageFormData({ ...storageFormData, notes: e.target.value })}
+                      className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg"
+                    ></textarea>
+                  </div>
+
+                  <div className="flex justify-end space-x-2 pt-2 border-t border-slate-100">
+                    <button type="button" onClick={() => setIsStorageModalOpen(false)} className="px-3 py-1.5 border rounded text-xs">Cancelar</button>
+                    <button type="submit" className="px-4 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded text-xs font-bold">
+                      Salvar Localização no Firebase
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* MODAL: EXPORTAR EXCEL DIÁRIO COM FILTROS PARA APRESENTAR À CHEFIA */}
+          {isExcelModalOpen && (
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full space-y-4 animate-in fade-in zoom-in">
+                <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                  <div>
+                    <h3 className="font-bold text-base text-emerald-900 flex items-center gap-2">
+                      <span>📊</span> Exportar Excel para a Chefia
+                    </h3>
+                    <p className="text-xs text-slate-500">Gera planilha detalhada com todos os dados e status.</p>
+                  </div>
+                  <button onClick={() => setIsExcelModalOpen(false)} className="text-slate-400 hover:text-slate-600 font-bold text-lg">&times;</button>
+                </div>
+
+                <div className="space-y-3 text-xs">
+                  {/* Filtro de Período */}
+                  <div>
+                    <label className="block font-bold text-slate-700 uppercase mb-1">Filtrar Período:</label>
+                    <select
+                      value={excelDatePeriod}
+                      onChange={(e) => setExcelDatePeriod(e.target.value)}
+                      className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg font-semibold"
+                    >
+                      <option value="all">Todas as Datas (Histórico Completo)</option>
+                      <option value="today">Hoje ({new Date().toLocaleDateString('pt-BR')})</option>
+                      <option value="week">Esta Semana (Últimos 7 dias)</option>
+                      <option value="month">Este Mês Atual</option>
+                      <option value="custom">Intervalo de Datas Personalizado</option>
+                    </select>
+                  </div>
+
+                  {excelDatePeriod === 'custom' && (
+                    <div className="grid grid-cols-2 gap-2 p-2.5 bg-slate-50 rounded-lg border border-slate-200">
+                      <div>
+                        <span className="text-[10px] text-slate-500 font-semibold">De:</span>
+                        <input
+                          type="date"
+                          value={excelCustomStart}
+                          onChange={(e) => setExcelCustomStart(e.target.value)}
+                          className="w-full p-1.5 bg-white border border-slate-300 rounded text-xs"
+                        />
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-500 font-semibold">Até:</span>
+                        <input
+                          type="date"
+                          value={excelCustomEnd}
+                          onChange={(e) => setExcelCustomEnd(e.target.value)}
+                          className="w-full p-1.5 bg-white border border-slate-300 rounded text-xs"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Filtro de Status */}
+                  <div>
+                    <label className="block font-bold text-slate-700 uppercase mb-1">Filtrar por Status:</label>
+                    <select
+                      value={excelStatusFilter}
+                      onChange={(e) => setExcelStatusFilter(e.target.value)}
+                      className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg font-semibold"
+                    >
+                      <option value="ALL">Todos os Status (Solicitações, Montados, Desmontados)</option>
+                      <option value="Avaliação">1 - Solicitações na Fila</option>
+                      <option value="Iniciado Montagem">2 - Visita Técnica Realizada</option>
+                      <option value="Em Movimentação">3 - Em Transporte / Movimentação</option>
+                      <option value="Montado">4 - Andaimes Montados em Campo</option>
+                      <option value="Liberado para Desmontagem">5 - Liberado / Solicitada Desmontagem</option>
+                      <option value="Desmontado">6 - Desmontados Concluídos</option>
+                      <option value="Cancelado">Cancelados</option>
+                    </select>
+                  </div>
+
+                  {/* Filtro de Fábrica */}
+                  <div>
+                    <label className="block font-bold text-slate-700 uppercase mb-1">Filtrar por Fábrica:</label>
+                    <select
+                      value={excelFactoryFilter}
+                      onChange={(e) => setExcelFactoryFilter(e.target.value)}
+                      className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg font-semibold"
+                    >
+                      <option value="ALL">Todas as Fábricas / Plantas</option>
+                      {factories.map((f, i) => (
+                        <option key={i} value={f}>{f}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="p-2.5 bg-emerald-50 rounded-lg border border-emerald-200 text-[11px] text-emerald-800">
+                    ✓ Arquivo gerado em formato <strong>.csv</strong> com codificação UTF-8 compatível diretamente com o <strong>Microsoft Excel</strong> brasileiro (colunas separadas por ponto e vírgula).
+                  </div>
+
+                  <div className="flex justify-end space-x-2 pt-2 border-t border-slate-100">
+                    <button type="button" onClick={() => setIsExcelModalOpen(false)} className="px-3 py-1.5 border rounded text-xs font-semibold">Cancelar</button>
+                    <button
+                      type="button"
+                      onClick={handleExportExcelDaily}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition shadow flex items-center gap-1.5"
+                    >
+                      <span>📥</span> Baixar Planilha Excel (.csv)
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           )}
