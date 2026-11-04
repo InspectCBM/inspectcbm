@@ -1000,6 +1000,12 @@
 
     // Fallback robusto inicial para garantir que rotas e tags nunca sumam
     let defaultRotas = ["Central de pó", "Sopradores Massas", "Extrusoras"];
+    // Rotas excluídas pelo usuário: nunca devem ser recriadas por cache, nuvem, registros ou laudos
+    let deletedRotas = [];
+    try {
+      const _del = JSON.parse(localStorage.getItem('inspectcbm_deleted_rotas') || '[]');
+      if (Array.isArray(_del)) deletedRotas = _del;
+    } catch(e) {}
     let defaultTagMap = { 
       "Central de pó": ["FM7011", "EX7002"],
       "Sopradores Massas": ["SP8001"],
@@ -1087,6 +1093,10 @@
     function mergeAndPersistRotasAndTags() {
       const routeSet = new Set(defaultRotas);
       try {
+        const _del = JSON.parse(localStorage.getItem('inspectcbm_deleted_rotas') || '[]');
+        if (Array.isArray(_del)) _del.forEach(r => { if (r && !deletedRotas.includes(r)) deletedRotas.push(r); });
+      } catch(e) {}
+      try {
         const local = localStorage.getItem('inspectcbm_saved_rotas');
         if (local) JSON.parse(local).forEach(r => r && routeSet.add(r));
       } catch(e) {}
@@ -1105,15 +1115,17 @@
       (cloudPreLaudos || []).forEach(p => { if(p.rota) routeSet.add(p.rota); });
       Object.keys(defaultTagMap || {}).forEach(r => { if(r) routeSet.add(r); });
 
-      const merged = Array.from(routeSet).filter(Boolean);
+      const merged = Array.from(routeSet).filter(r => r && !deletedRotas.includes(r));
       if (merged.length > 0) defaultRotas = merged;
+      // remove do mapa de tags qualquer rota excluída
+      deletedRotas.forEach(r => { delete defaultTagMap[r]; });
 
       defaultRotas.forEach(r => {
         if (!defaultTagMap[r]) defaultTagMap[r] = [];
       });
 
       (cloudRecords || []).forEach(r => {
-        if (r.rota && r.baseTag) {
+        if (r.rota && r.baseTag && !deletedRotas.includes(r.rota)) {
           if (!defaultTagMap[r.rota]) defaultTagMap[r.rota] = [];
           if (!defaultTagMap[r.rota].includes(r.baseTag)) {
             defaultTagMap[r.rota].push(r.baseTag);
@@ -1122,6 +1134,7 @@
       });
 
       try {
+        localStorage.setItem('inspectcbm_deleted_rotas', JSON.stringify(deletedRotas));
         localStorage.setItem('inspectcbm_saved_rotas', JSON.stringify(defaultRotas));
         localStorage.setItem('inspectcbm_saved_tagmap', JSON.stringify(defaultTagMap));
         localStorage.setItem('inspectcbm_cached_cfg', JSON.stringify({
@@ -1176,13 +1189,17 @@
       db.collection("inspectcbm_config").doc("rotas_tags").onSnapshot((doc) => {
         if (doc.exists) {
           const data = doc.data();
+          if (Array.isArray(data.deletedRotas)) {
+            data.deletedRotas.forEach(r => { if (r && !deletedRotas.includes(r)) deletedRotas.push(r); });
+          }
           if (Array.isArray(data.rotas) && data.rotas.length > 0) {
             data.rotas.forEach(r => {
-              if (r && !defaultRotas.includes(r)) defaultRotas.push(r);
+              if (r && !deletedRotas.includes(r) && !defaultRotas.includes(r)) defaultRotas.push(r);
             });
           }
           if (data.tagMap && typeof data.tagMap === 'object') {
             Object.keys(data.tagMap).forEach(k => {
+              if (deletedRotas.includes(k)) return;
               if (!defaultTagMap[k]) defaultTagMap[k] = [];
               (data.tagMap[k] || []).forEach(t => {
                 if (!defaultTagMap[k].includes(t)) defaultTagMap[k].push(t);
@@ -1200,6 +1217,7 @@
         } else {
           db.collection("inspectcbm_config").doc("rotas_tags").set({
             rotas: defaultRotas,
+            deletedRotas: deletedRotas,
             tagMap: defaultTagMap,
             inspetores: defaultInspetores,
             availableFalhaTypes: availableFalhaTypes
@@ -1291,6 +1309,7 @@
         mergeAndPersistRotasAndTags();
         await db.collection("inspectcbm_config").doc("rotas_tags").set({
           rotas: defaultRotas,
+          deletedRotas: deletedRotas,
           tagMap: defaultTagMap,
           inspetores: defaultInspetores,
           availableFalhaTypes: availableFalhaTypes
@@ -1532,6 +1551,7 @@
       const val = document.getElementById('nova_rota_input').value.trim();
       if(!val) return;
       if(!defaultRotas.includes(val)) {
+        deletedRotas = deletedRotas.filter(r => r !== val);
         defaultRotas.push(val);
         if(!defaultTagMap[val]) defaultTagMap[val] = [];
         await saveConfigToCloud();
@@ -1547,7 +1567,13 @@
       const rotaName = defaultRotas[index];
       defaultRotas.splice(index, 1);
       delete defaultTagMap[rotaName];
+      if (!deletedRotas.includes(rotaName)) deletedRotas.push(rotaName);
       await saveConfigToCloud();
+      // apaga também a chave da rota dentro do tagMap na nuvem (merge:true não remove chaves)
+      try {
+        await db.collection("inspectcbm_config").doc("rotas_tags")
+          .update(new firebase.firestore.FieldPath('tagMap', rotaName), firebase.firestore.FieldValue.delete());
+      } catch(e) { console.warn("Aviso ao limpar rota do tagMap na nuvem:", e); }
       renderRotasList();
       loadSavedRotas();
       populateFilters();
@@ -3435,11 +3461,6 @@
           doc.text("SUPERVISORY & CONDITION MONITORING SYSTEM  •  SCADA PREDICTIVE MAINTENANCE", 18, 19);
           
           // Metadados à Direita no Topo
-          doc.setFont("helvetica", "bold");
-          doc.setFontSize(7.5);
-          doc.setTextColor(245, 158, 11);
-          doc.text("LAUDO TÉCNICO CBM", 195, 13.5, { align: "right" });
-          
           doc.setFont("helvetica", "normal");
           doc.setFontSize(6.8);
           doc.setTextColor(148, 163, 184);
@@ -3605,15 +3626,10 @@
       doc.setFillColor(243, 112, 33); // Barra de acentuação laranja
       doc.rect(122, 16, 2.5, 15.5, 'F');
 
-      doc.setFontSize(6.8);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(251, 191, 36); // Dourado suave
-      doc.text("SETOR OPERACIONAL", 128, 21.5);
-
       doc.setFontSize(11);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(255, 255, 255);
-      doc.text("ÁREA: UTILIDADES", 128, 27.8);
+      doc.text("ÁREA: UTILIDADES", 128, 25.4);
 
       // Linha sutil separando o cabeçalho
       doc.setDrawColor(226, 232, 240);
@@ -3886,29 +3902,36 @@
       doc.text(splitTecnica, 15, 34);
 
       // =======================================================================
-      // TABELAS TÉCNICAS EM LARGURA TOTAL (ISO 10816 & CRITÉRIOS SAP)
+      // TABELAS TÉCNICAS REDUZIDAS E CENTRALIZADAS (ISO 10816 & CRITÉRIOS SAP)
       // =======================================================================
-      const tableX = 12;
-      const tableW = 186;
-      
+      const tableW = 150;
+      const tableX = (210 - tableW) / 2; // centralizada horizontalmente na folha A4
+
+      const t1H = 66;   // altura Tabela 1
+      const t2H = 92;   // altura Tabela 2
+      const tGap = 12;  // espaço entre as tabelas
+      const areaTop = 50;    // logo abaixo do box "A técnica de análise de vibração"
+      const areaBottom = 274; // logo acima do rodapé
+      const t1Y = areaTop + ((areaBottom - areaTop) - (t1H + tGap + t2H)) / 2; // centralizada na vertical
+      const t2Y = t1Y + t1H + tGap;
+
       // =======================================================================
       // TABELA 1: TABELA DE SEVERIDADE DE VIBRAÇÃO (BASEADO EM ABNT NBR ISO 10816)
       // =======================================================================
-      const t1Y = 51;
-      const t1H = 96;
       doc.setFillColor(255, 255, 255);
       doc.setDrawColor(203, 213, 225);
+      doc.setLineWidth(0.35);
       doc.roundedRect(tableX, t1Y, tableW, t1H, 2, 2, 'FD');
 
       // Cabeçalho da Tabela 1
       doc.setFillColor(224, 242, 254);
       doc.roundedRect(tableX, t1Y, tableW, 12, 2, 2, 'F');
       doc.rect(tableX, t1Y + 7, tableW, 5, 'F');
-      doc.setFontSize(9.5);
+      doc.setFontSize(8.5);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(15, 23, 42);
       doc.text("TABELA DE SEVERIDADE DE VIBRAÇÃO", tableX + (tableW / 2), t1Y + 5.2, { align: "center" });
-      doc.setFontSize(7.8);
+      doc.setFontSize(7.2);
       doc.text("(BASEADO EM ABNT NBR ISO 10816)", tableX + (tableW / 2), t1Y + 9.8, { align: "center" });
 
       // Linha de Cabeçalhos das Colunas da Tabela ISO 10816
@@ -3917,9 +3940,9 @@
       doc.setDrawColor(203, 213, 225);
       doc.line(tableX, t1Y + 22, tableX + tableW, t1Y + 22);
 
-      const colW1 = 52;
-      const colW2 = 62;
-      const colW3 = 72;
+      const colW1 = 42;
+      const colW2 = 50;
+      const colW3 = 58;
       const c1X = tableX;
       const c2X = tableX + colW1;
       const c3X = tableX + colW1 + colW2;
@@ -3927,7 +3950,7 @@
       doc.line(c2X, t1Y + 12, c2X, t1Y + t1H);
       doc.line(c3X, t1Y + 12, c3X, t1Y + t1H);
 
-      doc.setFontSize(7.5);
+      doc.setFontSize(7);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(15, 23, 42);
       doc.text("CLASSE DE MÁQUINA", c1X + (colW1 / 2), t1Y + 16.2, { align: "center" });
@@ -3946,7 +3969,7 @@
         { classe: "IV", vel: "> 7.1", status: "Inaceitável: > 7.1", bg: [220, 38, 38], textWhite: true }
       ];
 
-      const rowH_iso = 18.5;
+      const rowH_iso = 11;
       isoRows.forEach((r, idx) => {
         const curY = t1Y + 22 + (idx * rowH_iso);
         // Coluna 3 colorida conforme severidade
@@ -3958,33 +3981,32 @@
         doc.line(tableX, curY + rowH_iso, tableX + tableW, curY + rowH_iso);
 
         // Texto Coluna 1
-        doc.setFontSize(8.5);
+        doc.setFontSize(8);
         doc.setFont("helvetica", "bold");
         doc.setTextColor(15, 23, 42);
-        doc.text(r.classe, c1X + (colW1 / 2), curY + 11, { align: "center" });
+        doc.text(r.classe, c1X + (colW1 / 2), curY + 6.8, { align: "center" });
 
         // Texto Coluna 2
-        doc.text(r.vel, c2X + (colW2 / 2), curY + 11, { align: "center" });
+        doc.text(r.vel, c2X + (colW2 / 2), curY + 6.8, { align: "center" });
 
         // Texto Coluna 3
         doc.setTextColor(r.textWhite ? 255 : 15, r.textWhite ? 255 : 23, r.textWhite ? 255 : 42);
-        doc.text(r.status, c3X + (colW3 / 2), curY + 11, { align: "center" });
+        doc.text(r.status, c3X + (colW3 / 2), curY + 6.8, { align: "center" });
       });
 
       // =======================================================================
       // TABELA 2: CRITÉRIOS DE ABERTURA DE ORDEM SAP (SEVERIDADE E AÇÃO)
       // =======================================================================
-      const t2Y = 153;
-      const t2H = 118;
       doc.setFillColor(255, 255, 255);
       doc.setDrawColor(203, 213, 225);
+      doc.setLineWidth(0.35);
       doc.roundedRect(tableX, t2Y, tableW, t2H, 2, 2, 'FD');
 
       // Cabeçalho da Tabela 2
       doc.setFillColor(224, 242, 254);
       doc.roundedRect(tableX, t2Y, tableW, 12, 2, 2, 'F');
       doc.rect(tableX, t2Y + 7, tableW, 5, 'F');
-      doc.setFontSize(9.5);
+      doc.setFontSize(8.5);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(15, 23, 42);
       doc.text("CRITÉRIOS DE ABERTURA DE ORDEM SAP (SEVERIDADE E AÇÃO)", tableX + (tableW / 2), t2Y + 7.5, { align: "center" });
@@ -3992,7 +4014,7 @@
       // Subtítulo da Tabela SAP
       doc.setFillColor(248, 250, 252);
       doc.rect(tableX, t2Y + 12, tableW, 8.5, 'F');
-      doc.setFontSize(7.2);
+      doc.setFontSize(6.6);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(71, 85, 105);
       doc.text("*As ordens do SAP devem ser abertas entre os prazos indicados abaixo, com base na severidade.*", tableX + (tableW / 2), t2Y + 17.5, { align: "center" });
@@ -4003,17 +4025,16 @@
       doc.setDrawColor(203, 213, 225);
       doc.line(tableX, t2Y + 32.5, tableX + tableW, t2Y + 32.5);
 
-      const sapColW1 = 62;
-      const sapColW2 = 62;
-      const sapColW3 = 62;
+      const sapColW1 = 50;
+      const sapColW2 = 50;
+      const sapColW3 = 50;
       const sapC1X = tableX;
       const sapC2X = tableX + sapColW1;
       const sapC3X = tableX + sapColW1 + sapColW2;
+      const rowH_sap = 10.5;
+      const sapBodyEnd = t2Y + 32.5 + (5 * rowH_sap);
 
-      doc.line(sapC2X, t2Y + 20.5, sapC2X, t2Y + 110);
-      doc.line(sapC3X, t2Y + 20.5, sapC3X, t2Y + 110);
-
-      doc.setFontSize(7.2);
+      doc.setFontSize(7);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(15, 23, 42);
       doc.text("STATUS", sapC1X + (sapColW1 / 2), t2Y + 25.5, { align: "center" });
@@ -4034,7 +4055,6 @@
         { status: "NORMAL", dias: "NA", prioridade: "NA", bg: [22, 163, 74], textWhite: true }
       ];
 
-      const rowH_sap = 15.5;
       sapRows.forEach((r, idx) => {
         const curY = t2Y + 32.5 + (idx * rowH_sap);
         // Fundo total da linha preenchido com a cor de severidade
@@ -4047,17 +4067,23 @@
         doc.line(tableX, curY + rowH_sap, tableX + tableW, curY + rowH_sap);
 
         // Texto
-        doc.setFontSize(8.5);
+        doc.setFontSize(8);
         doc.setFont("helvetica", "bold");
         doc.setTextColor(r.textWhite ? 255 : 15, r.textWhite ? 255 : 23, r.textWhite ? 255 : 42);
 
-        doc.text(r.status, sapC1X + (sapColW1 / 2), curY + 10, { align: "center" });
-        doc.text(r.dias, sapC2X + (sapColW2 / 2), curY + 10, { align: "center" });
-        doc.text(r.prioridade, sapC3X + (sapColW3 / 2), curY + 10, { align: "center" });
+        doc.text(r.status, sapC1X + (sapColW1 / 2), curY + 6.6, { align: "center" });
+        doc.text(r.dias, sapC2X + (sapColW2 / 2), curY + 6.6, { align: "center" });
+        doc.text(r.prioridade, sapC3X + (sapColW3 / 2), curY + 6.6, { align: "center" });
       });
 
+      // Divisórias verticais do cabeçalho de colunas da tabela SAP
+      doc.setDrawColor(203, 213, 225);
+      doc.setLineWidth(0.25);
+      doc.line(sapC2X, t2Y + 20.5, sapC2X, t2Y + 32.5);
+      doc.line(sapC3X, t2Y + 20.5, sapC3X, t2Y + 32.5);
+
       // Nota de rodapé da tabela SAP
-      doc.setFontSize(6.5);
+      doc.setFontSize(6.3);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(100, 116, 139);
       doc.text("*Atualizado com feedback do campo", tableX + tableW - 3, t2Y + t2H - 2.5, { align: "right" });
