@@ -4,6 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>InspectCBM - Supervisory & Condition Monitoring System</title>
+  <meta name="description" content="Sistema de Supervisório e Monitoramento Preditivo de Condição (CBM), coleta em campo, pré-análise e emissão de laudos técnicos SCADA." />
+  <meta property="og:title" content="InspectCBM - Supervisory & Condition Monitoring System" />
+  <meta property="og:description" content="Sistema de Supervisório e Monitoramento Preditivo de Condição (CBM), coleta em campo, pré-análise e emissão de laudos técnicos SCADA." />
+  <meta property="og:type" content="website" />
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- FontAwesome Icons -->
@@ -13,6 +17,7 @@
   <!-- jsPDF & AutoTable para relatórios PDF profissionais -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+  
   <!-- Firebase Compat SDKs -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
@@ -30,15 +35,21 @@
       firebase.initializeApp(firebaseConfig);
     }
     const db = firebase.firestore();
+    
     document.addEventListener("DOMContentLoaded", () => {
       const now = new Date();
       now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
       const isoNow = now.toISOString().slice(0,16);
+      
       if(document.getElementById("data_coleta")) document.getElementById("data_coleta").value = isoNow;
       if(document.getElementById("rel_data_coleta")) document.getElementById("rel_data_coleta").value = isoNow.slice(0,10);
       if(document.getElementById("rel_data_analise")) document.getElementById("rel_data_analise").valueAsDate = new Date();
+      const savedResp = localStorage.getItem("inspectcbm_last_resp_tecnico") || "CARLOS SILVA";
+      if(document.getElementById("rel_responsavel_tecnico")) document.getElementById("rel_responsavel_tecnico").value = savedResp;
+      if(document.getElementById("rel_responsavel_tecnico_bar")) document.getElementById("rel_responsavel_tecnico_bar").value = savedResp;
       if(document.getElementById("sup_data_coleta")) document.getElementById("sup_data_coleta").value = isoNow.slice(0,10);
       if(document.getElementById("sup_mes_filtro")) document.getElementById("sup_mes_filtro").value = isoNow.slice(0,7);
+      
       initCloudListeners();
     });
   </script>
@@ -54,6 +65,7 @@
   </style>
 </head>
 <body class="min-h-screen pb-12 selection:bg-amber-500 selection:text-slate-950">
+  
   <!-- Supervisory Top Bar / Header -->
   <header class="bg-slate-900/90 backdrop-blur-md border-b border-slate-800 sticky top-0 z-50 shadow-2xl">
     <div class="max-w-7xl mx-auto px-4 py-3 flex flex-col md:flex-row justify-between items-center gap-3">
@@ -96,8 +108,10 @@
       </div>
     </div>
   </header>
+
   <!-- Main Container -->
   <main class="max-w-7xl mx-auto px-4 mt-6">
+    
     <!-- SEÇÃO: TELA DO SUPERVISÓRIO DE CBM -->
     <div id="tab-supervisorio" class="hidden space-y-6">
       <div class="bg-slate-900/90 backdrop-blur-md rounded-2xl p-5 border border-slate-800 shadow-2xl flex flex-col md:flex-row justify-between items-center gap-4">
@@ -105,10 +119,22 @@
           <h2 class="text-sm font-bold text-white uppercase tracking-wider font-mono flex items-center">
             <i class="fa-solid fa-gauge text-emerald-400 mr-2 text-base"></i> Supervisório Executivo de Saúde de Ativos (CBM)
           </h2>
-          <p class="text-xs text-slate-400">Monitoramento online da frota e estratificação baseada estritamente nos Laudos Técnicos Salvos</p>
+          <div class="flex items-center space-x-2 mt-1.5 flex-wrap gap-y-1">
+            <p class="text-xs text-slate-400">Monitoramento online da frota alimentado diretamente pelos Laudos Salvos na Nuvem</p>
+            <span id="sup-active-source-badge" class="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2.5 py-0.5 rounded-full font-mono font-bold flex items-center">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse mr-1.5"></span>Histórico Consolidado
+            </span>
+          </div>
         </div>
         <div class="flex flex-wrap items-center gap-2">
-          <select id="sup_filter_rota" multiple onchange="renderSupervisorioTab()" class="bg-slate-950 border border-emerald-500/40 rounded-xl px-3 py-2 text-xs text-emerald-400 font-bold shadow-inner h-16 w-48">
+          <!-- SELETOR DE LAUDO SALVO NA NUVEM -->
+          <div class="flex items-center space-x-1.5 bg-slate-950 border border-amber-500/40 rounded-xl px-3 py-1.5 text-xs text-amber-400 shadow-inner">
+            <span class="text-[10px] text-slate-400 font-mono flex items-center"><i class="fa-solid fa-cloud-arrow-down mr-1.5 text-amber-400"></i>Laudo Nuvem:</span>
+            <select id="sup_select_laudo" onchange="renderSupervisorioTab()" class="bg-transparent text-xs text-amber-300 font-bold font-mono focus:outline-none max-w-[220px]">
+              <option value="CONSOLIDADO">Todos os Laudos (Último Status por Ativo)</option>
+            </select>
+          </div>
+          <select id="sup_filter_rota" multiple onchange="renderSupervisorioTab()" class="bg-slate-950 border border-emerald-500/40 rounded-xl px-3 py-1.5 text-xs text-emerald-400 font-bold shadow-inner h-14 w-44">
             <option value="TODAS_ROTAS">-- Todas as Rotas --</option>
           </select>
           <div class="flex items-center space-x-1.5 bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-white shadow-inner">
@@ -119,11 +145,12 @@
             <span class="text-[10px] text-slate-400 font-mono">Data Coleta:</span>
             <input type="date" id="sup_data_coleta" onchange="renderSupervisorioTab()" class="bg-transparent text-xs text-white focus:outline-none font-mono">
           </div>
-          <button onclick="clearSupervisorioFilters()" title="Limpar filtro" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-2.5 py-2 rounded-xl transition border border-slate-700">
+          <button onclick="clearSupervisorioFilters()" title="Limpar filtros" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-2.5 py-2 rounded-xl transition border border-slate-700">
             <i class="fa-solid fa-xmark"></i>
           </button>
         </div>
       </div>
+
       <!-- CARDS DE RESUMO EXECUTIVO (KPIs) -->
       <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
         <div class="bg-slate-900/90 backdrop-blur-md p-4 rounded-2xl border border-slate-800 shadow-xl relative overflow-hidden flex flex-col justify-between">
@@ -134,22 +161,22 @@
         <div class="bg-slate-900/90 backdrop-blur-md p-4 rounded-2xl border border-emerald-500/30 shadow-xl relative overflow-hidden flex flex-col justify-between">
           <div class="absolute top-0 left-0 w-1 h-full bg-emerald-500"></div>
           <span class="text-[11px] font-mono text-emerald-400 uppercase">Normal</span>
-          <span id="sup-kpi-seguro" class="text-2xl font-bold font-mono text-emerald-400 mt-2">0</span>
+          <span id="sup-kpi-normal" class="text-2xl font-bold font-mono text-emerald-400 mt-2">0</span>
         </div>
         <div class="bg-slate-900/90 backdrop-blur-md p-4 rounded-2xl border border-blue-500/30 shadow-xl relative overflow-hidden flex flex-col justify-between">
           <div class="absolute top-0 left-0 w-1 h-full bg-blue-600"></div>
           <span class="text-[11px] font-mono text-blue-400 uppercase">Observação</span>
-          <span id="sup-kpi-a1" class="text-2xl font-bold font-mono text-blue-400 mt-2">0</span>
+          <span id="sup-kpi-observacao" class="text-2xl font-bold font-mono text-blue-400 mt-2">0</span>
         </div>
         <div class="bg-slate-900/90 backdrop-blur-md p-4 rounded-2xl border border-amber-500/30 shadow-xl relative overflow-hidden flex flex-col justify-between">
           <div class="absolute top-0 left-0 w-1 h-full bg-amber-400"></div>
           <span class="text-[11px] font-mono text-amber-400 uppercase">Alerta</span>
-          <span id="sup-kpi-a2" class="text-2xl font-bold font-mono text-amber-400 mt-2">0</span>
+          <span id="sup-kpi-alerta" class="text-2xl font-bold font-mono text-amber-400 mt-2">0</span>
         </div>
         <div class="bg-slate-900/90 backdrop-blur-md p-4 rounded-2xl border border-rose-500/30 shadow-xl relative overflow-hidden flex flex-col justify-between">
           <div class="absolute top-0 left-0 w-1 h-full bg-rose-600"></div>
           <span class="text-[11px] font-mono text-rose-400 uppercase">Alarme / Emergência</span>
-          <span id="sup-kpi-perigo" class="text-2xl font-bold font-mono text-rose-400 mt-2">0</span>
+          <span id="sup-kpi-alarme" class="text-2xl font-bold font-mono text-rose-400 mt-2">0</span>
         </div>
         <div class="bg-slate-900/90 backdrop-blur-md p-4 rounded-2xl border border-slate-700 shadow-xl relative overflow-hidden flex flex-col justify-between">
           <div class="absolute top-0 left-0 w-1 h-full bg-slate-500"></div>
@@ -157,6 +184,7 @@
           <span id="sup-kpi-naomedido" class="text-2xl font-bold font-mono text-slate-300 mt-2">0</span>
         </div>
       </div>
+
       <!-- GRÁFICOS DO SUPERVISÓRIO -->
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div class="bg-slate-900/90 backdrop-blur-md rounded-2xl p-6 border border-slate-800 shadow-2xl relative overflow-hidden flex flex-col items-center">
@@ -174,7 +202,7 @@
           <div class="absolute top-0 left-0 w-1 h-full bg-cyan-400"></div>
           <div class="w-full flex justify-between items-center mb-4">
             <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider font-mono flex items-center">
-              <i class="fa-solid fa-chart-column text-cyan-400 mr-2"></i> Ativos por Alarme
+              <i class="fa-solid fa-chart-column text-cyan-400 mr-2"></i> Ativos por Severidade
             </h3>
           </div>
           <div class="relative h-64 w-full">
@@ -193,6 +221,7 @@
           </div>
         </div>
       </div>
+
       <!-- TABELA DO SUPERVISÓRIO -->
       <div class="bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-800 shadow-2xl overflow-hidden">
         <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-950/40">
@@ -203,11 +232,12 @@
           <table class="w-full text-left text-xs text-slate-300">
             <thead class="bg-slate-950/80 text-slate-400 uppercase font-semibold font-mono tracking-wider">
               <tr>
-                <th class="p-3">Status / Criticidade</th>
+                <th class="p-3">Severidade</th>
                 <th class="p-3">Rota / Tag</th>
                 <th class="p-3">Equipamento & Setor</th>
                 <th class="p-3">Falhas Apontadas</th>
-                <th class="p-3">Diagnóstico Principal (Laudo Salvo)</th>
+                <th class="p-3">Diagnóstico Principal</th>
+                <th class="p-3">Origem no Histórico</th>
               </tr>
             </thead>
             <tbody id="sup-table-body" class="divide-y divide-slate-800/60"></tbody>
@@ -215,9 +245,11 @@
         </div>
       </div>
     </div>
+
     <!-- SEÇÃO: FORMULÁRIO DE COLETA DE CAMPO -->
     <div id="tab-form" class="max-w-5xl mx-auto space-y-6">
       <form id="vibration-form" onsubmit="saveInspection(event)" class="space-y-6">
+        
         <div class="bg-slate-900/90 backdrop-blur-md rounded-2xl p-6 border border-slate-800 shadow-2xl relative overflow-hidden">
           <div class="absolute top-0 left-0 w-1 h-full bg-amber-500"></div>
           <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-5 gap-3">
@@ -235,8 +267,12 @@
               <button type="button" onclick="saveOnlyTagRegistration()" class="bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/30 text-xs px-3 py-1.5 rounded-xl transition flex items-center font-semibold shadow">
                 <i class="fa-solid fa-bookmark mr-1.5"></i> Salvar Tag
               </button>
+              <button type="button" onclick="confirmResetInspection()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-rose-400 border border-slate-700/60 text-xs px-3 py-1.5 rounded-xl transition flex items-center font-semibold shadow" title="Limpar campos de medição desta coleta">
+                <i class="fa-solid fa-rotate-left mr-1.5"></i> Limpar Medição
+              </button>
             </div>
           </div>
+          
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
             <div>
               <div class="flex justify-between items-center mb-1.5">
@@ -314,6 +350,7 @@
             </div>
           </div>
         </div>
+
         <!-- BLOCO 2 -->
         <div class="bg-slate-900/90 backdrop-blur-md rounded-2xl p-6 border border-slate-800 shadow-2xl space-y-5 relative overflow-hidden">
           <div class="absolute top-0 left-0 w-1 h-full bg-cyan-500"></div>
@@ -331,6 +368,7 @@
               <input type="datetime-local" id="data_coleta" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white font-mono focus:outline-none focus:border-cyan-500">
             </div>
           </div>
+          
           <div class="bg-slate-950/80 p-4 rounded-xl border border-amber-500/20 space-y-3">
             <h3 class="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center font-mono">
               <i class="fa-solid fa-bolt mr-2"></i> Componente 1: Motor Elétrico
@@ -355,6 +393,7 @@
               <div><label class="block text-[11px] text-slate-400 mb-1">Rolamento 3</label><input type="text" id="elem_rol3" placeholder="Ex: 7208" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-mono"></div>
               <div><label class="block text-[11px] text-slate-400 mb-1">Rolamento 4</label><input type="text" id="elem_rol4" placeholder="Ex: 7208" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-mono"></div>
             </div>
+            
             <div id="fields_redutor" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 hidden">
               <div><label class="block text-[11px] text-slate-400 mb-1">Marca Redutor</label><input type="text" id="red_marca" placeholder="Ex: SEW" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"></div>
               <div><label class="block text-[11px] text-slate-400 mb-1">Modelo Redutor</label><input type="text" id="red_modelo" placeholder="Ex: K87" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"></div>
@@ -380,6 +419,7 @@
             </div>
           </div>
         </div>
+
         <!-- BLOCO 3 -->
         <div class="bg-slate-900/90 backdrop-blur-md rounded-2xl p-6 border border-slate-800 shadow-2xl relative overflow-hidden">
           <div class="absolute top-0 left-0 w-1 h-full bg-emerald-500"></div>
@@ -412,6 +452,7 @@
             </div>
           </div>
         </div>
+
         <!-- BLOCO 4 -->
         <div class="bg-slate-900/90 backdrop-blur-md rounded-2xl p-6 border border-amber-500/30 shadow-2xl relative overflow-hidden">
           <div class="absolute top-0 left-0 w-1 h-full bg-amber-400"></div>
@@ -440,6 +481,7 @@
             <input type="text" id="strobo_obs" placeholder="Ex: Desgaste no elemento elástico do acoplamento." class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-amber-500">
           </div>
         </div>
+
         <!-- BLOCO 5 -->
         <div class="bg-slate-900/90 backdrop-blur-md rounded-2xl p-6 border border-slate-800 shadow-2xl space-y-4 relative overflow-hidden">
           <div class="absolute top-0 left-0 w-1 h-full bg-rose-500"></div>
@@ -479,6 +521,7 @@
             <input type="text" id="temp_obs" placeholder="Ex: Ponto quente detetado no mancal LA do Motor." class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-rose-500">
           </div>
         </div>
+
         <!-- BLOCO 6 -->
         <div class="bg-slate-900/90 backdrop-blur-md rounded-2xl p-6 border border-slate-800 shadow-2xl space-y-4 relative overflow-hidden">
           <div class="absolute top-0 left-0 w-1 h-full bg-purple-500"></div>
@@ -572,12 +615,14 @@
             <textarea id="observacoes" rows="2" placeholder="Ex: Equipamento em regime normal de operação." class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-amber-500"></textarea>
           </div>
         </div>
+        
         <button type="submit" class="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold py-3.5 px-4 rounded-2xl shadow-xl shadow-amber-500/20 transition flex items-center justify-center space-x-2 text-sm tracking-wide border border-amber-400/40">
           <i class="fa-solid fa-cloud-arrow-up text-base"></i>
           <span>Transmitir Registo para a Nuvem SCADA</span>
         </button>
       </form>
     </div>
+
     <!-- SEÇÃO: PRÉ-ANÁLISE -->
     <div id="tab-dashboard" class="hidden space-y-6">
       <div class="bg-slate-900/90 backdrop-blur-md rounded-2xl p-5 border border-slate-800 shadow-2xl flex flex-col md:flex-row justify-between items-center gap-4">
@@ -657,6 +702,7 @@
         </div>
       </div>
     </div>
+
     <!-- SEÇÃO: RELATÓRIO TÉCNICO -->
     <div id="tab-relatorio" class="hidden space-y-6">
       <div class="bg-slate-900/90 backdrop-blur-md rounded-2xl p-6 border border-slate-800 shadow-2xl space-y-4 relative overflow-hidden">
@@ -680,7 +726,7 @@
             </button>
           </div>
         </div>
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
           <div>
             <label class="block text-xs font-semibold text-slate-300 mb-1">Rotas de Inspeção *</label>
             <select id="rel_filter_rota" multiple onchange="onRelFilterRotaChange()" class="w-full bg-slate-950 border border-amber-500/40 rounded-xl px-3.5 py-2 text-xs text-amber-400 font-bold shadow-inner h-24">
@@ -703,12 +749,31 @@
             <label class="block text-xs font-semibold text-slate-300 mb-1">Data da Análise (Laudo)</label>
             <input type="date" id="rel_data_analise" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-amber-500">
           </div>
+          <div>
+            <label class="block text-xs font-semibold text-amber-400 mb-1 flex items-center">
+              <i class="fa-solid fa-user-check mr-1.5 text-amber-400"></i> Resp. Técnico (Laudo) *
+            </label>
+            <input type="text" id="rel_responsavel_tecnico" list="lista-tecnicos-laudo" placeholder="Ex: Carlos Silva" oninput="syncRelResponsavelTecnico(this.value)" class="w-full bg-slate-950 border border-amber-500/50 rounded-xl px-3.5 py-2.5 text-xs text-amber-300 font-semibold focus:outline-none focus:border-amber-400 shadow-inner">
+            <datalist id="lista-tecnicos-laudo"></datalist>
+            <span class="text-[10px] text-slate-400 block mt-1">Técnico que analisou (sai na capa e laudo PDF)</span>
+          </div>
         </div>
       </div>
       <div class="bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-800 shadow-2xl overflow-hidden">
-        <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-950/40">
-          <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider font-mono">Matriz de Equipamentos para Análise Técnica</h3>
-          <span id="rel-record-count" class="text-xs bg-slate-800 px-3 py-1 rounded-full text-amber-400 font-bold font-mono border border-slate-700">0 equipamentos</span>
+        <div class="p-4 border-b border-slate-800 flex flex-col sm:flex-row justify-between items-center gap-3 bg-slate-950/60">
+          <div class="flex items-center space-x-3">
+            <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider font-mono flex items-center">
+              <i class="fa-solid fa-microscope mr-2 text-cyan-400"></i> Matriz de Equipamentos para Análise Técnica
+            </h3>
+            <span id="rel-record-count" class="text-xs bg-slate-800 px-3 py-1 rounded-full text-amber-400 font-bold font-mono border border-slate-700">0 equipamentos</span>
+          </div>
+          <!-- Campo na Área de Análise para o Nome do Responsável Técnico -->
+          <div class="flex items-center space-x-2 bg-slate-900 border border-amber-500/50 rounded-xl px-3 py-1.5 shadow-lg">
+            <label for="rel_responsavel_tecnico_bar" class="text-xs font-bold text-amber-400 flex items-center whitespace-nowrap cursor-pointer">
+              <i class="fa-solid fa-user-pen mr-1.5 text-amber-400"></i> Resp. Técnico da Análise:
+            </label>
+            <input type="text" id="rel_responsavel_tecnico_bar" list="lista-tecnicos-laudo" placeholder="Nome do Técnico" oninput="syncRelResponsavelTecnico(this.value)" class="bg-slate-950 border border-amber-500/40 rounded-lg px-2.5 py-1 text-xs text-amber-300 font-bold focus:outline-none focus:border-amber-400 shadow-inner w-44 sm:w-56">
+          </div>
         </div>
         <div class="overflow-x-auto">
           <table class="w-full text-left text-xs text-slate-300">
@@ -737,6 +802,7 @@
       </div>
     </div>
   </main>
+
   <!-- MODAIS -->
   <div id="modal-rotas" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
     <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-md w-full space-y-4 shadow-2xl">
@@ -760,6 +826,7 @@
       </div>
     </div>
   </div>
+
   <div id="modal-tags" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
     <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-md w-full space-y-4 shadow-2xl">
       <h3 class="text-xs font-bold text-amber-400 uppercase tracking-widest flex items-center justify-between font-mono">
@@ -788,6 +855,7 @@
       </div>
     </div>
   </div>
+
   <div id="modal-inspetores" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
     <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-md w-full space-y-4 shadow-2xl">
       <h3 class="text-xs font-bold text-amber-400 uppercase tracking-widest flex items-center justify-between font-mono">
@@ -810,12 +878,137 @@
       </div>
     </div>
   </div>
+
+  <!-- TOAST CONTAINER -->
+  <div id="toast-container" class="fixed top-5 right-5 z-[100] flex flex-col space-y-2 pointer-events-none max-w-sm w-full [&>*]:pointer-events-auto"></div>
+
+  <!-- MODAL CONFIRM -->
+  <div id="modal-confirm" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-md w-full space-y-4 shadow-2xl">
+      <div class="flex items-center space-x-3 text-amber-400">
+        <i class="fa-solid fa-triangle-exclamation text-xl"></i>
+        <h3 class="text-sm font-bold uppercase tracking-wider font-mono">Confirmação SCADA</h3>
+      </div>
+      <p id="confirm-modal-text" class="text-xs text-slate-300 leading-relaxed"></p>
+      <div class="flex justify-end space-x-2 pt-2">
+        <button onclick="handleConfirmChoice(false)" class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700 transition">Cancelar</button>
+        <button onclick="handleConfirmChoice(true)" class="px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white shadow transition">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL PROMPT -->
+  <div id="modal-prompt" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <form onsubmit="handlePromptSubmit(event)" class="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-md w-full space-y-4 shadow-2xl">
+      <h3 id="prompt-modal-title" class="text-xs font-bold text-amber-400 uppercase tracking-widest font-mono">Inserir Dados</h3>
+      <input type="text" id="prompt-modal-input" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-amber-500 font-mono shadow-inner">
+      <div class="flex justify-end space-x-2 pt-2">
+        <button type="button" onclick="handlePromptCancel()" class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700 transition">Cancelar</button>
+        <button type="submit" class="px-4 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 shadow transition">Confirmar</button>
+      </div>
+    </form>
+  </div>
+
   <script>
-    let defaultRotas = [];
-    let defaultTagMap = {};
-    let defaultInspetores = ["TÉCNICO RESPONSÁVEL"];
+    // Sistema moderno de Notificações Toast (sem bloquear iframe)
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      if (!container) return;
+      const toast = document.createElement('div');
+      let bgBorder = 'bg-slate-900 border-amber-500/40 text-amber-300';
+      let icon = 'fa-circle-info text-amber-400';
+      if (type === 'success' || message.includes('sucesso') || message.includes('concluída') || message.includes('carregada') || message.includes('carregado') || message.includes('salvo')) {
+        bgBorder = 'bg-slate-900 border-emerald-500/50 text-emerald-300';
+        icon = 'fa-circle-check text-emerald-400';
+      } else if (type === 'error' || message.includes('Erro') || message.includes('erro') || message.includes('Excluir') || message.includes('Deve manter') || message.includes('Selecione')) {
+        bgBorder = 'bg-slate-900 border-rose-500/50 text-rose-300';
+        icon = 'fa-circle-exclamation text-rose-400';
+      }
+      toast.className = `flex items-center space-x-3 px-4 py-3 rounded-2xl border shadow-2xl backdrop-blur-md transition-all duration-300 transform translate-y-2 opacity-0 text-xs font-medium ${bgBorder}`;
+      toast.innerHTML = `<i class="fa-solid ${icon} text-base shrink-0"></i><span class="flex-1">${message}</span><button class="text-slate-400 hover:text-white shrink-0 ml-2" onclick="this.parentElement.remove()"><i class="fa-solid fa-xmark"></i></button>`;
+      container.appendChild(toast);
+      requestAnimationFrame(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+      });
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 300);
+      }, 4000);
+    }
+    window.alert = (msg) => showToast(msg);
+
+    // Sistema de Confirmação e Prompt Modais sem travar o browser
+    let confirmResolver = null;
+    function customConfirm(message) {
+      return new Promise((resolve) => {
+        const modal = document.getElementById('modal-confirm');
+        const text = document.getElementById('confirm-modal-text');
+        if (!modal || !text) {
+          resolve(true);
+          return;
+        }
+        text.textContent = message;
+        modal.classList.remove('hidden');
+        confirmResolver = resolve;
+      });
+    }
+    function handleConfirmChoice(val) {
+      const modal = document.getElementById('modal-confirm');
+      if (modal) modal.classList.add('hidden');
+      if (confirmResolver) {
+        confirmResolver(val);
+        confirmResolver = null;
+      }
+    }
+
+    let promptResolver = null;
+    function customPrompt(title, defaultValue = '') {
+      return new Promise((resolve) => {
+        const modal = document.getElementById('modal-prompt');
+        const label = document.getElementById('prompt-modal-title');
+        const input = document.getElementById('prompt-modal-input');
+        if (!modal || !label || !input) {
+          resolve(null);
+          return;
+        }
+        label.textContent = title;
+        input.value = defaultValue;
+        modal.classList.remove('hidden');
+        input.focus();
+        promptResolver = resolve;
+      });
+    }
+    function handlePromptSubmit(e) {
+      if (e) e.preventDefault();
+      const modal = document.getElementById('modal-prompt');
+      const input = document.getElementById('prompt-modal-input');
+      const val = input ? input.value : null;
+      if (modal) modal.classList.add('hidden');
+      if (promptResolver) {
+        promptResolver(val);
+        promptResolver = null;
+      }
+    }
+    function handlePromptCancel() {
+      const modal = document.getElementById('modal-prompt');
+      if (modal) modal.classList.add('hidden');
+      if (promptResolver) {
+        promptResolver(null);
+        promptResolver = null;
+      }
+    }
+
+    // Fallback robusto inicial para garantir que rotas e tags nunca sumam
+    let defaultRotas = ["Central de pó", "Sopradores Massas", "Extrusoras"];
+    let defaultTagMap = { 
+      "Central de pó": ["FM7011", "EX7002"],
+      "Sopradores Massas": ["SP8001"],
+      "Extrusoras": ["EXT101"]
+    };
+    let defaultInspetores = ["TÉCNICO RESPONSÁVEL", "CARLOS SILVA"];
     let cloudLaudos = [];
     let cloudPreLaudos = [];
+    
     let currentPhotoBase64 = "";
     let cloudRecords = [];
     let cloudTagRegistry = {};   
@@ -823,7 +1016,8 @@
     let supDoughnutInstance = null;
     let supBarInstance = null;
     let supFalhasInstance = null;
-    const defaultFalhaTypes = [
+    
+    let availableFalhaTypes = [
       "Desbalanceamento",
       "Desalinhamento",
       "Falha de Rolamento",
@@ -833,47 +1027,28 @@
       "Folga Mecânica",
       "Cavitação"
     ];
-    let availableFalhaTypes = defaultFalhaTypes.slice();
-    // Escala de severidade do Laudo Técnico (do menor para o maior)
-    const severidadeOpcoes = ['NORMAL', 'OBSERVAÇÃO', 'ALERTA', 'ALARME', 'EMERGÊNCIA'];
-    // Laudos antigos (escala anterior) são convertidos automaticamente na mesma ordem
-    function normalizeSeveridade(v) {
-      const mapa = { 'Seguro': 'NORMAL', 'Alarme A1': 'OBSERVAÇÃO', 'Alarme A2': 'ALERTA', 'Perigo P1': 'ALARME', 'Perigo P2': 'EMERGÊNCIA' };
-      if (!v) return 'NORMAL';
-      if (mapa[v]) return mapa[v];
-      const up = String(v).toUpperCase();
-      return severidadeOpcoes.includes(up) ? up : 'NORMAL';
-    }
-    function normalizeLaudoState(state) {
-      const out = JSON.parse(JSON.stringify(state || {}));
-      Object.keys(out).forEach(k => {
-        if (out[k]) {
-          out[k].statusVal = normalizeSeveridade(out[k].statusVal);
-          if (out[k].os === undefined) out[k].os = '';
-        }
-      });
-      return out;
-    }
-    function escAttr(v) {
-      return String(v === undefined || v === null ? '' : v).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    }
+    
     function switchTab(tab) {
       const supTab = document.getElementById('tab-supervisorio');
       const formTab = document.getElementById('tab-form');
       const dashTab = document.getElementById('tab-dashboard');
       const relTab = document.getElementById('tab-relatorio');
+      
       const btnSup = document.getElementById('btn-tab-supervisorio');
       const btnForm = document.getElementById('btn-tab-form');
       const btnDash = document.getElementById('btn-tab-dashboard');
       const btnRel = document.getElementById('btn-tab-relatorio');
+      
       supTab.classList.add('hidden');
       formTab.classList.add('hidden');
       dashTab.classList.add('hidden');
       relTab.classList.add('hidden');
+      
       btnSup.className = "px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition flex items-center border border-slate-700/50 shadow-inner";
       btnForm.className = "px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition flex items-center border border-slate-700/50 shadow-inner";
       btnDash.className = "px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition flex items-center border border-slate-700/50 shadow-inner";
       btnRel.className = "px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition flex items-center border border-slate-700/50 shadow-inner";
+      
       if(tab === 'supervisorio') {
         supTab.classList.remove('hidden');
         btnSup.className = "px-3.5 py-2 rounded-xl text-xs font-semibold bg-emerald-500 text-slate-950 transition flex items-center shadow-md font-bold";
@@ -884,83 +1059,222 @@
       } else if(tab === 'dashboard') {
         dashTab.classList.remove('hidden');
         btnDash.className = "px-3.5 py-2 rounded-xl text-xs font-semibold bg-cyan-500 text-slate-950 transition flex items-center shadow-md font-bold";
+        renderDashboard();
       } else if(tab === 'relatorio') {
         relTab.classList.remove('hidden');
         btnRel.className = "px-4 py-2 rounded-xl text-xs font-bold bg-amber-500 text-slate-950 transition flex items-center shadow-md font-bold";
+        renderRelatorioTab();
       }
     }
+
+    function getActiveTabId() {
+      const supTab = document.getElementById('tab-supervisorio');
+      const dashTab = document.getElementById('tab-dashboard');
+      const relTab = document.getElementById('tab-relatorio');
+      if (supTab && !supTab.classList.contains('hidden')) return 'supervisorio';
+      if (dashTab && !dashTab.classList.contains('hidden')) return 'dashboard';
+      if (relTab && !relTab.classList.contains('hidden')) return 'relatorio';
+      return 'form';
+    }
+
+    function renderActiveTab() {
+      const active = getActiveTabId();
+      if (active === 'supervisorio') renderSupervisorioTab();
+      else if (active === 'dashboard') renderDashboard();
+      else if (active === 'relatorio') renderRelatorioTab();
+    }
+
+    function mergeAndPersistRotasAndTags() {
+      const routeSet = new Set(defaultRotas);
+      try {
+        const local = localStorage.getItem('inspectcbm_saved_rotas');
+        if (local) JSON.parse(local).forEach(r => r && routeSet.add(r));
+      } catch(e) {}
+      try {
+        const cachedCfg = localStorage.getItem('inspectcbm_cached_cfg');
+        if (cachedCfg) {
+          const parsed = JSON.parse(cachedCfg);
+          if (Array.isArray(parsed.rotas)) parsed.rotas.forEach(r => r && routeSet.add(r));
+        }
+      } catch(e) {}
+      (cloudRecords || []).forEach(r => { if(r.rota) routeSet.add(r.rota); });
+      (cloudLaudos || []).forEach(l => {
+        if(l.rota) routeSet.add(l.rota);
+        if(Array.isArray(l.rotas)) l.rotas.forEach(r => routeSet.add(r));
+      });
+      (cloudPreLaudos || []).forEach(p => { if(p.rota) routeSet.add(p.rota); });
+      Object.keys(defaultTagMap || {}).forEach(r => { if(r) routeSet.add(r); });
+
+      const merged = Array.from(routeSet).filter(Boolean);
+      if (merged.length > 0) defaultRotas = merged;
+
+      defaultRotas.forEach(r => {
+        if (!defaultTagMap[r]) defaultTagMap[r] = [];
+      });
+
+      (cloudRecords || []).forEach(r => {
+        if (r.rota && r.baseTag) {
+          if (!defaultTagMap[r.rota]) defaultTagMap[r.rota] = [];
+          if (!defaultTagMap[r.rota].includes(r.baseTag)) {
+            defaultTagMap[r.rota].push(r.baseTag);
+          }
+        }
+      });
+
+      try {
+        localStorage.setItem('inspectcbm_saved_rotas', JSON.stringify(defaultRotas));
+        localStorage.setItem('inspectcbm_saved_tagmap', JSON.stringify(defaultTagMap));
+        localStorage.setItem('inspectcbm_cached_cfg', JSON.stringify({
+          rotas: defaultRotas,
+          tagMap: defaultTagMap,
+          inspetores: defaultInspetores,
+          availableFalhaTypes: availableFalhaTypes
+        }));
+      } catch(e) {}
+    }
+
     function initCloudListeners() {
+      // 1. Carregamento rápido via cache local para garantir estabilidade imediata
+      try {
+        const cachedRotas = localStorage.getItem('inspectcbm_saved_rotas');
+        if (cachedRotas) {
+          const p = JSON.parse(cachedRotas);
+          if (Array.isArray(p) && p.length > 0) defaultRotas = p;
+        }
+        const cachedTagMap = localStorage.getItem('inspectcbm_saved_tagmap');
+        if (cachedTagMap) {
+          const p = JSON.parse(cachedTagMap);
+          if (p && typeof p === 'object') defaultTagMap = p;
+        }
+        const cachedCfg = localStorage.getItem('inspectcbm_cached_cfg');
+        if (cachedCfg) {
+          const parsed = JSON.parse(cachedCfg);
+          if (parsed.rotas && parsed.rotas.length > 0) defaultRotas = parsed.rotas;
+          if (parsed.tagMap && Object.keys(parsed.tagMap).length > 0) defaultTagMap = parsed.tagMap;
+          if (parsed.inspetores && parsed.inspetores.length > 0) defaultInspetores = parsed.inspetores;
+          if (parsed.availableFalhaTypes && parsed.availableFalhaTypes.length > 0) availableFalhaTypes = parsed.availableFalhaTypes;
+        }
+        const cachedTags = localStorage.getItem('inspectcbm_cached_tags');
+        if (cachedTags) cloudTagRegistry = JSON.parse(cachedTags);
+        const cachedRecords = localStorage.getItem('inspectcbm_cached_records');
+        if (cachedRecords) cloudRecords = JSON.parse(cachedRecords);
+        const cachedLaudos = localStorage.getItem('inspectcbm_cached_laudos');
+        if (cachedLaudos) cloudLaudos = JSON.parse(cachedLaudos);
+        const cachedPre = localStorage.getItem('inspectcbm_cached_prelaudos');
+        if (cachedPre) cloudPreLaudos = JSON.parse(cachedPre);
+      } catch (e) {
+        console.warn("Aviso ao carregar cache local:", e);
+      }
+
+      mergeAndPersistRotasAndTags();
+      loadSavedRotas();
+      loadSavedInspetores();
+      populateFilters();
+      updateSupervisoryKPIs();
+
+      // Sincronização em tempo real com o Firestore Cloud (sem resetar formulário ou inputs ativos)
       db.collection("inspectcbm_config").doc("rotas_tags").onSnapshot((doc) => {
-        // A nuvem é a ÚNICA fonte da verdade das rotas e tags.
-        // Nada é recriado automaticamente: rota excluída no app NÃO volta.
         if (doc.exists) {
           const data = doc.data();
-          defaultRotas = Array.isArray(data.rotas) ? data.rotas.slice() : [];
-          const cloudTagMap = data.tagMap || {};
-          defaultTagMap = {};
-          // Só considera tags de rotas que existem na lista de rotas (ignora resíduos de rotas já excluídas)
-          defaultRotas.forEach(r => {
-            defaultTagMap[r] = Array.isArray(cloudTagMap[r]) ? cloudTagMap[r].slice() : [];
-          });
-          if (Array.isArray(data.inspetores) && data.inspetores.length > 0) defaultInspetores = data.inspetores.slice();
-          // Tipos de falha: lista padrão + os que você cadastrou em "Adicionar Tipo"
-          availableFalhaTypes = defaultFalhaTypes.slice();
-          (Array.isArray(data.availableFalhaTypes) ? data.availableFalhaTypes : []).forEach(f => {
-            if (!availableFalhaTypes.includes(f)) availableFalhaTypes.push(f);
-          });
+          if (Array.isArray(data.rotas) && data.rotas.length > 0) {
+            data.rotas.forEach(r => {
+              if (r && !defaultRotas.includes(r)) defaultRotas.push(r);
+            });
+          }
+          if (data.tagMap && typeof data.tagMap === 'object') {
+            Object.keys(data.tagMap).forEach(k => {
+              if (!defaultTagMap[k]) defaultTagMap[k] = [];
+              (data.tagMap[k] || []).forEach(t => {
+                if (!defaultTagMap[k].includes(t)) defaultTagMap[k].push(t);
+              });
+            });
+          }
+          if (Array.isArray(data.inspetores) && data.inspetores.length > 0) {
+            data.inspetores.forEach(i => {
+              if (i && !defaultInspetores.includes(i)) defaultInspetores.push(i);
+            });
+          }
+          if (Array.isArray(data.availableFalhaTypes) && data.availableFalhaTypes.length > 0) {
+            availableFalhaTypes = data.availableFalhaTypes;
+          }
         } else {
-          defaultRotas = [];
-          defaultTagMap = {};
+          db.collection("inspectcbm_config").doc("rotas_tags").set({
+            rotas: defaultRotas,
+            tagMap: defaultTagMap,
+            inspetores: defaultInspetores,
+            availableFalhaTypes: availableFalhaTypes
+          }, { merge: true }).catch(() => {});
         }
+        mergeAndPersistRotasAndTags();
         loadSavedRotas();
         loadSavedInspetores();
         populateFilters();
         updateSupervisoryKPIs();
-        renderSupervisorioTab();
-        const modalRotas = document.getElementById('modal-rotas');
-        if (modalRotas && !modalRotas.classList.contains('hidden')) renderRotasList();
+        renderActiveTab();
+      }, (err) => {
+        console.warn("Firestore config listener offline:", err);
       });
+
       db.collection("inspectcbm_records").onSnapshot((snapshot) => {
         cloudRecords = [];
         snapshot.forEach((doc) => {
           cloudRecords.push({ docId: doc.id, ...doc.data() });
         });
         cloudRecords.sort((a, b) => b.id - a.id);
+        try { localStorage.setItem('inspectcbm_cached_records', JSON.stringify(cloudRecords)); } catch(e) {}
+        mergeAndPersistRotasAndTags();
+        loadSavedRotas();
         populateFilters();
-        renderDashboard();
-        renderRelatorioTab();
         updateSupervisoryKPIs();
-        renderSupervisorioTab();
+        renderActiveTab();
+      }, (err) => {
+        console.warn("Firestore records listener offline:", err);
       });
+      
       db.collection("inspectcbm_tags").onSnapshot((snapshot) => {
         cloudTagRegistry = {};
         snapshot.forEach((doc) => {
           cloudTagRegistry[doc.id] = doc.data();
         });
+        try { localStorage.setItem('inspectcbm_cached_tags', JSON.stringify(cloudTagRegistry)); } catch(e) {}
         const currentTag = getBaseTag();
         if(currentTag) loadTagData(currentTag);
-        renderRelatorioTab();
         updateSupervisoryKPIs();
-        renderSupervisorioTab();
+        renderActiveTab();
+      }, (err) => {
+        console.warn("Firestore tags listener offline:", err);
       });
+
       db.collection("inspectcbm_laudos").onSnapshot((snapshot) => {
         cloudLaudos = [];
         snapshot.forEach((doc) => {
           cloudLaudos.push({ docId: doc.id, ...doc.data() });
         });
         cloudLaudos.sort((a, b) => b.id - a.id);
+        try { localStorage.setItem('inspectcbm_cached_laudos', JSON.stringify(cloudLaudos)); } catch(e) {}
+        mergeAndPersistRotasAndTags();
+        populateSupLaudosFilter();
         fetchSavedLaudosHistory();
-        renderSupervisorioTab();
+        renderActiveTab();
+      }, (err) => {
+        console.warn("Firestore laudos listener offline:", err);
       });
+
       db.collection("inspectcbm_prelaudos").onSnapshot((snapshot) => {
         cloudPreLaudos = [];
         snapshot.forEach((doc) => {
           cloudPreLaudos.push({ docId: doc.id, ...doc.data() });
         });
         cloudPreLaudos.sort((a, b) => b.id - a.id);
+        try { localStorage.setItem('inspectcbm_cached_prelaudos', JSON.stringify(cloudPreLaudos)); } catch(e) {}
+        mergeAndPersistRotasAndTags();
         fetchSavedPreLaudosHistory();
+        renderActiveTab();
+      }, (err) => {
+        console.warn("Firestore prelaudos listener offline:", err);
       });
     }
+
     function updateSupervisoryKPIs() {
       let totalTagsCount = 0;
       Object.keys(defaultTagMap).forEach(r => {
@@ -971,39 +1285,22 @@
       if(tagEl) tagEl.textContent = totalTagsCount;
       if(recEl) recEl.textContent = cloudRecords.length;
     }
-    // ====== Operações atômicas na configuração (rotas / tags / inspetores) ======
-    // Cada ação do usuário altera SOMENTE o item que ele mexeu.
-    // Nunca é regravada a lista inteira (isso fazia rotas excluídas voltarem).
-    const configDocRef = () => db.collection("inspectcbm_config").doc("rotas_tags");
-    const FieldValue = firebase.firestore.FieldValue;
-    const FieldPath = firebase.firestore.FieldPath;
-    async function cloudAddRota(rota) {
-      await configDocRef().set({
-        rotas: FieldValue.arrayUnion(rota),
-        tagMap: { [rota]: [] }
-      }, { merge: true });
+
+    async function saveConfigToCloud() {
+      try {
+        mergeAndPersistRotasAndTags();
+        await db.collection("inspectcbm_config").doc("rotas_tags").set({
+          rotas: defaultRotas,
+          tagMap: defaultTagMap,
+          inspetores: defaultInspetores,
+          availableFalhaTypes: availableFalhaTypes
+        }, { merge: true });
+        updateSupervisoryKPIs();
+      } catch (err) {
+        console.error("Erro ao salvar configuração na nuvem:", err);
+      }
     }
-    async function cloudRemoveRota(rota) {
-      await configDocRef().update(
-        'rotas', FieldValue.arrayRemove(rota),
-        new FieldPath('tagMap', rota), FieldValue.delete()
-      );
-    }
-    async function cloudAddTag(rota, tag) {
-      await configDocRef().set({ tagMap: { [rota]: FieldValue.arrayUnion(tag) } }, { merge: true });
-    }
-    async function cloudRemoveTag(rota, tag) {
-      await configDocRef().update(new FieldPath('tagMap', rota), FieldValue.arrayRemove(tag));
-    }
-    async function cloudAddFalhaType(nome) {
-      await configDocRef().set({ availableFalhaTypes: FieldValue.arrayUnion(nome) }, { merge: true });
-    }
-    async function cloudAddInspetor(nome) {
-      await configDocRef().set({ inspetores: FieldValue.arrayUnion(nome) }, { merge: true });
-    }
-    async function cloudRemoveInspetor(nome) {
-      await configDocRef().update('inspetores', FieldValue.arrayRemove(nome));
-    }
+
     async function importExcelData(e) {
       const file = e.target.files[0];
       if(!file) return;
@@ -1014,20 +1311,16 @@
         let importedCount = 0;
         const firstLine = lines[0] || "";
         const delimiter = firstLine.includes(';') ? ';' : ',';
-        const rotasExistentes = new Set(defaultRotas);
-        const novasRotas = new Set();
-        const tagsPorRota = {};
         for (let i = 1; i < lines.length; i++) {
           const line = lines[i].trim();
           if(!line) continue;
           const cols = line.split(delimiter).map(c => c.replace(/^["']|["']$/g, '').trim());
           if (cols.length >= 7) {
             const [rota, tag, composicao, equipamento, sapNumber, setor, area] = cols;
-            if (!rota || !tag) continue;
+            if (!defaultRotas.includes(rota)) defaultRotas.push(rota);
+            if (!defaultTagMap[rota]) defaultTagMap[rota] = [];
             const cleanTag = tag.toUpperCase();
-            if (!rotasExistentes.has(rota)) novasRotas.add(rota);
-            if (!tagsPorRota[rota]) tagsPorRota[rota] = new Set();
-            tagsPorRota[rota].add(cleanTag);
+            if (!defaultTagMap[rota].includes(cleanTag)) defaultTagMap[rota].push(cleanTag);
             const tData = {
               composicao: composicao || 'motor_elemento',
               equipamento_nome: equipamento || '',
@@ -1044,20 +1337,7 @@
             }
           }
         }
-        try {
-          const payload = { tagMap: {} };
-          if (novasRotas.size > 0) payload.rotas = FieldValue.arrayUnion(...Array.from(novasRotas));
-          Object.keys(tagsPorRota).forEach(r => {
-            const tagsArr = Array.from(tagsPorRota[r]);
-            payload.tagMap[r] = novasRotas.has(r) ? tagsArr : FieldValue.arrayUnion(...tagsArr);
-          });
-          if (Object.keys(payload.tagMap).length > 0) {
-            await configDocRef().set(payload, { merge: true });
-          }
-        } catch (err) {
-          console.error("Erro ao salvar rotas/tags importadas na nuvem:", err);
-          alert("Os dados das tags foram importados, mas não foi possível atualizar a lista de rotas na nuvem.");
-        }
+        await saveConfigToCloud();
         loadSavedRotas();
         populateFilters();
         alert(`Importação concluída! ${importedCount} registos por Tag salvos na nuvem.`);
@@ -1066,6 +1346,7 @@
       };
       reader.readAsText(file, 'UTF-8');
     }
+
     function onComposicaoChange(val) {
       const elElem = document.getElementById('fields_elemento');
       const elRed = document.getElementById('fields_redutor');
@@ -1096,8 +1377,9 @@
       }
       updateFullTagPreview();
     }
-    function promptAddCustomComponentType() {
-      const name = prompt("Digite o nome do novo componente para o conjunto:");
+
+    async function promptAddCustomComponentType() {
+      const name = await customPrompt("Digite o nome do novo componente para o conjunto:");
       if (!name) return;
       const key = 'motor_' + name.toLowerCase().replace(/\s+/g, '_');
       const select = document.getElementById('composicao_conjunto_select');
@@ -1108,27 +1390,28 @@
       select.value = key;
       onComposicaoChange(key);
     }
+
     async function promptAddNewFalhaType() {
-      const falha = prompt("Digite a nova nomenclatura de Tipo de Falha:");
-      if (!falha) return;
+      const falha = await customPrompt("Digite a nova nomenclatura de Tipo de Falha:");
+      if(!falha) return;
       const cleanFalha = falha.trim();
-      if (!cleanFalha) return;
-      if (availableFalhaTypes.includes(cleanFalha)) { alert("Este Tipo de Falha já está cadastrado."); return; }
-      try {
-        await cloudAddFalhaType(cleanFalha);
-      } catch (err) {
-        console.error("Erro ao cadastrar tipo de falha:", err);
-        alert("Não foi possível cadastrar o tipo de falha na nuvem. Tente novamente.");
-        return;
+      if(!cleanFalha) return;
+      if(!availableFalhaTypes.includes(cleanFalha)) {
+        availableFalhaTypes.push(cleanFalha);
+        await saveConfigToCloud();
+        renderRelatorioTab();
+        showToast("Tipo de falha cadastrado!", "success");
+      } else {
+        showToast("Este Tipo de Falha já está cadastrado.", "error");
       }
-      if (!availableFalhaTypes.includes(cleanFalha)) availableFalhaTypes.push(cleanFalha);
-      renderRelatorioTab();
     }
+
     function toggleNokObs(prefix, isNok) {
       const box = document.getElementById(`${prefix}_obs_box`);
       if (isNok) box.classList.remove('hidden');
       else { box.classList.add('hidden'); document.getElementById(`${prefix}_obs`).value = ''; }
     }
+
     function handlePhotoUpload(e) {
       const file = e.target.files[0];
       if(!file) return;
@@ -1159,6 +1442,7 @@
       };
       reader.readAsDataURL(file);
     }
+
     function removePhoto() {
       currentPhotoBase64 = "";
       document.getElementById('eq_photo_input').value = "";
@@ -1167,90 +1451,108 @@
       document.getElementById('photo-placeholder-icon').classList.remove('hidden');
       document.getElementById('btn-remove-photo').classList.add('hidden');
     }
+
     function loadSavedRotas() {
       const select = document.getElementById('rota_select');
       if(!select) return;
       const currentVal = select.value;
-      select.innerHTML = '';
-      defaultRotas.forEach(r => {
-        const opt = document.createElement('option');
-        opt.value = r; opt.textContent = r;
-        select.appendChild(opt);
-      });
-      if(defaultRotas.includes(currentVal)) select.value = currentVal;
-      else if(defaultRotas.length > 0) onRotaChange(defaultRotas[0]);
-      else onRotaChange('');
+      const existingOptions = Array.from(select.options).map(o => o.value);
+      const isSame = existingOptions.length === defaultRotas.length && existingOptions.every((val, index) => val === defaultRotas[index]);
+      
+      if (!isSame) {
+        select.innerHTML = '';
+        defaultRotas.forEach(r => {
+          const opt = document.createElement('option');
+          opt.value = r; opt.textContent = r;
+          select.appendChild(opt);
+        });
+      }
+      
+      if (currentVal && defaultRotas.includes(currentVal)) {
+        select.value = currentVal;
+      } else if (defaultRotas.length > 0) {
+        select.value = defaultRotas[0];
+        onRotaChange(defaultRotas[0]);
+      }
     }
+
     function loadSavedInspetores() {
       const select = document.getElementById('inspetor_select');
       if(!select) return;
       const currentVal = select.value;
-      select.innerHTML = '';
-      defaultInspetores.forEach(insp => {
-        const opt = document.createElement('option');
-        opt.value = insp; opt.textContent = insp;
-        select.appendChild(opt);
-      });
-      if(defaultInspetores.includes(currentVal)) select.value = currentVal;
+      const existingOptions = Array.from(select.options).map(o => o.value);
+      const isSame = existingOptions.length === defaultInspetores.length && existingOptions.every((val, index) => val === defaultInspetores[index]);
+      
+      if (!isSame) {
+        select.innerHTML = '';
+        defaultInspetores.forEach(insp => {
+          const opt = document.createElement('option');
+          opt.value = insp; opt.textContent = insp;
+          select.appendChild(opt);
+        });
+      }
+      if(currentVal && defaultInspetores.includes(currentVal)) select.value = currentVal;
+      else if (defaultInspetores.length > 0) select.value = defaultInspetores[0];
+
+      const dl = document.getElementById('lista-tecnicos-laudo');
+      if (dl) {
+        dl.innerHTML = '';
+        defaultInspetores.forEach(insp => {
+          const opt = document.createElement('option');
+          opt.value = insp;
+          dl.appendChild(opt);
+        });
+      }
     }
+
     function manageRotasModal() {
       document.getElementById('modal-rotas').classList.remove('hidden');
       renderRotasList();
     }
+
     function closeRotasModal() {
       document.getElementById('modal-rotas').classList.add('hidden');
       loadSavedRotas();
       populateFilters();
       onRotaChange(document.getElementById('rota_select').value);
     }
+
     function renderRotasList() {
       const container = document.getElementById('lista-rotas-cadastradas');
       container.innerHTML = '';
-      defaultRotas.forEach((rota) => {
+      defaultRotas.forEach((rota, index) => {
         const div = document.createElement('div');
         div.className = "flex justify-between items-center bg-slate-900 p-2.5 rounded-xl border border-slate-800";
-        const span = document.createElement('span');
-        span.className = "font-medium";
-        span.textContent = rota;
-        const btn = document.createElement('button');
-        btn.className = "text-rose-400 hover:text-rose-300 text-xs px-2 py-1";
-        btn.innerHTML = '<i class="fa-solid fa-trash-can"></i>';
-        btn.onclick = () => removeRota(rota);
-        div.appendChild(span);
-        div.appendChild(btn);
+        div.innerHTML = `<span class="font-medium">${rota}</span> <button onclick="removeRota(${index})" class="text-rose-400 hover:text-rose-300 text-xs px-2 py-1"><i class="fa-solid fa-trash-can"></i></button>`;
         container.appendChild(div);
       });
     }
+
     async function addNewRota() {
       const val = document.getElementById('nova_rota_input').value.trim();
       if(!val) return;
       if(!defaultRotas.includes(val)) {
-        try {
-          await cloudAddRota(val);
-        } catch (err) {
-          console.error("Erro ao adicionar rota:", err);
-          alert("Não foi possível adicionar a rota na nuvem. Tente novamente.");
-          return;
-        }
+        defaultRotas.push(val);
+        if(!defaultTagMap[val]) defaultTagMap[val] = [];
+        await saveConfigToCloud();
         document.getElementById('nova_rota_input').value = '';
         renderRotasList();
         loadSavedRotas();
         populateFilters();
-      } else { alert("Esta rota já existe."); }
+      } else { alert(" Esta rota já existe."); }
     }
-    async function removeRota(rotaName) {
-      if(!confirm(`Excluir a rota "${rotaName}"?\n\nOs registros de inspeção já salvos não são apagados.`)) return;
-      try {
-        await cloudRemoveRota(rotaName);
-      } catch (err) {
-        console.error("Erro ao excluir rota:", err);
-        alert("Não foi possível excluir a rota na nuvem. Verifique a conexão e tente novamente.");
-        return;
-      }
+
+    async function removeRota(index) {
+      if(defaultRotas.length <= 1) { alert("Deve manter pelo menos uma rota."); return; }
+      const rotaName = defaultRotas[index];
+      defaultRotas.splice(index, 1);
+      delete defaultTagMap[rotaName];
+      await saveConfigToCloud();
       renderRotasList();
       loadSavedRotas();
       populateFilters();
     }
+
     function manageTagsModal() {
       document.getElementById('modal-tags').classList.remove('hidden');
       const modalRotaSelect = document.getElementById('modal_tag_rota_select');
@@ -1263,59 +1565,47 @@
       modalRotaSelect.onchange = renderTagsList;
       renderTagsList();
     }
+
     function closeTagsModal() {
       document.getElementById('modal-tags').classList.add('hidden');
       onRotaChange(document.getElementById('rota_select').value);
       populateFilters();
     }
+
     function renderTagsList() {
       const rota = document.getElementById('modal_tag_rota_select').value;
       const container = document.getElementById('lista-tags-cadastradas');
       container.innerHTML = '';
       const tags = defaultTagMap[rota] || [];
-      tags.forEach((tag) => {
+      tags.forEach((tag, index) => {
         const div = document.createElement('div');
         div.className = "flex justify-between items-center bg-slate-900 p-2.5 rounded-xl border border-slate-800 font-mono";
-        const span = document.createElement('span');
-        span.className = "text-amber-400 font-bold";
-        span.textContent = tag;
-        const btn = document.createElement('button');
-        btn.className = "text-rose-400 hover:text-rose-300 text-xs px-2 py-1";
-        btn.innerHTML = '<i class="fa-solid fa-trash-can"></i>';
-        btn.onclick = () => removeTag(rota, tag);
-        div.appendChild(span);
-        div.appendChild(btn);
+        div.innerHTML = `<span class="text-amber-400 font-bold">${tag}</span> <button onclick="removeTag('${rota}', ${index})" class="text-rose-400 hover:text-rose-300 text-xs px-2 py-1"><i class="fa-solid fa-trash-can"></i></button>`;
         container.appendChild(div);
       });
     }
+
     async function addNewTag() {
       const rota = document.getElementById('modal_tag_rota_select').value;
       const tagVal = document.getElementById('nova_tag_input').value.trim().toUpperCase();
       if(!tagVal) return;
-      if(!rota) { alert("Selecione uma rota para adicionar a tag."); return; }
-      if(!(defaultTagMap[rota] || []).includes(tagVal)) {
-        try {
-          await cloudAddTag(rota, tagVal);
-        } catch (err) {
-          console.error("Erro ao adicionar tag:", err);
-          alert("Não foi possível adicionar a tag na nuvem. Tente novamente.");
-          return;
-        }
+      if(!defaultTagMap[rota]) defaultTagMap[rota] = [];
+      if(!defaultTagMap[rota].includes(tagVal)) {
+        defaultTagMap[rota].push(tagVal);
+        await saveConfigToCloud();
         document.getElementById('nova_tag_input').value = '';
         renderTagsList();
         onRotaChange(document.getElementById('rota_select').value);
         populateFilters();
       } else { alert("Esta tag já está cadastrada nesta rota."); }
     }
-    async function removeTag(rota, tagToRemove) {
-      if (confirm(`Deseja realmente EXCLUIR permanentemente a Tag ${tagToRemove} e todos os seus parâmetros salvos?`)) {
-        try {
-          await cloudRemoveTag(rota, tagToRemove);
-        } catch (err) {
-          console.error("Erro ao excluir tag:", err);
-          alert("Não foi possível excluir a tag na nuvem. Verifique a conexão e tente novamente.");
-          return;
-        }
+
+    async function removeTag(rota, index) {
+      const tagToRemove = defaultTagMap[rota][index];
+      const confirmed = await customConfirm(`Deseja realmente EXCLUIR permanentemente a Tag ${tagToRemove} e todos os seus parâmetros salvos?`);
+      if (confirmed) {
+        defaultTagMap[rota].splice(index, 1);
+        await saveConfigToCloud();
         try {
           await db.collection("inspectcbm_tags").doc(tagToRemove).delete();
           delete cloudTagRegistry[tagToRemove];
@@ -1325,73 +1615,70 @@
         renderTagsList();
         onRotaChange(document.getElementById('rota_select').value);
         populateFilters();
+        showToast(`Tag ${tagToRemove} excluída com sucesso!`, "success");
       }
     }
+
     function manageInspetoresModal() {
       document.getElementById('modal-inspetores').classList.remove('hidden');
       renderInspetoresList();
     }
+
     function closeInspetoresModal() {
       document.getElementById('modal-inspetores').classList.add('hidden');
       loadSavedInspetores();
     }
+
     function renderInspetoresList() {
       const container = document.getElementById('lista-inspetores-cadastradas');
       container.innerHTML = '';
-      defaultInspetores.forEach((insp) => {
+      defaultInspetores.forEach((insp, index) => {
         const div = document.createElement('div');
         div.className = "flex justify-between items-center bg-slate-900 p-2.5 rounded-xl border border-slate-800";
-        const span = document.createElement('span');
-        span.textContent = insp;
-        const btn = document.createElement('button');
-        btn.className = "text-rose-400 hover:text-rose-300 text-xs px-2 py-1";
-        btn.innerHTML = '<i class="fa-solid fa-trash-can"></i>';
-        btn.onclick = () => removeInspetor(insp);
-        div.appendChild(span);
-        div.appendChild(btn);
+        div.innerHTML = `<span>${insp}</span> <button onclick="removeInspetor(${index})" class="text-rose-400 hover:text-rose-300 text-xs px-2 py-1"><i class="fa-solid fa-trash-can"></i></button>`;
         container.appendChild(div);
       });
     }
+
     async function addNewInspetor() {
       const val = document.getElementById('novo_inspetor_input').value.trim().toUpperCase();
       if(!val) return;
       if(!defaultInspetores.includes(val)) {
-        try {
-          await cloudAddInspetor(val);
-        } catch (err) {
-          console.error("Erro ao adicionar inspetor:", err);
-          alert("Não foi possível adicionar o inspetor na nuvem. Tente novamente.");
-          return;
-        }
+        defaultInspetores.push(val);
+        await saveConfigToCloud();
         document.getElementById('novo_inspetor_input').value = '';
         renderInspetoresList();
       } else { alert("Este inspetor já está cadastrado."); }
     }
-    async function removeInspetor(nome) {
+
+    async function removeInspetor(index) {
       if(defaultInspetores.length <= 1) { alert("Deve manter pelo menos um inspetor."); return; }
-      try {
-        await cloudRemoveInspetor(nome);
-      } catch (err) {
-        console.error("Erro ao excluir inspetor:", err);
-        alert("Não foi possível excluir o inspetor na nuvem. Tente novamente.");
-        return;
-      }
+      defaultInspetores.splice(index, 1);
+      await saveConfigToCloud();
       renderInspetoresList();
     }
+
     function onRotaChange(rota) {
       const tagSelect = document.getElementById('tag_select');
       if(!tagSelect) return;
       const currentTagVal = tagSelect.value;
-      tagSelect.innerHTML = '<option value="">Selecione a Tag...</option>';
       let tags = defaultTagMap[rota] || [];
-      tags.forEach(t => {
-        const opt = document.createElement('option');
-        opt.value = t; opt.textContent = t;
-        tagSelect.appendChild(opt);
-      });
-      if(tags.includes(currentTagVal)) {
+      
+      const existingOptions = Array.from(tagSelect.options).map(o => o.value).filter(Boolean);
+      const isSame = existingOptions.length === tags.length && existingOptions.every((val, index) => val === tags[index]);
+      
+      if (!isSame) {
+        tagSelect.innerHTML = '<option value="">Selecione a Tag...</option>';
+        tags.forEach(t => {
+          const opt = document.createElement('option');
+          opt.value = t; opt.textContent = t;
+          tagSelect.appendChild(opt);
+        });
+      }
+      
+      if (currentTagVal && tags.includes(currentTagVal)) {
         tagSelect.value = currentTagVal;
-      } else if(tags.length > 0) { 
+      } else if (tags.length > 0) { 
         tagSelect.value = tags[0]; 
         handleTagSelection(tags[0]); 
       } else {
@@ -1399,30 +1686,44 @@
         removePhoto();
       }
     }
+
     function handleTagSelection(tag) {
       updateFullTagPreview();
       loadTagData(tag);
-      resetInspectionFields();
+      // Mantém as medições inseridas para não perder informações ao navegar
     }
+
+    async function confirmResetInspection() {
+      const confirmed = await customConfirm("Deseja realmente limpar todos os campos de medição desta coleta?");
+      if (confirmed) {
+        resetInspectionFields();
+        showToast("Campos de medição limpos.", "info");
+      }
+    }
+
     function getBaseTag() {
       const el = document.getElementById('tag_select');
       return el ? el.value : '';
     }
+
     function getFullTag() {
       const base = getBaseTag();
       if(!base) return '';
       const compText = document.getElementById('composicao_conjunto_select').selectedOptions[0]?.text || '';
       return `${base} (${compText})`;
     }
+
     function updateFullTagPreview() {
       const el = document.getElementById('lbl_tag_final');
       if(el) el.textContent = getFullTag() || 'SELECIONE UMA TAG...';
     }
+
     function loadTagData(tag) {
       if(!tag) return;
       document.getElementById('tag-mechanic-badge-label').textContent = `(Tag: ${tag})`;
       const badge = document.getElementById('auto-fill-route-badge');
       const tData = cloudTagRegistry[tag];
+      
       if(tData) {
         document.getElementById('equipamento_nome').value = tData.equipamento_nome || '';
         document.getElementById('sap_number').value = tData.sap_number || '';
@@ -1432,6 +1733,7 @@
         document.getElementById('rolamento_la').value = tData.rolamento_la || '';
         document.getElementById('rolamento_loa').value = tData.rolamento_loa || '';
         document.getElementById('potencia').value = tData.potencia || '';
+        
         if (tData.composicao) {
           document.getElementById('composicao_conjunto_select').value = tData.composicao;
           onComposicaoChange(tData.composicao);
@@ -1477,6 +1779,7 @@
         badge.classList.add('hidden');
       }
     }
+
     function clearTagFields() {
       document.getElementById('equipamento_nome').value = '';
       document.getElementById('sap_number').value = '';
@@ -1489,6 +1792,7 @@
       document.getElementById('tag-mechanic-badge-label').textContent = '';
       document.getElementById('auto-fill-route-badge').classList.add('hidden');
     }
+
     function resetInspectionFields() {
       document.getElementById('carga_valor').value = '';
       document.getElementById('status_operacao').selectedIndex = 0;
@@ -1508,6 +1812,7 @@
       });
       document.getElementById('observacoes').value = '';
     }
+
     async function saveOnlyTagRegistration() {
       const tag = getBaseTag();
       if(!tag) { alert("Selecione a Tag base para salvar."); return; }
@@ -1557,6 +1862,7 @@
         document.getElementById('auto-fill-route-badge').classList.remove('hidden');
       } catch (err) { alert("Erro ao salvar dados da tag na nuvem: " + err.message); }
     }
+
     async function saveOnlyTagPhoto() {
       const tag = getBaseTag();
       if(!tag) { alert("Selecione uma Tag primeiro para salvar a foto."); return; }
@@ -1568,15 +1874,19 @@
         alert(`Foto do equipamento da Tag "${tag}" salva com sucesso na nuvem!`);
       } catch (err) { alert("Erro ao salvar a foto na nuvem: " + err.message); }
     }
+
     function getRadioValue(name) {
       const selected = document.querySelector(`input[name="${name}"]:checked`);
       return selected ? selected.value : 'OK';
     }
+
     async function saveInspection(e) {
       e.preventDefault();
       const baseTag = getBaseTag();
       if(!baseTag) { alert("Selecione a Tag do Equipamento."); return; }
+      
       await saveOnlyTagRegistration();
+      
       const record = {
         id: Date.now(),
         data_coleta: document.getElementById('data_coleta').value,
@@ -1625,6 +1935,7 @@
         switchTab('dashboard');
       } catch (err) { alert("Erro ao salvar: " + err.message); }
     }
+
     function populateFilters() {
       const filterRota = document.getElementById('filter_rota');
       if(!filterRota) return;
@@ -1636,8 +1947,10 @@
         filterRota.appendChild(opt);
       });
       filterRota.value = defaultRotas.includes(currentRota) ? currentRota : 'TODAS_ROTAS';
+      
       populateTagFilter();
       populateDateFilterSelect();
+      
       const relFilterRota = document.getElementById('rel_filter_rota');
       if(relFilterRota) {
         const currentSelected = Array.from(relFilterRota.selectedOptions).map(o => o.value);
@@ -1666,7 +1979,40 @@
           supFilterRota.options[0].selected = true;
         }
       }
+      populateSupLaudosFilter();
     }
+
+    function populateSupLaudosFilter() {
+      const supSelect = document.getElementById('sup_select_laudo');
+      if(!supSelect) return;
+      const currentVal = supSelect.value;
+      supSelect.innerHTML = '<option value="CONSOLIDADO">Todos os Laudos (Último Status por Ativo)</option>';
+      cloudLaudos.forEach((l, idx) => {
+        const opt = document.createElement('option');
+        opt.value = l.docId || String(l.id);
+        const dataStr = l.dataAnalise || l.dataColeta || 'Sem data';
+        const rotaStr = l.rota || (l.rotas ? l.rotas.join(', ') : 'Rota');
+        const countAtivos = l.state ? Object.keys(l.state).filter(k => l.state[k].isMedido).length : 0;
+        opt.textContent = `Laudo #${cloudLaudos.length - idx}: ${dataStr} - ${rotaStr} (${countAtivos} ativos)`;
+        supSelect.appendChild(opt);
+      });
+      if (currentVal && Array.from(supSelect.options).some(o => o.value === currentVal)) {
+        supSelect.value = currentVal;
+      } else {
+        supSelect.value = 'CONSOLIDADO';
+      }
+    }
+
+    function viewLaudoInSupervisorio(docId) {
+      switchTab('supervisorio');
+      const supSelect = document.getElementById('sup_select_laudo');
+      if (supSelect) {
+        supSelect.value = docId;
+        renderSupervisorioTab();
+        showToast("Supervisório alimentado com o laudo do histórico!", "success");
+      }
+    }
+
     function populateTagFilter() {
       const filterRota = document.getElementById('filter_rota').value;
       const filterSelect = document.getElementById('filter_tag');
@@ -1682,6 +2028,7 @@
       });
       filterSelect.value = tags.includes(currentVal) ? currentVal : 'TODAS';
     }
+
     function populateDateFilterSelect() {
       const filterRota = document.getElementById('filter_rota').value;
       const dateSelect = document.getElementById('filter_date_select');
@@ -1703,27 +2050,33 @@
       });
       dateSelect.value = sortedDates.includes(currentVal) ? currentVal : 'TODAS_DATAS';
     }
+
     function onFilterRotaChange() { 
       populateTagFilter(); 
       populateDateFilterSelect();
       renderDashboard(); 
     }
+
     function onRelFilterRotaChange() { renderRelatorioTab(); }
+
     function clearDateFilter() { 
       document.getElementById('filter_date_select').value = 'TODAS_DATAS';
       document.getElementById('filter_date_start').value = ''; 
       document.getElementById('filter_date_end').value = ''; 
       renderDashboard(); 
     }
+
     function clearSupervisorioFilters() {
       document.getElementById('sup_data_coleta').value = '';
       if(document.getElementById('sup_mes_filtro')) document.getElementById('sup_mes_filtro').value = '';
+      if(document.getElementById('sup_select_laudo')) document.getElementById('sup_select_laudo').value = 'CONSOLIDADO';
       const supFilterRota = document.getElementById('sup_filter_rota');
       for (let i = 0; i < supFilterRota.options.length; i++) {
         supFilterRota.options[i].selected = (i === 0);
       }
       renderSupervisorioTab();
     }
+
     async function savePreAnaliseRouteState() {
       const filterRota = document.getElementById('filter_rota').value;
       if (filterRota === 'TODAS_ROTAS') {
@@ -1768,11 +2121,13 @@
         document.getElementById('filter_date_select').value = 'TODAS_DATAS';
         document.getElementById('filter_date_start').value = '';
         document.getElementById('filter_date_end').value = '';
+        
         onFilterRotaChange();
       } catch (err) {
         alert("Erro ao salvar pré-análise na nuvem: " + err.message);
       }
     }
+
     function fetchSavedPreLaudosHistory() {
       const container = document.getElementById('saved-prelaudos-list');
       if(!container) return;
@@ -1800,6 +2155,7 @@
         container.appendChild(div);
       });
     }
+
     function loadSavedPreLaudo(idx) {
       const pl = cloudPreLaudos[idx];
       if(!pl) return;
@@ -1808,10 +2164,12 @@
       renderDashboardWithCustomData(pl.registros);
       alert(`Pré-análise da rota "${pl.rota}" carregada com sucesso!`);
     }
+
     function renderDashboardWithCustomData(customRecords) {
       document.getElementById('record-count').textContent = `${customRecords.length} registo(s) (Pré-Análise Salva)`;
       const tbody = document.getElementById('records-table-body');
       tbody.innerHTML = '';
+      
       if(customRecords.length === 0) {
         tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-slate-500 italic">Nenhum registo nesta pré-análise.</td></tr>`;
       } else {
@@ -1820,6 +2178,7 @@
           if(r.observacoes && r.observacoes !== '-') allObs.push(`Geral: ${r.observacoes}`);
           if(r.strobo_obs && r.strobo_obs !== '-') allObs.push(`Strobo: ${r.strobo_obs}`);
           if(r.temp_obs && r.temp_obs !== '-') allObs.push(`Temp: ${r.temp_obs}`);
+          
           const tr = document.createElement('tr');
           tr.className = "hover:bg-slate-800/40 transition";
           tr.innerHTML = `
@@ -1850,19 +2209,23 @@
       }
       renderChart(customRecords);
     }
+
     async function exportSavedPreLaudoPDF(idx) {
       const pl = cloudPreLaudos[idx];
       if(!pl) return;
+      
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF('p', 'mm', 'a4');
       doc.setFont("helvetica", "bold");
       doc.setFontSize(13);
       doc.setTextColor(30, 41, 59);
       doc.text(`PRÉ-ANÁLISE SALVA (ROTA: ${pl.rota.toUpperCase()})`, 14, 15);
+      
       doc.setFontSize(8);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(100, 116, 139);
       doc.text(`Data Salvamento: ${new Date(pl.dataSalvar).toLocaleString('pt-PT')} | Total Itens: ${pl.registros.length}`, 14, 20);
+      
       const tableRows = [];
       const imageCellStore = [];
       pl.registros.forEach((r, index) => {
@@ -1915,37 +2278,100 @@
       });
       doc.save(`PreAnaliseSalva_${pl.rota.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0,10)}.pdf`);
     }
+
     async function deleteSavedPreLaudo(docId) {
-      if(!confirm("Deseja excluir esta pré-análise salva da nuvem?")) return;
+      const confirmed = await customConfirm("Deseja excluir esta pré-análise salva da nuvem?");
+      if(!confirmed) return;
       try {
         await db.collection("inspectcbm_prelaudos").doc(docId).delete();
+        showToast("Pré-análise excluída com sucesso!", "success");
       } catch (err) {
-        alert("Erro ao excluir: " + err.message);
+        showToast("Erro ao excluir: " + err.message, "error");
       }
     }
+
     function renderSupervisorioTab() {
       const supFilterRotaEl = document.getElementById('sup_filter_rota');
       if(!supFilterRotaEl) return;
       const selectedRotas = Array.from(supFilterRotaEl.selectedOptions).map(o => o.value);
       const filterColetaDate = document.getElementById('sup_data_coleta').value;
       const filterMesVal = document.getElementById('sup_mes_filtro') ? document.getElementById('sup_mes_filtro').value : '';
+      const selectedLaudoDocId = document.getElementById('sup_select_laudo') ? document.getElementById('sup_select_laudo').value : 'CONSOLIDADO';
+      const badgeSourceEl = document.getElementById('sup-active-source-badge');
+
       let rotasParaAnalisar = [];
       if (selectedRotas.includes('TODAS_ROTAS') || selectedRotas.length === 0) {
         rotasParaAnalisar = defaultRotas;
       } else {
         rotasParaAnalisar = selectedRotas;
       }
-      // EXCLUSIVO: O Supervisório lê ESTRICTAMENTE do último laudo salvo na nuvem (cloudLaudos)
-      let targetLaudo = null;
-      if (cloudLaudos && cloudLaudos.length > 0) {
-        targetLaudo = cloudLaudos.find(l => {
-          let matchRota = selectedRotas.includes('TODAS_ROTAS') || !l.rotas || l.rotas.some(r => selectedRotas.includes(r));
-          let matchData = !filterColetaDate || l.dataColeta === filterColetaDate;
-          let matchMes = !filterMesVal || (l.dataColeta && l.dataColeta.startsWith(filterMesVal));
-          return matchRota && matchData && matchMes;
-        }) || cloudLaudos[0];
+
+      // Filtrar laudos do histórico na nuvem de acordo com os filtros de rota e data
+      let matchingLaudos = (cloudLaudos || []).filter(l => {
+        let matchRota = selectedRotas.includes('TODAS_ROTAS') || !l.rotas || l.rotas.some(r => selectedRotas.includes(r));
+        let matchData = !filterColetaDate || l.dataColeta === filterColetaDate;
+        let matchMes = !filterMesVal || (l.dataColeta && l.dataColeta.startsWith(filterMesVal)) || (l.dataAnalise && l.dataAnalise.startsWith(filterMesVal));
+        return matchRota && matchData && matchMes;
+      });
+
+      // Determinar o modo: Consolidado (todos os laudos do histórico) ou Laudo Específico
+      let evaluatedAssetState = {};
+      let assetSourceMap = {};
+
+      if (cloudLaudos.length === 0) {
+        if (badgeSourceEl) {
+          badgeSourceEl.className = "text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/30 px-2.5 py-0.5 rounded-full font-mono font-bold flex items-center";
+          badgeSourceEl.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-amber-400 mr-1.5"></span>Nenhum Laudo Salvo na Nuvem`;
+        }
+      } else if (selectedLaudoDocId === 'CONSOLIDADO') {
+        // Modo Consolidado: Itera laudos do mais recente ao mais antigo.
+        // O primeiro laudo que avaliou o ativo com medição define o seu estado mais recente.
+        const poolLaudos = matchingLaudos.length > 0 ? matchingLaudos : cloudLaudos;
+        poolLaudos.forEach(l => {
+          if (!l.state) return;
+          const laudoLabel = `${l.dataAnalise || l.dataColeta || 'Sem data'} (${l.rota || 'Geral'})`;
+          Object.keys(l.state).forEach(tag => {
+            const st = l.state[tag];
+            if (!evaluatedAssetState[tag] && st && st.isMedido) {
+              evaluatedAssetState[tag] = st;
+              assetSourceMap[tag] = laudoLabel;
+            }
+          });
+        });
+
+        // Para os que continuam sem medição, se houver registro mesmo não medido em algum laudo recente
+        poolLaudos.forEach(l => {
+          if (!l.state) return;
+          const laudoLabel = `${l.dataAnalise || l.dataColeta || 'Sem data'} (${l.rota || 'Geral'})`;
+          Object.keys(l.state).forEach(tag => {
+            const st = l.state[tag];
+            if (!evaluatedAssetState[tag] && st) {
+              evaluatedAssetState[tag] = st;
+              assetSourceMap[tag] = laudoLabel;
+            }
+          });
+        });
+
+        if (badgeSourceEl) {
+          badgeSourceEl.className = "text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2.5 py-0.5 rounded-full font-mono font-bold flex items-center";
+          badgeSourceEl.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse mr-1.5"></span>Consolidado (${poolLaudos.length} Laudos da Nuvem)`;
+        }
+      } else {
+        // Laudo Específico selecionado pelo usuário
+        const targetLaudo = cloudLaudos.find(l => (l.docId || String(l.id)) === selectedLaudoDocId);
+        if (targetLaudo && targetLaudo.state) {
+          const laudoLabel = `${targetLaudo.dataAnalise || targetLaudo.dataColeta || 'Sem data'} (${targetLaudo.rota || 'Geral'})`;
+          evaluatedAssetState = targetLaudo.state;
+          Object.keys(targetLaudo.state).forEach(tag => {
+            assetSourceMap[tag] = laudoLabel;
+          });
+          if (badgeSourceEl) {
+            badgeSourceEl.className = "text-[10px] bg-sky-500/10 text-sky-400 border border-sky-500/30 px-2.5 py-0.5 rounded-full font-mono font-bold flex items-center";
+            badgeSourceEl.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-sky-400 mr-1.5"></span>Laudo Selecionado: ${laudoLabel}`;
+          }
+        }
       }
-      let laudoState = targetLaudo ? normalizeLaudoState(targetLaudo.state) : {};
+      
       let tagToRotaMap = {};
       rotasParaAnalisar.forEach(rota => {
         let tagsDaRota = defaultTagMap[rota] || [];
@@ -1957,33 +2383,40 @@
       });
       let uniqueBaseTags = Object.keys(tagToRotaMap);
       let totalAtivos = uniqueBaseTags.length;
-      let countSeguro = 0;
-      let countA1 = 0;
-      let countA2 = 0;
-      let countPerigo = 0;
+      
+      let countNormal = 0;
+      let countObservacao = 0;
+      let countAlerta = 0;
+      let countAlarme = 0;
       let countNaoMedido = 0;
+      
       let falhasEstratificacaoCount = {};
       availableFalhaTypes.forEach(f => falhasEstratificacaoCount[f] = 0);
+      
       let tableItems = [];
       uniqueBaseTags.forEach(baseTag => {
         let rota = tagToRotaMap[baseTag];
-        let assetState = laudoState[baseTag]; // Lê do laudo salvo
+        let assetState = evaluatedAssetState[baseTag];
+        
         let isMedido = assetState ? (assetState.isMedido !== undefined ? assetState.isMedido : false) : false;
-        let statusVal = assetState ? normalizeSeveridade(assetState.statusVal) : 'NORMAL';
+        let statusVal = assetState ? (assetState.statusVal || 'NORMAL') : 'NORMAL';
         let problemaDesc = assetState ? (assetState.problema || '-') : '-';
         let falhasList = assetState ? (assetState.falhas || []) : [];
+        let origemLaudo = assetSourceMap[baseTag] || null;
+
         if (statusVal === 'NORMAL') {
           falhasList = [];
         }
-        if (!isMedido || !targetLaudo || !laudoState[baseTag]) {
+        if (!isMedido || !assetState) {
           countNaoMedido++;
           isMedido = false;
         } else {
-          if (statusVal === 'NORMAL') countSeguro++;
-          else if (statusVal === 'OBSERVAÇÃO') countA1++;
-          else if (statusVal === 'ALERTA') countA2++;
-          else if (statusVal === 'ALARME' || statusVal === 'EMERGÊNCIA') countPerigo++;
-          else countSeguro++;
+          if (statusVal === 'NORMAL') countNormal++;
+          else if (statusVal === 'OBSERVAÇÃO') countObservacao++;
+          else if (statusVal === 'ALERTA') countAlerta++;
+          else if (statusVal === 'ALARME' || statusVal === 'EMERGÊNCIA') countAlarme++;
+          else countNormal++;
+          
           falhasList.forEach(falha => {
             if (falhasEstratificacaoCount[falha] !== undefined) {
               falhasEstratificacaoCount[falha]++;
@@ -1999,29 +2432,49 @@
           isMedido: isMedido,
           statusVal: isMedido ? statusVal : 'Não Medido',
           problema: problemaDesc,
-          falhas: falhasList
+          falhas: falhasList,
+          origem: origemLaudo
         });
       });
+      
       document.getElementById('sup-kpi-total').textContent = totalAtivos;
-      document.getElementById('sup-kpi-seguro').textContent = countSeguro;
-      document.getElementById('sup-kpi-a1').textContent = countA1;
-      document.getElementById('sup-kpi-a2').textContent = countA2;
-      document.getElementById('sup-kpi-perigo').textContent = countPerigo;
+      document.getElementById('sup-kpi-normal').textContent = countNormal;
+      document.getElementById('sup-kpi-observacao').textContent = countObservacao;
+      document.getElementById('sup-kpi-alerta').textContent = countAlerta;
+      document.getElementById('sup-kpi-alarme').textContent = countAlarme;
       document.getElementById('sup-kpi-naomedido').textContent = countNaoMedido;
       document.getElementById('sup-table-count').textContent = `${tableItems.length} ativos`;
+      
       const tbody = document.getElementById('sup-table-body');
       tbody.innerHTML = '';
-      if(tableItems.length === 0 || !targetLaudo) {
-        tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-slate-500 italic">Nenhum laudo salvo encontrado na nuvem para alimentar o supervisório. Clique em "Salvar Análise" na aba Laudo Técnico.</td></tr>`;
+      if(tableItems.length === 0 || cloudLaudos.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="6" class="p-8 text-center text-slate-400">
+              <i class="fa-solid fa-cloud-arrow-up text-amber-400 text-3xl mb-3 block"></i>
+              <span class="font-semibold block mb-1">Nenhum laudo salvo encontrado no histórico da nuvem para alimentar o Supervisório.</span>
+              <span class="text-xs text-slate-500 block mb-3">Para gerar a visão executiva e indicadores, elabore e salve uma análise técnica na aba correspondente.</span>
+              <button onclick="switchTab('relatorio')" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-4 py-2 rounded-xl text-xs transition shadow">
+                <i class="fa-solid fa-file-signature mr-1.5"></i> Acessar Laudo Técnico & Salvar Análise
+              </button>
+            </td>
+          </tr>
+        `;
       } else {
         tableItems.forEach(item => {
           const tr = document.createElement('tr');
           tr.className = "hover:bg-slate-800/40 transition border-b border-slate-800/60";
           let badgeClass = getStatusBgColor(item.statusVal);
           if(!item.isMedido) badgeClass = 'bg-slate-800 text-slate-400 border-slate-700';
+          
           let falhasBadges = item.falhas.length > 0 
             ? item.falhas.map(f => `<span class="inline-block bg-amber-500/10 text-amber-300 border border-amber-500/30 text-[10px] px-2 py-0.5 rounded-md mr-1 mb-1 font-mono">${f}</span>`).join('')
             : '<span class="text-[10px] text-slate-500 italic">Nenhuma falha ativa</span>';
+
+          let origemBadge = item.origem 
+            ? `<span class="inline-flex items-center text-[10px] bg-slate-950 text-amber-300 px-2.5 py-1 rounded-lg border border-amber-500/30 font-mono shadow-sm"><i class="fa-solid fa-cloud mr-1.5 text-amber-400"></i>${item.origem}</span>`
+            : '<span class="text-[10px] text-slate-500 italic">Sem laudo salvo</span>';
+
           tr.innerHTML = `
             <td class="p-3">
               <span class="px-2.5 py-1 rounded-lg text-[11px] font-bold border font-mono ${badgeClass}">${item.statusVal}</span>
@@ -2040,13 +2493,17 @@
             <td class="p-3 text-[11px] text-amber-300">
               ${item.problema !== '-' ? item.problema : '<span class="text-slate-500 italic">Nenhum apontamento</span>'}
             </td>
+            <td class="p-3 text-[11px]">
+              ${origemBadge}
+            </td>
           `;
           tbody.appendChild(tr);
         });
       }
-      renderSupervisorioCharts(countSeguro, countA1, countA2, countPerigo, countNaoMedido, falhasEstratificacaoCount);
+      renderSupervisorioCharts(countNormal, countObservacao, countAlerta, countAlarme, countNaoMedido, falhasEstratificacaoCount);
     }
-    function renderSupervisorioCharts(seg, a1, a2, perigo, naomedido, falhasCounts) {
+
+    function renderSupervisorioCharts(normal, observacao, alerta, alarme, naomedido, falhasCounts) {
       const ctxDoughnut = document.getElementById('supDoughnutChart').getContext('2d');
       if (supDoughnutInstance) supDoughnutInstance.destroy();
       supDoughnutInstance = new Chart(ctxDoughnut, {
@@ -2054,7 +2511,7 @@
         data: {
           labels: ['Normal', 'Observação', 'Alerta', 'Alarme / Emergência', 'Não Medido'],
           datasets: [{
-            data: [seg, a1, a2, perigo, naomedido],
+            data: [normal, observacao, alerta, alarme, naomedido],
             backgroundColor: ['#10b981', '#1e3a8a', '#f59e0b', '#dc2626', '#475569'],
             borderWidth: 2,
             borderColor: '#0f172a'
@@ -2068,6 +2525,7 @@
           }
         }
       });
+
       const ctxBar = document.getElementById('supBarChart').getContext('2d');
       if (supBarInstance) supBarInstance.destroy();
       supBarInstance = new Chart(ctxBar, {
@@ -2076,7 +2534,7 @@
           labels: ['Normal', 'Observação', 'Alerta', 'Alarme / Emerg.', 'Não Medidos'],
           datasets: [{
             label: 'Qtd de Ativos',
-            data: [seg, a1, a2, perigo, naomedido],
+            data: [normal, observacao, alerta, alarme, naomedido],
             backgroundColor: ['#10b981', '#1e3a8a', '#f59e0b', '#dc2626', '#475569'],
             borderRadius: 6
           }]
@@ -2091,6 +2549,7 @@
           }
         }
       });
+
       const ctxFalhas = document.getElementById('supFalhasChart').getContext('2d');
       if (supFalhasInstance) supFalhasInstance.destroy();
       const falhasLabels = Object.keys(falhasCounts);
@@ -2117,6 +2576,7 @@
         }
       });
     }
+
     let chartInstance = null;
     function renderDashboard() {
       const filterRota = document.getElementById('filter_rota').value;
@@ -2124,6 +2584,7 @@
       const filterDateSelect = document.getElementById('filter_date_select').value;
       const dateStart = document.getElementById('filter_date_start').value;
       const dateEnd = document.getElementById('filter_date_end').value;
+      
       let filtered = cloudRecords;
       if (filterRota !== 'TODAS_ROTAS') filtered = filtered.filter(r => r.rota === filterRota);
       if (filterTag !== 'TODAS') filtered = filtered.filter(r => (r.baseTag === filterTag || r.tag.includes(filterTag)));
@@ -2139,9 +2600,11 @@
       } else if (filterDateSelect !== 'TODAS_DATAS') {
         filtered = filtered.filter(r => r.data_coleta.startsWith(filterDateSelect));
       }
+      
       document.getElementById('record-count').textContent = `${filtered.length} registo(s)`;
       const tbody = document.getElementById('records-table-body');
       tbody.innerHTML = '';
+      
       if(filtered.length === 0) {
         tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-slate-500 italic">Nenhum registo encontrado para este filtro.</td></tr>`;
       } else {
@@ -2150,6 +2613,7 @@
           if(r.observacoes && r.observacoes !== '-') allObs.push(`Geral: ${r.observacoes}`);
           if(r.strobo_obs && r.strobo_obs !== '-') allObs.push(`Strobo: ${r.strobo_obs}`);
           if(r.temp_obs && r.temp_obs !== '-') allObs.push(`Temp: ${r.temp_obs}`);
+          
           const tr = document.createElement('tr');
           tr.className = "hover:bg-slate-800/40 transition";
           tr.innerHTML = `
@@ -2180,6 +2644,7 @@
       }
       renderChart(filtered);
     }
+
     function updateRelMedidoStatus(baseTag, isMedido) {
       if (!relatorioAnalysisState[baseTag]) {
         relatorioAnalysisState[baseTag] = { isMedido: isMedido, statusVal: 'NORMAL', falhas: [], deteccao: '', problema: '', recomendacao: '', os: '' };
@@ -2188,6 +2653,7 @@
       }
       renderRelatorioTab();
     }
+
     function toggleRelFalha(baseTag, falhaName, checkboxEl) {
       if (!relatorioAnalysisState[baseTag]) {
         relatorioAnalysisState[baseTag] = { isMedido: true, statusVal: 'NORMAL', falhas: [], deteccao: '', problema: '', recomendacao: '', os: '' };
@@ -2202,6 +2668,7 @@
         relatorioAnalysisState[baseTag].falhas = arr.filter(f => f !== falhaName);
       }
     }
+
     function updateRelAnalysisField(baseTag, field, value) {
       if (!relatorioAnalysisState[baseTag]) {
         relatorioAnalysisState[baseTag] = { isMedido: true, statusVal: 'NORMAL', falhas: [], deteccao: '', problema: '', recomendacao: '', os: '' };
@@ -2212,9 +2679,9 @@
         if (sel) sel.className = `w-full border rounded-xl px-2.5 py-1.5 text-xs font-bold focus:outline-none shadow-sm ${getStatusBgColor(value)}`;
       }
     }
+
     function getStatusBgColor(status) {
-      const v = (status === 'Não Medido') ? status : normalizeSeveridade(status);
-      switch(v) {
+      switch(status) {
         case 'NORMAL': return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40';
         case 'OBSERVAÇÃO': return 'bg-blue-900/40 text-blue-300 border-blue-600/50';
         case 'ALERTA': return 'bg-amber-500/20 text-amber-400 border-amber-500/40';
@@ -2223,31 +2690,38 @@
         default: return 'bg-slate-800 text-white border-slate-700';
       }
     }
+
     function clearTechnicalAnalysisState() {
       relatorioAnalysisState = {};
       renderRelatorioTab();
     }
+
     async function saveTechnicalAnalysisState() {
       const relFilterRotaEl = document.getElementById('rel_filter_rota');
       const selectedRotas = Array.from(relFilterRotaEl.selectedOptions).map(o => o.value);
       const dataColeta = document.getElementById('rel_data_coleta').value;
       const dataAnalise = document.getElementById('rel_data_analise').value;
+      const respTecnicoInput = (document.getElementById('rel_responsavel_tecnico')?.value || document.getElementById('rel_responsavel_tecnico_bar')?.value || '').trim() || localStorage.getItem('inspectcbm_last_resp_tecnico') || 'CARLOS SILVA';
+      localStorage.setItem('inspectcbm_last_resp_tecnico', respTecnicoInput);
       const laudoObj = {
         id: Date.now(),
         rotas: selectedRotas,
         rota: selectedRotas.join(', '),
         dataColeta: dataColeta,
         dataAnalise: dataAnalise,
+        responsavelTecnico: respTecnicoInput,
         state: JSON.parse(JSON.stringify(relatorioAnalysisState))
       };
       try {
         await db.collection("inspectcbm_laudos").add(laudoObj);
-        alert("Análise técnica salva com sucesso na nuvem! O Supervisório foi atualizado.");
+        showToast("Análise técnica salva com sucesso na nuvem! O Supervisório foi atualizado.", "success");
+        populateSupLaudosFilter();
         renderSupervisorioTab();
       } catch (err) {
-        alert("Erro ao salvar na nuvem: " + err.message);
+        showToast("Erro ao salvar na nuvem: " + err.message, "error");
       }
     }
+
     function fetchSavedLaudosHistory() {
       const container = document.getElementById('saved-laudos-list');
       if(!container) return;
@@ -2263,9 +2737,11 @@
           <div>
             <span class="font-bold text-amber-400 font-mono">Rotas: ${laudo.rota || laudo.rotas?.join(', ') || '-'}</span> | 
             <span class="text-slate-300">Coleta: ${laudo.dataColeta || '-'}</span> | 
-            <span class="text-slate-300">Análise: ${laudo.dataAnalise || '-'}</span>
+            <span class="text-slate-300">Análise: ${laudo.dataAnalise || '-'}</span> | 
+            <span class="text-amber-300 font-semibold"><i class="fa-solid fa-user-check mr-1 text-amber-400"></i>${laudo.responsavelTecnico || 'Técnico Responsável'}</span>
           </div>
-          <div class="flex items-center space-x-2">
+          <div class="flex items-center space-x-2 flex-wrap gap-y-1">
+            <button onclick="viewLaudoInSupervisorio('${laudo.docId}')" class="bg-emerald-600/30 hover:bg-emerald-600/40 text-emerald-300 border border-emerald-500/30 font-semibold px-2.5 py-1.5 rounded-lg transition flex items-center shadow" title="Alimentar e Visualizar no Supervisório"><i class="fa-solid fa-gauge mr-1"></i> Supervisório</button>
             <button onclick="loadSavedLaudo(${idx})" class="bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/30 font-semibold px-2.5 py-1.5 rounded-lg transition flex items-center"><i class="fa-solid fa-arrow-rotate-left mr-1"></i> Carregar</button>
             <button onclick="generatePDFFromSavedLaudo(${idx})" class="bg-rose-600 hover:bg-rose-500 text-white font-semibold px-2.5 py-1.5 rounded-lg transition flex items-center shadow"><i class="fa-solid fa-file-pdf mr-1"></i> PDF</button>
             <button onclick="deleteSavedLaudo('${laudo.docId}')" class="text-rose-400 hover:text-rose-300 px-2 py-1.5 transition" title="Excluir"><i class="fa-solid fa-trash-can"></i></button>
@@ -2274,6 +2750,7 @@
         container.appendChild(div);
       });
     }
+
     function loadSavedLaudo(idx) {
       const laudo = cloudLaudos[idx];
       if(!laudo) return;
@@ -2285,10 +2762,14 @@
       }
       if(laudo.dataColeta) document.getElementById('rel_data_coleta').value = laudo.dataColeta;
       if(laudo.dataAnalise) document.getElementById('rel_data_analise').value = laudo.dataAnalise;
-      relatorioAnalysisState = normalizeLaudoState(laudo.state);
+      if(laudo.responsavelTecnico) {
+        syncRelResponsavelTecnico(laudo.responsavelTecnico);
+      }
+      relatorioAnalysisState = JSON.parse(JSON.stringify(laudo.state || {}));
       renderRelatorioTab();
-      alert("Laudo carregado com sucesso!");
+      showToast("Laudo carregado com sucesso!", "success");
     }
+
     async function generatePDFFromSavedLaudo(idx) {
       const laudo = cloudLaudos[idx];
       if(!laudo) return;
@@ -2297,6 +2778,8 @@
       const previousSelected = Array.from(relFilterRotaEl.selectedOptions).map(o => o.value);
       const previousDataColeta = document.getElementById('rel_data_coleta').value;
       const previousDataAnalise = document.getElementById('rel_data_analise').value;
+      const previousRespTecnico = document.getElementById('rel_responsavel_tecnico') ? document.getElementById('rel_responsavel_tecnico').value : '';
+      
       const targetRotas = laudo.rotas || (laudo.rota ? laudo.rota.split(', ') : ['TODAS_ROTAS']);
       for (let i = 0; i < relFilterRotaEl.options.length; i++) {
         let opt = relFilterRotaEl.options[i];
@@ -2304,30 +2787,54 @@
       }
       if(laudo.dataColeta) document.getElementById('rel_data_coleta').value = laudo.dataColeta;
       if(laudo.dataAnalise) document.getElementById('rel_data_analise').value = laudo.dataAnalise;
-      relatorioAnalysisState = normalizeLaudoState(laudo.state);
+      if(laudo.responsavelTecnico && document.getElementById('rel_responsavel_tecnico')) {
+        document.getElementById('rel_responsavel_tecnico').value = laudo.responsavelTecnico;
+      }
+      relatorioAnalysisState = laudo.state || {};
       await exportTechnicalPDF();
+      
       for (let i = 0; i < relFilterRotaEl.options.length; i++) {
         let opt = relFilterRotaEl.options[i];
         opt.selected = previousSelected.includes(opt.value);
       }
       document.getElementById('rel_data_coleta').value = previousDataColeta;
       document.getElementById('rel_data_analise').value = previousDataAnalise;
+      if(document.getElementById('rel_responsavel_tecnico')) {
+        document.getElementById('rel_responsavel_tecnico').value = previousRespTecnico;
+      }
       relatorioAnalysisState = previousState;
       renderRelatorioTab();
     }
+
     async function deleteSavedLaudo(docId) {
-      if(!confirm("Deseja excluir este laudo da nuvem?")) return;
+      const confirmed = await customConfirm("Deseja excluir este laudo da nuvem?");
+      if(!confirmed) return;
       try {
         await db.collection("inspectcbm_laudos").doc(docId).delete();
+        showToast("Laudo excluído com sucesso!", "success");
       } catch (err) {
-        alert("Erro ao excluir: " + err.message);
+        showToast("Erro ao excluir: " + err.message, "error");
       }
     }
+
+    function syncRelResponsavelTecnico(val) {
+      val = val || '';
+      localStorage.setItem('inspectcbm_last_resp_tecnico', val);
+      const el1 = document.getElementById('rel_responsavel_tecnico');
+      const el2 = document.getElementById('rel_responsavel_tecnico_bar');
+      if (el1 && el1.value !== val) el1.value = val;
+      if (el2 && el2.value !== val) el2.value = val;
+      document.querySelectorAll('.rel-resp-badge').forEach(el => {
+        el.textContent = val.toUpperCase() || 'NÃO DEFINIDO';
+      });
+    }
+
     function renderRelatorioTab() {
       const relFilterRotaEl = document.getElementById('rel_filter_rota');
       const selectedRotas = Array.from(relFilterRotaEl.selectedOptions).map(o => o.value);
       const filterStatus = document.getElementById('rel_filter_status').value;
       const filterColetaDate = document.getElementById('rel_data_coleta').value;
+      
       let rotasParaAnalisar = [];
       if (selectedRotas.includes('TODAS_ROTAS') || selectedRotas.length === 0) {
         rotasParaAnalisar = defaultRotas;
@@ -2354,7 +2861,7 @@
             baseTag: baseTag,
             rota: rota,
             isMedido: currentState.isMedido,
-            statusVal: normalizeSeveridade(currentState.statusVal),
+            statusVal: currentState.statusVal,
             falhas: currentState.falhas || [],
             deteccao: currentState.deteccao || '',
             problema: currentState.problema || '',
@@ -2421,16 +2928,24 @@
           <td class="p-3">
             ${item.isMedido ? `
               <div class="space-y-2.5 bg-slate-950 p-3 rounded-xl border border-slate-800">
+                <div class="flex justify-between items-center bg-slate-900/80 px-2.5 py-1 rounded-lg border border-slate-800 text-[10px]">
+                  <span class="text-slate-400 font-mono flex items-center"><i class="fa-solid fa-user-check text-amber-400 mr-1.5"></i> RESP. TÉCNICO:</span>
+                  <span class="font-bold text-amber-300 font-mono rel-resp-badge">${(document.getElementById('rel_responsavel_tecnico')?.value || document.getElementById('rel_responsavel_tecnico_bar')?.value || localStorage.getItem('inspectcbm_last_resp_tecnico') || 'CARLOS SILVA').toUpperCase()}</span>
+                </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <div>
                     <label class="block text-[10px] text-slate-400 font-bold mb-1 font-mono"><i class="fa-solid fa-triangle-exclamation mr-1 text-amber-400"></i> SEVERIDADE:</label>
                     <select id="rel_status_select_${item.baseTag}" onchange="updateRelAnalysisField('${item.baseTag}', 'statusVal', this.value)" class="w-full border rounded-xl px-2 py-1 text-xs font-bold focus:outline-none shadow-sm ${statusBgClass}">
-                      ${severidadeOpcoes.map(o => `<option value="${o}" ${item.statusVal === o ? 'selected' : ''}>${o}</option>`).join('')}
+                      <option value="NORMAL" ${item.statusVal === 'NORMAL' ? 'selected' : ''}>NORMAL</option>
+                      <option value="OBSERVAÇÃO" ${item.statusVal === 'OBSERVAÇÃO' ? 'selected' : ''}>OBSERVAÇÃO</option>
+                      <option value="ALERTA" ${item.statusVal === 'ALERTA' ? 'selected' : ''}>ALERTA</option>
+                      <option value="ALARME" ${item.statusVal === 'ALARME' ? 'selected' : ''}>ALARME</option>
+                      <option value="EMERGÊNCIA" ${item.statusVal === 'EMERGÊNCIA' ? 'selected' : ''}>EMERGÊNCIA</option>
                     </select>
                   </div>
                   <div>
                     <label class="block text-[10px] text-slate-400 font-bold mb-1 font-mono"><i class="fa-solid fa-wrench mr-1 text-amber-400"></i> OS (ORDEM DE SERVIÇO):</label>
-                    <input type="text" value="${escAttr(item.os)}" oninput="updateRelAnalysisField('${item.baseTag}', 'os', this.value)" placeholder="Ex: 40012345" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-2 py-1 text-xs text-amber-300 font-mono focus:outline-none focus:border-amber-500">
+                    <input type="text" value="${item.os}" oninput="updateRelAnalysisField('${item.baseTag}', 'os', this.value)" placeholder="Ex: 40012345" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-2 py-1 text-xs text-amber-300 font-mono focus:outline-none focus:border-amber-500">
                   </div>
                 </div>
                 <div>
@@ -2442,15 +2957,15 @@
                 </div>
                 <div>
                   <label class="block text-[10px] text-slate-400 font-bold mb-1 font-mono"><i class="fa-solid fa-magnifying-glass mr-1 text-cyan-400"></i> DETECÇÃO / TÉCNICA:</label>
-                  <input type="text" value="${escAttr(item.deteccao)}" oninput="updateRelAnalysisField('${item.baseTag}', 'deteccao', this.value)" placeholder="Ex: Análise de Vibração" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-2 py-1 text-xs text-cyan-300 focus:outline-none focus:border-cyan-500">
+                  <input type="text" value="${item.deteccao}" oninput="updateRelAnalysisField('${item.baseTag}', 'deteccao', this.value)" placeholder="Ex: Análise de Vibração" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-2 py-1 text-xs text-cyan-300 focus:outline-none focus:border-cyan-500">
                 </div>
                 <div>
                   <label class="block text-[10px] text-slate-400 font-bold mb-0.5 font-mono">DIAGNÓSTICO (PROBLEMA):</label>
-                  <input type="text" value="${escAttr(item.problema)}" oninput="updateRelAnalysisField('${item.baseTag}', 'problema', this.value)" placeholder="Descreva o diagnóstico detalhado..." class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-amber-300 focus:outline-none focus:border-amber-500">
+                  <input type="text" value="${item.problema}" oninput="updateRelAnalysisField('${item.baseTag}', 'problema', this.value)" placeholder="Descreva o diagnóstico detalhado..." class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-amber-300 focus:outline-none focus:border-amber-500">
                 </div>
                 <div>
                   <label class="block text-[10px] text-slate-400 font-bold mb-0.5 font-mono">RECOMENDAÇÃO:</label>
-                  <input type="text" value="${escAttr(item.recomendacao)}" oninput="updateRelAnalysisField('${item.baseTag}', 'recomendacao', this.value)" placeholder="Descreva a ação recomendada..." class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-emerald-300 focus:outline-none focus:border-emerald-500">
+                  <input type="text" value="${item.recomendacao}" oninput="updateRelAnalysisField('${item.baseTag}', 'recomendacao', this.value)" placeholder="Descreva a ação recomendada..." class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-emerald-300 focus:outline-none focus:border-emerald-500">
                 </div>
               </div>
             ` : `
@@ -2463,11 +2978,19 @@
         tbody.appendChild(tr);
       });
     }
+
     async function deleteCloudRecord(docId) {
-      if(confirm('Excluir este registo do SCADA?')) {
-        await db.collection("inspectcbm_records").doc(docId).delete();
+      const confirmed = await customConfirm('Excluir este registo do SCADA?');
+      if(confirmed) {
+        try {
+          await db.collection("inspectcbm_records").doc(docId).delete();
+          showToast("Registo excluído do SCADA!", "success");
+        } catch(err) {
+          showToast("Erro ao excluir: " + err.message, "error");
+        }
       }
     }
+
     function renderChart(data) {
       const ctx = document.getElementById('tempChart').getContext('2d');
       if(chartInstance) chartInstance.destroy();
@@ -2496,12 +3019,14 @@
         }
       });
     }
+
     function exportCSV() {
       const filterRota = document.getElementById('filter_rota').value;
       const filterTag = document.getElementById('filter_tag').value;
       const filterDateSelect = document.getElementById('filter_date_select').value;
       const dateStart = document.getElementById('filter_date_start').value;
       const dateEnd = document.getElementById('filter_date_end').value;
+      
       let filtered = cloudRecords;
       if (filterRota !== 'TODAS_ROTAS') filtered = filtered.filter(r => r.rota === filterRota);
       if (filterTag !== 'TODAS') filtered = filtered.filter(r => r.baseTag === filterTag || r.tag.includes(filterTag));
@@ -2518,6 +3043,7 @@
         filtered = filtered.filter(r => r.data_coleta.startsWith(filterDateSelect));
       }
       if(filtered.length === 0) { alert('Sem dados para exportar com este filtro.'); return; }
+      
       let csv = 'Data;Rota;Tag;SAP_Number;Componente;Equipamento;Setor;Area;Inspetor;Temp_Motor_LA;Temp_Comp2_P1;Operacao;Observacoes\n';
       filtered.forEach(r => {
         csv += `"${r.data_coleta}";"${r.rota}";"${r.tag}";"${r.sap_number || ''}";"${r.componente}";"${r.equipamento_nome}";"${r.setor}";"${r.area}";"${r.inspetor}";"${r.temp_la || ''}";"${r.temp_c2_p1 || ''}";"${r.status_operacao}";"${r.observacoes}"\n`;
@@ -2528,6 +3054,7 @@
       a.download = `InspectCBM_SCADA_${new Date().toISOString().slice(0,10)}.csv`;
       a.click();
     }
+
     async function exportDashboardPreAnalisePDF() {
       const { jsPDF } = window.jspdf;
       const filterRota = document.getElementById('filter_rota').value;
@@ -2535,6 +3062,7 @@
       const filterDateSelect = document.getElementById('filter_date_select').value;
       const dateStart = document.getElementById('filter_date_start').value;
       const dateEnd = document.getElementById('filter_date_end').value;
+      
       let filtered = cloudRecords;
       if (filterRota !== 'TODAS_ROTAS') filtered = filtered.filter(r => r.rota === filterRota);
       if (filterTag !== 'TODAS') filtered = filtered.filter(r => r.baseTag === filterTag || r.tag.includes(filterTag));
@@ -2551,7 +3079,7 @@
         filtered = filtered.filter(r => r.data_coleta.startsWith(filterDateSelect));
       }
       if (filtered.length === 0) {
-        alert('Nenhum registo encontrado para exportar na pré-análise com os filtros atuais.');
+        showToast('Nenhum registo encontrado para exportar na pré-análise com os filtros atuais.', 'error');
         return;
       }
       const doc = new jsPDF('p', 'mm', 'a4');
@@ -2559,6 +3087,7 @@
       doc.setFontSize(13);
       doc.setTextColor(30, 41, 59);
       doc.text(`PRÉ-ANÁLISE SCADA & HISTÓRICO - INSPECTCBM`, 14, 15);
+      
       doc.setFontSize(8);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(100, 116, 139);
@@ -2615,275 +3144,936 @@
       });
       doc.save(`PreAnalise_SCADA_${filterRota}_${new Date().toISOString().slice(0,10)}.pdf`);
     }
-    async function exportTechnicalPDF() {
-      const { jsPDF } = window.jspdf;
-      const relFilterRotaEl = document.getElementById('rel_filter_rota');
-      const selectedRotas = Array.from(relFilterRotaEl.selectedOptions).map(o => o.value);
-      const filterStatus = document.getElementById('rel_filter_status').value;
-      const dataColetaInput = document.getElementById('rel_data_coleta').value;
-      const dataAnaliseInput = document.getElementById('rel_data_analise').value;
-      let dataColetaFmt = new Date().toLocaleDateString('pt-PT');
-      if (dataColetaInput) {
-        const parts = dataColetaInput.split('-');
-        dataColetaFmt = `${parts[2]}/${parts[1]}/${parts[0]}`;
+
+    function getStatusRgbColor(status) {
+      switch((status || '').toUpperCase()) {
+        case 'NORMAL': return [16, 185, 129];      // emerald-500
+        case 'OBSERVAÇÃO': return [37, 99, 235];   // blue-600
+        case 'ALERTA': return [245, 158, 11];      // amber-500
+        case 'ALARME': return [225, 29, 72];       // rose-600
+        case 'EMERGÊNCIA': return [185, 28, 28];   // red-700
+        case 'NÃO MEDIDO': return [100, 116, 139]; // slate-500
+        default: return [100, 116, 139];
       }
-      let dataAnaliseFmt = new Date().toLocaleDateString('pt-PT');
-      if (dataAnaliseInput) {
-        const parts = dataAnaliseInput.split('-');
-        dataAnaliseFmt = `${parts[2]}/${parts[1]}/${parts[0]}`;
-      }
-      let rotasParaAnalisar = [];
-      if (selectedRotas.includes('TODAS_ROTAS') || selectedRotas.length === 0) {
-        rotasParaAnalisar = defaultRotas;
-      } else {
-        rotasParaAnalisar = selectedRotas;
-      }
-      let filtered = [];
-      rotasParaAnalisar.forEach(rota => {
-        let tagsDaRota = defaultTagMap[rota] || [];
-        tagsDaRota.forEach(baseTag => {
-          let lastRecord = cloudRecords.find(r => (r.baseTag === baseTag || r.tag.startsWith(baseTag)) && (!dataColetaInput || r.data_coleta.startsWith(dataColetaInput)));
-          let rawState = relatorioAnalysisState[baseTag] || { isMedido: !!lastRecord, statusVal: 'NORMAL', falhas: [], deteccao: '', problema: '', recomendacao: '', os: '' };
-          let state = { ...rawState, statusVal: normalizeSeveridade(rawState.statusVal) };
-          if (filterStatus === 'MEDIDOS' && !state.isMedido) return;
-          if (filterStatus === 'NAO_MEDIDOS' && state.isMedido) return;
-          let tagData = cloudTagRegistry[baseTag] || {};
-          if (state.isMedido && lastRecord) {
-            filtered.push({ ...lastRecord, rota: lastRecord.rota || rota, analysisState: state });
-          } else {
-            filtered.push({
-              tag: `${baseTag}`,
-              baseTag: baseTag,
-              rota: rota,
-              componente: 'Conjunto',
-              equipamento_nome: tagData.equipamento_nome || '-',
-              sap_number: tagData.sap_number || '-',
-              setor: tagData.setor || '-',
-              area: tagData.area || '-',
-              inspetor: 'PENDENTE',
-              photo: tagData.photo || null,
-              analysisState: state
-            });
-          }
-        });
-      });
-      if(filtered.length === 0) { alert('Sem itens para exportar no relatório com este filtro.'); return; }
-
-      const doc = new jsPDF('p', 'mm', 'a4');
-      const X0 = 14;            // margem esquerda
-      const W = 182;            // largura útil
-      const COL_FOTO = 85;      // largura da coluna da foto
-      const COL_DADOS = 97;     // largura da coluna de dados
-      const START_Y = 41;       // início dos cards (abaixo do cabeçalho da página)
-      const PAGE_BOTTOM = 281;  // limite inferior útil (rodapé em 284)
-      const GAP = 6;            // espaço entre os 2 equipamentos
-      const HEAD_H = 7;         // altura do cabeçalho FOTO / DADOS
-      const BAR_H = 5.5;        // altura da barra "PARECER TÉCNICO"
-      const LH = 1.2;           // fator de altura de linha
-      const FS = 8.5;           // tamanho da fonte do texto
-      const lineMM = FS * 0.3528 * LH;
-      const statusFiltroTxt = filterStatus === 'MEDIDOS' ? 'MEDIDOS' : (filterStatus === 'NAO_MEDIDOS' ? 'NÃO MEDIDOS' : 'TODOS');
-
-      const capLines = (lines, max) => {
-        if (lines.length <= max) return lines;
-        const cut = lines.slice(0, max);
-        cut[max - 1] = cut[max - 1].replace(/.{0,3}$/, '') + '...';
-        return cut;
-      };
-
-      // Monta os textos do card e calcula a altura dele
-      const medirCard = (r) => {
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(FS);
-        const state = r.analysisState;
-        const sevStatus = state.isMedido ? (state.statusVal || 'NORMAL').toUpperCase() : 'NÃO MEDIDO';
-        const dadosLinhas = [
-          `TAG: ${r.tag || r.baseTag}`,
-          `SAP: ${r.sap_number || '-'}`,
-          `OS: ${state.os || '-'}`,
-          `SEVERIDADE: ${sevStatus}`,
-          ``,
-          `INFORMAÇÕES DO EQUIPAMENTO:`,
-          `• Rota: ${r.rota || '-'}`,
-          `• Equipamento: ${r.equipamento_nome || '-'}`,
-          `• Setor: ${r.setor || '-'} (${r.area || '-'})`,
-          `• Conjunto: ${r.componente || 'Conjunto'}`
-        ];
-        let dadosWrap = [];
-        dadosLinhas.forEach(l => { (l === '' ? [''] : doc.splitTextToSize(l, COL_DADOS - 8)).forEach(x => dadosWrap.push(x)); });
-        dadosWrap = capLines(dadosWrap, 16);
-        let falhasTexto = (state.falhas && state.falhas.length > 0) ? state.falhas.join(', ') : 'Nenhuma';
-        if (!state.isMedido) falhasTexto = 'Não avaliado (Equipamento não medido)';
-        const campos = [
-          `TIPOS DE FALHA: ${falhasTexto}`,
-          `DETECÇÃO / TÉCNICA: ${state.deteccao || 'Análise de Vibração'}`,
-          `PROBLEMA / DIAGNÓSTICO: ${state.isMedido && state.problema ? state.problema : 'Sem pendências identificadas. Equipamento em regime normal.'}`,
-          `RECOMENDAÇÃO TÉCNICA: ${state.isMedido && state.recomendacao ? state.recomendacao : 'Manter monitoramento de rotina preditiva.'}`,
-          `RESPONSÁVEL TÉCNICO: ${r.inspetor || 'PENDENTE'}`
-        ].map(t => capLines(doc.splitTextToSize(t, W - 10), 6));
-        const FIELD_GAP = 1.8;
-        const infH = campos.reduce((acc, l) => acc + l.length * lineMM, 0) + FIELD_GAP * (campos.length - 1) + 7;
-        const rowH = Math.max(54, dadosWrap.length * lineMM + 8);
-        return { dadosWrap, campos, rowH, infH, FIELD_GAP, height: HEAD_H + rowH + BAR_H + infH };
-      };
-
-      // Cabeçalho + faixa de rotas/coleta/status (uma vez por página)
-      const drawPageHeader = (rotasPagina) => {
-        doc.setFillColor(15, 23, 42);
-        doc.rect(14, 10, 182, 19, 'F');
-        doc.setFillColor(245, 158, 11);
-        doc.rect(14, 10, 3.5, 19, 'F');
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(13);
-        doc.setTextColor(255, 255, 255);
-        doc.text("MONDELEZ  |  LAUDO TÉCNICO DE CONDICIONAMENTO", 22, 18);
-        doc.setFontSize(7.5);
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(203, 213, 225);
-        doc.text("SUPERVISORY & CONDITION MONITORING SYSTEM  •  UTILIDADES CBM", 22, 24);
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(8);
-        doc.setTextColor(245, 158, 11);
-        doc.text("RELATÓRIO TÉCNICO CBM", 191, 17.5, { align: "right" });
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(7);
-        doc.setTextColor(148, 163, 184);
-        doc.text(`ANÁLISE: ${dataAnaliseFmt}`, 191, 24, { align: "right" });
-        doc.setFillColor(241, 245, 249);
-        doc.setDrawColor(203, 213, 225);
-        doc.setLineWidth(0.2);
-        doc.rect(14, 31, 182, 7.5, 'FD');
-        doc.setFontSize(7.5);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(51, 65, 85);
-        doc.text("ROTAS:", 18, 36);
-        doc.setFont("helvetica", "normal");
-        let rotasTxt = rotasPagina.join(', ');
-        if (rotasTxt.length > 50) rotasTxt = rotasTxt.slice(0, 47) + '...';
-        doc.text(rotasTxt, 31, 36);
-        doc.setFont("helvetica", "bold");
-        doc.text("COLETA:", 110, 36);
-        doc.setFont("helvetica", "normal");
-        doc.text(dataColetaFmt, 124, 36);
-        doc.setFont("helvetica", "bold");
-        doc.text("STATUS:", 152, 36);
-        doc.setFont("helvetica", "normal");
-        doc.text(statusFiltroTxt, 166, 36);
-      };
-
-      const drawFooter = (pageNum, total) => {
-        doc.setDrawColor(226, 232, 240);
-        doc.setLineWidth(0.3);
-        doc.line(14, 284, 196, 284);
-        doc.setFontSize(7.5);
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(148, 163, 184);
-        doc.text("MONDELEZ SCADA  •  Sistema de Monitoramento Preditivo & Confiabilidade de Ativos", 14, 289);
-        doc.text(`Página ${pageNum} de ${total}`, 196, 289, { align: "right" });
-      };
-
-      // Desenha um equipamento (foto + dados + parecer técnico)
-      const drawCard = (r, c, y) => {
-        doc.setDrawColor(203, 213, 225);
-        doc.setLineWidth(0.2);
-        // cabeçalhos FOTO / DADOS
-        doc.setFillColor(30, 41, 59);
-        doc.rect(X0, y, COL_FOTO, HEAD_H, 'FD');
-        doc.rect(X0 + COL_FOTO, y, COL_DADOS, HEAD_H, 'FD');
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(9);
-        doc.setTextColor(255, 255, 255);
-        doc.text("FOTO DO EQUIPAMENTO", X0 + COL_FOTO / 2, y + HEAD_H / 2, { align: 'center', baseline: 'middle' });
-        doc.text("DADOS TÉCNICOS DO EQUIPAMENTO", X0 + COL_FOTO + COL_DADOS / 2, y + HEAD_H / 2, { align: 'center', baseline: 'middle' });
-        // linha: foto | dados
-        const yRow = y + HEAD_H;
-        doc.setFillColor(255, 255, 255);
-        doc.rect(X0, yRow, COL_FOTO, c.rowH, 'FD');
-        doc.setFillColor(250, 250, 250);
-        doc.rect(X0 + COL_FOTO, yRow, COL_DADOS, c.rowH, 'FD');
-        // foto (mantém a proporção original)
-        const boxW = 79, boxH = c.rowH - 8;
-        const boxX = X0 + (COL_FOTO - boxW) / 2;
-        const boxY = yRow + (c.rowH - boxH) / 2;
-        const photoSrc = r.photo || (cloudTagRegistry[r.baseTag] ? cloudTagRegistry[r.baseTag].photo : null);
-        doc.setFillColor(248, 250, 252);
-        doc.setDrawColor(226, 232, 240);
-        if (photoSrc) {
-          doc.rect(boxX, boxY, boxW, boxH, 'FD');
-          try {
-            const props = doc.getImageProperties(photoSrc);
-            const ratio = props.width / props.height;
-            let w = boxW - 1, h = w / ratio;
-            if (h > boxH - 1) { h = boxH - 1; w = h * ratio; }
-            doc.addImage(photoSrc, props.fileType || 'JPEG', boxX + (boxW - w) / 2, boxY + (boxH - h) / 2, w, h);
-          } catch (e) {
-            console.error("Erro ao desenhar imagem no PDF", e);
-          }
-        } else {
-          doc.roundedRect(boxX, boxY, boxW, boxH, 2, 2, 'FD');
-          doc.setFontSize(8);
-          doc.setFont("helvetica", "normal");
-          doc.setTextColor(148, 163, 184);
-          doc.text("Sem Registro Fotográfico", boxX + boxW / 2, boxY + boxH / 2, { align: "center", baseline: 'middle' });
-        }
-        // dados técnicos
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(FS);
-        doc.setTextColor(30, 41, 59);
-        doc.text(c.dadosWrap, X0 + COL_FOTO + 4, yRow + 4, { baseline: 'top', lineHeightFactor: LH });
-        // barra do parecer técnico
-        const yBar = yRow + c.rowH;
-        doc.setFillColor(30, 41, 59);
-        doc.setDrawColor(203, 213, 225);
-        doc.rect(X0, yBar, W, BAR_H, 'FD');
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(8);
-        doc.setTextColor(245, 158, 11);
-        doc.text("PARECER TÉCNICO & DIAGNÓSTICO DE CONFIABILIDADE (CBM)", X0 + 3, yBar + BAR_H / 2, { baseline: 'middle' });
-        // texto do parecer (centralizado)
-        const yInf = yBar + BAR_H;
-        doc.setFillColor(255, 255, 255);
-        doc.rect(X0, yInf, W, c.infH, 'FD');
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(FS);
-        doc.setTextColor(30, 41, 59);
-        let yy = yInf + 3.5;
-        c.campos.forEach(lines => {
-          doc.text(lines, X0 + W / 2, yy, { align: 'center', baseline: 'top', lineHeightFactor: LH });
-          yy += lines.length * lineMM + c.FIELD_GAP;
-        });
-      };
-
-      // Paginação: 2 equipamentos por folha (se o texto for muito grande, vai 1 por folha)
-      const cards = filtered.map(r => medirCard(r));
-      const pages = [];
-      let cur = [];
-      let curY = START_Y;
-      cards.forEach((c, i) => {
-        if (cur.length >= 2 || (cur.length > 0 && curY + c.height > PAGE_BOTTOM)) {
-          pages.push(cur);
-          cur = [];
-          curY = START_Y;
-        }
-        cur.push(i);
-        curY += c.height + GAP;
-      });
-      if (cur.length) pages.push(cur);
-
-      pages.forEach((idxs, p) => {
-        if (p > 0) doc.addPage();
-        const rotasPagina = Array.from(new Set(idxs.map(i => filtered[i].rota || '-')));
-        drawPageHeader(rotasPagina);
-        let y = START_Y;
-        idxs.forEach(i => {
-          drawCard(filtered[i], cards[i], y);
-          y += cards[i].height + GAP;
-        });
-        drawFooter(p + 1, pages.length);
-      });
-
-      doc.save(`Laudo_Tecnico_Mondelez_${dataAnaliseFmt.replace(/\//g, '-')}.pdf`);
     }
+
+    function drawMachineCard(doc, r, startY, respTecnico) {
+      const state = r.analysisState;
+      const sevStatus = state.isMedido ? (state.statusVal || 'NORMAL').toUpperCase() : 'NÃO MEDIDO';
+      const statusColor = getStatusRgbColor(sevStatus);
+      
+      let falhasTexto = (state.falhas && state.falhas.length > 0) ? state.falhas.join(', ') : 'Nenhuma anomalia identificada';
+      if (!state.isMedido) falhasTexto = 'Não avaliado (Equipamento não medido na coleta)';
+      
+      let photoSrc = r.photo || (cloudTagRegistry[r.baseTag] ? cloudTagRegistry[r.baseTag].photo : null);
+
+      let blocoDadosTecnicos = 
+        `TAG: ${r.tag || r.baseTag}    |    SAP: ${r.sap_number || '-'}    |    OS: ${state.os || '-'}\n` +
+        `LOCALIZAÇÃO: ${r.setor || '-'} (${r.area || '-'})    |    ROTA: ${r.rota || '-'}\n` +
+        `CONJUNTO: ${r.componente || 'Conjunto'}    |    OPERAÇÃO: ${r.status_operacao || (state.isMedido ? 'Em Regime Operacional' : 'Não Medido')}\n` +
+        `STROBO / ROTAÇÃO: ${r.rpm_real_strobo ? r.rpm_real_strobo + ' RPM' : '-'}    |    ACOPLAMENTO: ${r.acoplamento_status || '-'}\n` +
+        `TEMPERATURAS: Motor LA: ${r.temp_la !== null && r.temp_la !== undefined ? r.temp_la + '°C' : '-'}    |    Comp. 2: ${r.temp_c2_p1 !== null && r.temp_c2_p1 !== undefined ? r.temp_c2_p1 + '°C' : '-'}\n` +
+        `INSPETOR DE CAMPO: ${r.inspetor || '-'}`;
+
+      let blocoParecer = 
+        `• TIPOS DE FALHA: ${falhasTexto}\n` +
+        `• TÉCNICA / DETECÇÃO: ${state.deteccao || 'Análise de Vibração & Termografia'}\n` +
+        `• DIAGNÓSTICO (PROBLEMA): ${state.isMedido && state.problema ? state.problema : 'Sem pendências críticas. Equipamento operando em conformidade técnica.'}\n` +
+        `• RECOMENDAÇÃO TÉCNICA: ${state.isMedido && state.recomendacao ? state.recomendacao : 'Manter rotina de inspeção e monitoramento preditivo periódico.'}\n` +
+        `• RESPONSÁVEL TÉCNICO: ${respTecnico.toUpperCase()}    |    STATUS: ${state.isMedido ? 'MEDIDO EM CAMPO' : 'NÃO MEDIDO'}`;
+
+      doc.autoTable({
+        startY: startY,
+        margin: { left: 12, right: 12 },
+        head: [[
+          { 
+            content: `ATIVO: TAG ${r.tag || r.baseTag}  •  ${r.equipamento_nome || '-'}`, 
+            styles: { 
+              fillColor: [15, 23, 42], 
+              textColor: [245, 158, 11], 
+              fontStyle: 'bold', 
+              fontSize: 8,
+              cellPadding: 2,
+              halign: 'left'
+            } 
+          },
+          { 
+            content: `SEVERIDADE: ${sevStatus}`, 
+            styles: { 
+              fillColor: statusColor, 
+              textColor: [255, 255, 255], 
+              fontStyle: 'bold', 
+              fontSize: 8,
+              cellPadding: 2,
+              halign: 'center'
+            } 
+          }
+        ]],
+        body: [
+          [
+            { content: '', styles: { minCellHeight: 40, cellWidth: 52, halign: 'center' } },
+            { content: blocoDadosTecnicos, styles: { cellWidth: 134, fontSize: 7.2, cellPadding: 2.2, lineHeight: 1.25, fillColor: [248, 250, 252] } }
+          ],
+          [
+            { 
+              content: 'PARECER TÉCNICO & DIAGNÓSTICO DE CONFIABILIDADE (CBM)', 
+              colSpan: 2, 
+              styles: { 
+                fillColor: [30, 41, 59], 
+                textColor: [245, 158, 11], 
+                fontStyle: 'bold', 
+                fontSize: 7.2, 
+                cellPadding: 1.5,
+                minCellHeight: 4.2
+              } 
+            }
+          ],
+          [
+            { 
+              content: blocoParecer, 
+              colSpan: 2, 
+              styles: { 
+                cellPadding: 2.5, 
+                fontSize: 7.2, 
+                textColor: [30, 41, 59], 
+                lineHeight: 1.25,
+                fillColor: [255, 255, 255]
+              } 
+            }
+          ]
+        ],
+        theme: 'grid',
+        styles: { 
+          font: 'helvetica',
+          overflow: 'linebreak', 
+          valign: 'middle', 
+          textColor: [30, 41, 59],
+          lineColor: [203, 213, 225],
+          lineWidth: 0.2
+        },
+        columnStyles: { 
+          0: { cellWidth: 52 }, 
+          1: { cellWidth: 134 } 
+        },
+        didDrawCell: function(data) {
+          if (data.section === 'body' && data.row.index === 0 && data.column.index === 0) {
+            const cellH = data.cell.height || 40;
+            const boxW = 48;
+            const boxH = Math.min(36, cellH - 4);
+            const boxX = data.cell.x + (data.cell.width - boxW) / 2;
+            const boxY = data.cell.y + (cellH - boxH) / 2;
+
+            if (photoSrc) {
+              try {
+                doc.setFillColor(241, 245, 249);
+                doc.setDrawColor(203, 213, 225);
+                doc.rect(boxX, boxY, boxW, boxH, 'FD');
+                doc.addImage(photoSrc, 'JPEG', boxX + 0.5, boxY + 0.5, boxW - 1, boxH - 1);
+              } catch(e) { 
+                console.error("Erro ao desenhar imagem no PDF", e); 
+              }
+            } else {
+              doc.setFillColor(241, 245, 249);
+              doc.setDrawColor(203, 213, 225);
+              doc.roundedRect(boxX, boxY, boxW, boxH, 1.5, 1.5, 'FD');
+              doc.setFontSize(7);
+              doc.setFont("helvetica", "normal");
+              doc.setTextColor(148, 163, 184);
+              doc.text("Sem Registro Fotográfico", boxX + boxW / 2, boxY + boxH / 2, { align: "center" });
+            }
+          }
+        }
+      });
+    }
+
+    let cachedMondelezLogoB64 = null;
+    async function getMondelezLogoB64() {
+      if (cachedMondelezLogoB64) return cachedMondelezLogoB64;
+      try {
+        const res = await fetch('/public/assets/aistudio/mondelez_logo_b64.txt');
+        if (res.ok) {
+          cachedMondelezLogoB64 = (await res.text()).trim();
+          return cachedMondelezLogoB64;
+        }
+      } catch(e) {
+        console.warn("Logo B64 fetch warning:", e);
+      }
+      return null;
+    }
+    // Pré-carregamento imediato do logo corporativo
+    try { getMondelezLogoB64(); } catch(e) {}
+
+    async function exportTechnicalPDF() {
+      try {
+        const jsPDFClass = (window.jspdf && window.jspdf.jsPDF) ? window.jspdf.jsPDF : (window.jsPDF || null);
+        if (!jsPDFClass) {
+          showToast('Biblioteca jsPDF não carregada. Por favor, recarregue a página.', 'error');
+          return;
+        }
+
+        const relFilterRotaEl = document.getElementById('rel_filter_rota');
+        const selectedRotas = relFilterRotaEl ? Array.from(relFilterRotaEl.selectedOptions).map(o => o.value) : [];
+        const filterStatus = document.getElementById('rel_filter_status') ? document.getElementById('rel_filter_status').value : 'TODOS';
+        const dataColetaInput = document.getElementById('rel_data_coleta') ? document.getElementById('rel_data_coleta').value : '';
+        const dataAnaliseInput = document.getElementById('rel_data_analise') ? document.getElementById('rel_data_analise').value : '';
+        const respTecnicoInput = (document.getElementById('rel_responsavel_tecnico')?.value || document.getElementById('rel_responsavel_tecnico_bar')?.value || '').trim() || localStorage.getItem('inspectcbm_last_resp_tecnico') || 'CARLOS SILVA';
+        localStorage.setItem('inspectcbm_last_resp_tecnico', respTecnicoInput);
+        
+        let dataColetaFmt = new Date().toLocaleDateString('pt-PT');
+        if (dataColetaInput) {
+          const parts = dataColetaInput.split('-');
+          dataColetaFmt = `${parts[2]}/${parts[1]}/${parts[0]}`;
+        }
+        let dataAnaliseFmt = new Date().toLocaleDateString('pt-PT');
+        if (dataAnaliseInput) {
+          const parts = dataAnaliseInput.split('-');
+          dataAnaliseFmt = `${parts[2]}/${parts[1]}/${parts[0]}`;
+        }
+        
+        let rotasParaAnalisar = [];
+        if (selectedRotas.includes('TODAS_ROTAS') || selectedRotas.length === 0) {
+          rotasParaAnalisar = defaultRotas;
+        } else {
+          rotasParaAnalisar = selectedRotas;
+        }
+        let filtered = [];
+        rotasParaAnalisar.forEach(rota => {
+          let tagsDaRota = defaultTagMap[rota] || [];
+          tagsDaRota.forEach(baseTag => {
+            let lastRecord = cloudRecords.find(r => (r.baseTag === baseTag || r.tag.startsWith(baseTag)) && (!dataColetaInput || r.data_coleta.startsWith(dataColetaInput)));
+            let state = relatorioAnalysisState[baseTag] || { isMedido: !!lastRecord, statusVal: 'NORMAL', falhas: [], deteccao: '', problema: '', recomendacao: '', os: '' };
+            if (filterStatus === 'MEDIDOS' && !state.isMedido) return;
+            if (filterStatus === 'NAO_MEDIDOS' && state.isMedido) return;
+            let tagData = cloudTagRegistry[baseTag] || {};
+            if (state.isMedido && lastRecord) {
+              filtered.push({ ...lastRecord, analysisState: state });
+            } else {
+              filtered.push({
+                tag: `${baseTag}`,
+                baseTag: baseTag,
+                rota: rota,
+                componente: 'Conjunto',
+                equipamento_nome: tagData.equipamento_nome || '-',
+                sap_number: tagData.sap_number || '-',
+                setor: tagData.setor || '-',
+                area: tagData.area || '-',
+                inspetor: 'PENDENTE',
+                photo: tagData.photo || null,
+                analysisState: state
+              });
+            }
+          });
+        });
+        if(filtered.length === 0) {
+          showToast('Sem itens para exportar no relatório com este filtro.', 'error');
+          return;
+        }
+        
+        showToast("Gerando laudo técnico com Capa Simples e Contracapa...", "info");
+
+        // Agrupamento para encaixar exatamente duas máquinas por folha de PDF
+        const chunkedItems = [];
+        for (let i = 0; i < filtered.length; i += 2) {
+          chunkedItems.push(filtered.slice(i, i + 2));
+        }
+        const totalEquipPages = Math.max(1, chunkedItems.length);
+        const totalReportPages = 1 + 1 + totalEquipPages; // 1 Capa + 1 Guia Técnico + N Páginas de Equipamentos
+
+        const doc = new jsPDFClass('p', 'mm', 'a4');
+
+        // Carregar logo Mondelez
+        let logoB64 = null;
+        try {
+          logoB64 = await getMondelezLogoB64();
+        } catch(e) {
+          console.warn("Logo B64 fetch warning:", e);
+        }
+
+        // ==========================================
+        // PÁGINA 1: CAPA SIMPLES DO LAUDO (MONDELEZ • UTILIDADES • DATA • TÉCNICO)
+        // Sempre gerada em qualquer laudo PDF
+        // ==========================================
+        renderSimpleCover(doc, {
+          rotas: rotasParaAnalisar,
+          filtered: filtered,
+          dataColetaFmt: dataColetaFmt,
+          dataAnaliseFmt: dataAnaliseFmt,
+          respTecnico: respTecnicoInput,
+          logoB64: logoB64
+        });
+
+        // ==========================================
+        // PÁGINA 2: GUIA TÉCNICO (LOCAIS DE COLETA, SEVERIDADE ISO 10816 & CRITÉRIOS SAP)
+        // Posicionado imediatamente depois da Capa
+        // ==========================================
+        doc.addPage();
+        renderTechnicalContracapa(doc);
+
+        // ==========================================
+        // PÁGINAS SEGUINTES (3 a N): MATRIZ DE EQUIPAMENTOS (2 POR FOLHA)
+        // ==========================================
+        chunkedItems.forEach((pair, pageIndex) => {
+          doc.addPage();
+          
+          // 1. BANNER INSTITUCIONAL SCADA NO CABEÇALHO DA FOLHA
+          doc.setFillColor(15, 23, 42); // slate-900
+          doc.rect(12, 8, 186, 14, 'F');
+          
+          // Barra Decorativa de Destaque Amber / Dourado
+          doc.setFillColor(245, 158, 11); // amber-500
+          doc.rect(12, 8, 3, 14, 'F');
+          
+          // Título e Subtítulo Principal
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(10.5);
+          doc.setTextColor(255, 255, 255);
+          doc.text("MONDELEZ  |  LAUDO TÉCNICO DE CONDICIONAMENTO & CONFIABILIDADE (CBM)", 18, 14);
+          
+          doc.setFontSize(6.8);
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(203, 213, 225); // slate-300
+          doc.text("SUPERVISORY & CONDITION MONITORING SYSTEM  •  SCADA PREDICTIVE MAINTENANCE", 18, 19);
+          
+          // Metadados à Direita no Topo
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(7.5);
+          doc.setTextColor(245, 158, 11);
+          doc.text("LAUDO TÉCNICO CBM", 195, 13.5, { align: "right" });
+          
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(6.8);
+          doc.setTextColor(148, 163, 184);
+          doc.text(`EMISSÃO / ANÁLISE: ${dataAnaliseFmt}`, 195, 19, { align: "right" });
+          
+          // 2. FAIXA DE METADADOS: ROTA, DATAS E RESPONSÁVEL TÉCNICO
+          doc.setFillColor(241, 245, 249); // slate-100
+          doc.setDrawColor(203, 213, 225); // slate-300
+          doc.rect(12, 23.5, 186, 5.5, 'FD');
+          
+          doc.setFontSize(7);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(51, 65, 85); // slate-700
+          doc.text("ROTAS:", 15, 27.5);
+          doc.setFont("helvetica", "normal");
+          doc.text(rotasParaAnalisar.join(', ').slice(0, 42), 27, 27.5);
+          
+          doc.setFont("helvetica", "bold");
+          doc.text("COLETA:", 95, 27.5);
+          doc.setFont("helvetica", "normal");
+          doc.text(dataColetaFmt, 108, 27.5);
+          
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(180, 83, 9); // amber-700
+          doc.text("RESP. TÉCNICO:", 135, 27.5);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(15, 23, 42);
+          doc.text(respTecnicoInput.toUpperCase().slice(0, 32), 158, 27.5);
+          
+          // 3. MÁQUINA 1 (SLOT SUPERIOR DA FOLHA)
+          if (pair[0]) {
+            drawMachineCard(doc, pair[0], 31, respTecnicoInput);
+          }
+          
+          // 4. MÁQUINA 2 (SLOT INFERIOR DA FOLHA - SE EXISTIR NO PAR)
+          if (pair[1]) {
+            drawMachineCard(doc, pair[1], 150, respTecnicoInput);
+          }
+          
+          // 5. RODAPÉ INSTITUCIONAL COM NUMERAÇÃO DE FOLHA & ASSINATURA TÉCNICA
+          doc.setDrawColor(203, 213, 225);
+          doc.setLineWidth(0.25);
+          doc.line(12, 283, 198, 283);
+          
+          doc.setFontSize(7);
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(100, 116, 139);
+          doc.text(`MONDELEZ SCADA  •  Sistema de Monitoramento Preditivo CBM  |  Resp. Técnico: ${respTecnicoInput.toUpperCase()}`, 12, 288);
+          doc.text(`Folha ${pageIndex + 1} de ${totalEquipPages} (Equipamentos)  •  Pág. Geral ${pageIndex + 3} de ${totalReportPages}`, 198, 288, { align: "right" });
+        });
+
+        const fileName = `Laudo_Tecnico_Mondelez_${dataAnaliseFmt.replace(/\//g, '-')}.pdf`;
+        try {
+          doc.save(fileName);
+        } catch(saveErr) {
+          console.warn("doc.save fallback acionado:", saveErr);
+          const pdfBlob = doc.output('blob');
+          const blobUrl = URL.createObjectURL(pdfBlob);
+          const dlLink = document.createElement('a');
+          dlLink.href = blobUrl;
+          dlLink.download = fileName;
+          document.body.appendChild(dlLink);
+          dlLink.click();
+          setTimeout(() => {
+            document.body.removeChild(dlLink);
+            URL.revokeObjectURL(blobUrl);
+          }, 2000);
+        }
+        showToast("Laudo Técnico emitido com sucesso (Capa + Guia Técnico + Equipamentos)!", "success");
+      } catch (err) {
+        console.error("Erro fatal ao gerar Laudo Técnico:", err);
+        showToast("Erro ao gerar laudo: " + err.message, "error");
+      }
+    }
+
+    // =========================================================================
+    // VETOR FALLBACK DO LOGO MONDELĒZ INTERNATIONAL (SE BITMAP NÃO CARREGAR)
+    // =========================================================================
+    function drawMondelezVectorLogo(doc, x, y) {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(22);
+      doc.setTextColor(56, 16, 83); // Roxo Corporativo Mondelez
+      doc.text("Mondelez", x, y);
+
+      // Friso decorativo sob a marca (sorriso laranja Mondelēz)
+      doc.setFillColor(243, 112, 33); // Laranja Mondelēz
+      doc.roundedRect(x + 24, y + 2.5, 17, 1.5, 0.5, 0.5, 'F');
+
+      doc.setFontSize(8.5);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(71, 85, 105);
+      doc.text("International", x, y + 7.5);
+    }
+
+    // =========================================================================
+    // CAPA SIMPLES DO LAUDO TÉCNICO (SEMPRE GERADA COM QUALQUER LAUDO PDF)
+    // Contém obrigatoriamente:
+    // 1. Nome / Logo da Mondelēz
+    // 2. Área: Utilidades
+    // 3. Data da emissão do laudo
+    // 4. Nome do técnico que analisou
+    // =========================================================================
+    function renderSimpleCover(doc, params) {
+      const { rotas, filtered, dataColetaFmt, dataAnaliseFmt, respTecnico, logoB64 } = params;
+      const qtdItens = filtered.length;
+
+      // 1. Contagem sintética de status dos ativos
+      let countNormal = 0, countObs = 0, countAlerta = 0, countAlarme = 0;
+      filtered.forEach(item => {
+        const s = item.analysisState;
+        if (!s || !s.isMedido) return;
+        const st = (s.statusVal || '').toUpperCase();
+        if (st === 'ALARME' || st === 'EMERGÊNCIA') countAlarme++;
+        else if (st === 'ALERTA') countAlerta++;
+        else if (st === 'OBSERVAÇÃO' || st === 'OBSERVACAO') countObs++;
+        else countNormal++;
+      });
+
+      const rotaPrincipal = (rotas && rotas.length > 0 && !rotas.includes('TODAS_ROTAS'))
+        ? rotas.join(' • ')
+        : 'COMPRESSORES CHOCOLATE & ROTAS GERAIS';
+
+      // Folha A4: 210 x 297 mm - Fundo Branco Puro
+      doc.setFillColor(255, 255, 255);
+      doc.rect(0, 0, 210, 297, 'F');
+
+      // Moldura externa elegante e limpa
+      doc.setDrawColor(203, 213, 225); // slate-300
+      doc.setLineWidth(0.4);
+      doc.rect(10, 10, 190, 277, 'D');
+
+      // Friso superior duplo Mondelēz (Roxo #381053 e Laranja #F37021)
+      doc.setFillColor(56, 16, 83); // Roxo Corporativo
+      doc.rect(10, 10, 190, 2.5, 'F');
+      doc.setFillColor(243, 112, 33); // Laranja Mondelēz
+      doc.rect(10, 12.5, 190, 1.2, 'F');
+
+      // =======================================================================
+      // 1. LOGO MONDELEZ & BADGE ÁREA: UTILIDADES
+      // =======================================================================
+      let logoDrawn = false;
+      if (logoB64) {
+        try {
+          doc.addImage(logoB64, 'PNG', 18, 16.5, 58, 12.3);
+          logoDrawn = true;
+        } catch(e) {
+          console.warn("Falha no bitmap logo Mondelēz, usando vetor:", e);
+        }
+      }
+      if (!logoDrawn) {
+        drawMondelezVectorLogo(doc, 18, 26);
+      }
+
+      // Sub-legenda da unidade Mondelez
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7.5);
+      doc.setTextColor(100, 116, 139);
+      doc.text("Mondelez - Planta Curitiba - PR", 18, 34);
+
+      // Badge de Destaque Executivo: ÁREA UTILIDADES (Topo Direito)
+      doc.setFillColor(56, 16, 83); // Roxo Mondelēz
+      doc.roundedRect(122, 16, 70, 15.5, 2, 2, 'F');
+      doc.setFillColor(243, 112, 33); // Barra de acentuação laranja
+      doc.rect(122, 16, 2.5, 15.5, 'F');
+
+      doc.setFontSize(6.8);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(251, 191, 36); // Dourado suave
+      doc.text("SETOR OPERACIONAL", 128, 21.5);
+
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(255, 255, 255);
+      doc.text("ÁREA: UTILIDADES", 128, 27.8);
+
+      // Linha sutil separando o cabeçalho
+      doc.setDrawColor(226, 232, 240);
+      doc.setLineWidth(0.35);
+      doc.line(18, 39, 192, 39);
+
+      // =======================================================================
+      // 2. TÍTULO PRINCIPAL (ESPAÇOSO, IMPACTANTE E LIMPO)
+      // =======================================================================
+      const tY = 51;
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8.5);
+      doc.setTextColor(180, 83, 9); // Âmbar corporativo
+      doc.text("ENGENHARIA DE MANUTENÇÃO PREDITIVA (CBM)", 18, tY);
+
+      doc.setFontSize(22);
+      doc.setTextColor(15, 23, 42); // slate-900
+      doc.text("RELATÓRIO DE ANÁLISE DE VIBRAÇÃO", 18, tY + 10);
+
+      doc.setFontSize(9.5);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(71, 85, 105); // slate-600
+      doc.text("Monitoramento Periódico de Condição e Integridade Mecânica de Ativos Rotativos", 18, tY + 17);
+
+      // Friso decorativo sob o título
+      doc.setFillColor(243, 112, 33); // Laranja Mondelēz
+      doc.rect(18, tY + 20.5, 42, 1.4, 'F');
+
+      // =======================================================================
+      // 3. DOSSIÊ CENTRAL DO LAUDO (AS 4 INFORMAÇÕES EXIGIDAS + ESCOPO)
+      // =======================================================================
+      const pY = 105;
+      const pW = 174;
+      const pH = 100;
+
+      // Painel container de fundo
+      doc.setFillColor(248, 250, 252); // slate-50
+      doc.setDrawColor(203, 213, 225); // slate-300
+      doc.setLineWidth(0.4);
+      doc.roundedRect(18, pY, pW, pH, 3, 3, 'FD');
+
+      // Cabeçalho da caixa
+      doc.setFillColor(30, 41, 59); // slate-800
+      doc.roundedRect(18, pY, pW, 9, 3, 3, 'F');
+      doc.rect(18, pY + 5, pW, 4, 'F');
+
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(245, 158, 11); // Âmbar
+      doc.text("INFORMAÇÕES GERAIS DO LAUDO TÉCNICO", 24, pY + 6.2);
+
+      doc.setFontSize(7);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(203, 213, 225);
+      doc.text("PLANTA CURITIBA • REGISTRO OFICIAL", 186, pY + 6.2, { align: "right" });
+
+      // CARD 1: ÁREA E ROTA DE INSPEÇÃO
+      const c1Y = pY + 13;
+      doc.setFillColor(255, 255, 255);
+      doc.setDrawColor(226, 232, 240);
+      doc.roundedRect(23, c1Y, 164, 21, 2, 2, 'FD');
+
+      // Faixa laranja lateral
+      doc.setFillColor(243, 112, 33);
+      doc.roundedRect(23, c1Y, 3, 21, 1, 1, 'F');
+
+      doc.setFontSize(7.5);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(100, 116, 139);
+      doc.text("ÁREA OPERACIONAL:", 30, c1Y + 7);
+
+      doc.setFontSize(13);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(56, 16, 83); // Roxo Mondelēz
+      doc.text("UTILIDADES", 30, c1Y + 15.5);
+
+      // Divisória vertical sutil
+      doc.setDrawColor(226, 232, 240);
+      doc.line(88, c1Y + 4, 88, c1Y + 17);
+
+      // Rota à direita (amplo espaço sem o campo TOTAL ATIVOS)
+      doc.setFontSize(7.5);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(100, 116, 139);
+      doc.text("ROTA DE INSPEÇÃO:", 94, c1Y + 7);
+
+      doc.setFontSize(10.5);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(2, 132, 199); // Azul petróleo
+      const rotaShort = rotaPrincipal.length > 50 ? rotaPrincipal.slice(0, 50) + '...' : rotaPrincipal;
+      doc.text(rotaShort.toUpperCase(), 94, c1Y + 15);
+
+      // CARD 2: DATA DE EMISSÃO & TÉCNICO QUE ANALISOU (2 COLUNAS LIMPAS)
+      const c2Y = c1Y + 25;
+      doc.setFillColor(255, 255, 255);
+      doc.setDrawColor(226, 232, 240);
+      doc.roundedRect(23, c2Y, 164, 32, 2, 2, 'FD');
+
+      // Coluna Esquerda: Data de Emissão do Laudo
+      doc.setFontSize(7.2);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(100, 116, 139);
+      doc.text("DATA DE EMISSÃO DO LAUDO:", 30, c2Y + 8);
+
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(15, 23, 42); // slate-900
+      doc.text(dataAnaliseFmt, 30, c2Y + 16.5);
+
+      doc.setFontSize(7);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(100, 116, 139);
+      doc.text("DATA / PERÍODO DA COLETA:", 30, c2Y + 23);
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(51, 65, 85);
+      doc.text(dataColetaFmt, 30, c2Y + 28);
+
+      // Divisória vertical
+      doc.setDrawColor(226, 232, 240);
+      doc.line(100, c2Y + 4, 100, c2Y + 28);
+
+      // Coluna Direita: Técnico que Analisou
+      doc.setFontSize(7.2);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(180, 83, 9); // Âmbar 700
+      doc.text("TÉCNICO QUE ANALISOU (RESPONSÁVEL):", 106, c2Y + 8);
+
+      doc.setFontSize(13);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(15, 23, 42); // slate-900
+      doc.text(respTecnico.toUpperCase(), 106, c2Y + 16.5);
+
+      doc.setFontSize(7);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(100, 116, 139);
+      doc.text("FUNÇÃO / ESPECIALIDADE:", 106, c2Y + 23);
+      doc.setFontSize(8.5);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(51, 65, 85);
+      doc.text("Técnico de Confiabilidade / Vibração", 106, c2Y + 28);
+
+      // RESUMO DOS ATIVOS DA ROTA (4 CHIPS DE STATUS SINTÉTICOS)
+      const c3Y = c2Y + 36;
+      doc.setFontSize(7.2);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(100, 116, 139);
+      doc.text("PANORAMA GERAL DE SEVERIDADE DOS ATIVOS:", 24, c3Y + 4);
+
+      const kpiW = 38.5;
+      const kpiH = 15;
+      const kpiGap = 3.3;
+      const startKpiX = 23;
+
+      function drawSimpleKpi(x, label, count, colorRgb, bgRgb) {
+        doc.setFillColor(bgRgb[0], bgRgb[1], bgRgb[2]);
+        doc.setDrawColor(colorRgb[0], colorRgb[1], colorRgb[2]);
+        doc.setLineWidth(0.35);
+        doc.roundedRect(x, c3Y + 7, kpiW, kpiH, 1.5, 1.5, 'FD');
+
+        doc.setFillColor(colorRgb[0], colorRgb[1], colorRgb[2]);
+        doc.circle(x + 5, c3Y + 12.5, 1.7, 'F');
+
+        doc.setFontSize(6.8);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(colorRgb[0], colorRgb[1], colorRgb[2]);
+        doc.text(label, x + 9, c3Y + 13.5);
+
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(15, 23, 42);
+        doc.text(`${count} ativo(s)`, x + (kpiW / 2), c3Y + 19, { align: "center" });
+      }
+
+      drawSimpleKpi(startKpiX, "NORMAL", countNormal, [16, 185, 129], [236, 253, 245]);
+      drawSimpleKpi(startKpiX + (kpiW + kpiGap), "OBSERVAÇÃO", countObs, [37, 99, 235], [239, 246, 255]);
+      drawSimpleKpi(startKpiX + (kpiW + kpiGap) * 2, "ALERTA", countAlerta, [217, 119, 6], [254, 243, 199]);
+      drawSimpleKpi(startKpiX + (kpiW + kpiGap) * 3, "ALARME", countAlarme, [220, 38, 38], [254, 242, 242]);
+
+      // =======================================================================
+      // 4. BLOCO DE ASSINATURA: TÉCNICO QUE ANALISOU (COMPACTO NA PARTE DE BAIXO)
+      // =======================================================================
+      const sY = 244;
+      const sW = 174;
+      const sH = 26;
+
+      doc.setFillColor(255, 255, 255);
+      doc.setDrawColor(203, 213, 225);
+      doc.setLineWidth(0.35);
+      doc.roundedRect(18, sY, sW, sH, 2, 2, 'FD');
+
+      // Cabeçalho fino discreto
+      doc.setFillColor(248, 250, 252);
+      doc.roundedRect(18, sY, sW, 6.5, 2, 2, 'F');
+      doc.rect(18, sY + 3.5, sW, 3, 'F');
+
+      doc.setFontSize(7);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(100, 116, 139);
+      doc.text("RESPONSÁVEL PELA ANÁLISE TÉCNICA", 105, sY + 4.8, { align: "center" });
+
+      // Linha de assinatura
+      doc.setDrawColor(203, 213, 225);
+      doc.setLineWidth(0.3);
+      doc.line(45, sY + 14, 165, sY + 14);
+
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(15, 23, 42); // slate-900
+      doc.text(respTecnico.toUpperCase(), 105, sY + 19, { align: "center" });
+
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(71, 85, 105);
+      doc.text("Técnico Responsável  •  Área de Utilidades", 105, sY + 23.5, { align: "center" });
+    }
+
+    // Alias de compatibilidade
+    function renderCustomExecutiveCover(doc, params) {
+      renderSimpleCover(doc, params);
+    }
+
+    // =========================================================================
+    // CONTRACAPA DO LAUDO (GUIA TÉCNICO VETORIAL COM TABELAS SAP & ISO 10816)
+    // =========================================================================
+    function renderTechnicalContracapa(doc) {
+      // 1. Fundo Branco Puro e Moldura Técnica Externa (Folha A4: 210 x 297 mm)
+      doc.setFillColor(255, 255, 255);
+      doc.rect(0, 0, 210, 297, 'F');
+
+      // Moldura externa elegante
+      doc.setDrawColor(30, 41, 59); // slate-800
+      doc.setLineWidth(0.8);
+      doc.rect(8, 8, 194, 281, 'D');
+
+      // Linha interna fina
+      doc.setDrawColor(203, 213, 225);
+      doc.setLineWidth(0.25);
+      doc.rect(9.5, 9.5, 191, 278, 'D');
+
+      // 2. CABEÇALHO DA CONTRACAPA
+      doc.setFillColor(30, 41, 59); // slate-800
+      doc.rect(10, 10, 190, 11, 'F');
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(12.5);
+      doc.setTextColor(255, 255, 255);
+      doc.text("GUIA TÉCNICO - ANÁLISE DE VIBRAÇÃO", 105, 17.5, { align: "center" });
+
+      // 3. BOX: A TÉCNICA DE ANÁLISE DE VIBRAÇÃO (TEXTO DIRETO SEM FIRULA)
+      doc.setFillColor(248, 250, 252);
+      doc.setDrawColor(203, 213, 225);
+      doc.setLineWidth(0.35);
+      doc.roundedRect(12, 23.5, 186, 23, 2, 2, 'FD');
+
+      doc.setFillColor(224, 242, 254); // Azul suave
+      doc.roundedRect(12, 23.5, 186, 6.5, 2, 2, 'F');
+      doc.rect(12, 27.5, 186, 2.5, 'F');
+
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(3, 105, 161); // sky-700
+      doc.text("A TÉCNICA DE ANÁLISE DE VIBRAÇÃO", 105, 28, { align: "center" });
+
+      doc.setFontSize(7.2);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(30, 41, 59);
+      const textoTecnica = "A análise de vibração é uma técnica de manutenção preditiva não destrutiva que monitora a energia mecânica de equipamentos rotativos. Ela permite a identificação precoce de falhas em componentes como rolamentos, engrenagens, desalinhamentos, desbalanceamentos e folgas mecânicas, prevenindo paradas não programadas e quebras catastróficas.";
+      const splitTecnica = doc.splitTextToSize(textoTecnica, 180);
+      doc.text(splitTecnica, 15, 34);
+
+      // =======================================================================
+      // TABELAS TÉCNICAS EM LARGURA TOTAL (ISO 10816 & CRITÉRIOS SAP)
+      // =======================================================================
+      const tableX = 12;
+      const tableW = 186;
+      
+      // =======================================================================
+      // TABELA 1: TABELA DE SEVERIDADE DE VIBRAÇÃO (BASEADO EM ABNT NBR ISO 10816)
+      // =======================================================================
+      const t1Y = 51;
+      const t1H = 96;
+      doc.setFillColor(255, 255, 255);
+      doc.setDrawColor(203, 213, 225);
+      doc.roundedRect(tableX, t1Y, tableW, t1H, 2, 2, 'FD');
+
+      // Cabeçalho da Tabela 1
+      doc.setFillColor(224, 242, 254);
+      doc.roundedRect(tableX, t1Y, tableW, 12, 2, 2, 'F');
+      doc.rect(tableX, t1Y + 7, tableW, 5, 'F');
+      doc.setFontSize(9.5);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(15, 23, 42);
+      doc.text("TABELA DE SEVERIDADE DE VIBRAÇÃO", tableX + (tableW / 2), t1Y + 5.2, { align: "center" });
+      doc.setFontSize(7.8);
+      doc.text("(BASEADO EM ABNT NBR ISO 10816)", tableX + (tableW / 2), t1Y + 9.8, { align: "center" });
+
+      // Linha de Cabeçalhos das Colunas da Tabela ISO 10816
+      doc.setFillColor(241, 245, 249);
+      doc.rect(tableX, t1Y + 12, tableW, 10, 'F');
+      doc.setDrawColor(203, 213, 225);
+      doc.line(tableX, t1Y + 22, tableX + tableW, t1Y + 22);
+
+      const colW1 = 52;
+      const colW2 = 62;
+      const colW3 = 72;
+      const c1X = tableX;
+      const c2X = tableX + colW1;
+      const c3X = tableX + colW1 + colW2;
+
+      doc.line(c2X, t1Y + 12, c2X, t1Y + t1H);
+      doc.line(c3X, t1Y + 12, c3X, t1Y + t1H);
+
+      doc.setFontSize(7.5);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(15, 23, 42);
+      doc.text("CLASSE DE MÁQUINA", c1X + (colW1 / 2), t1Y + 16.2, { align: "center" });
+      doc.text("(I, II, III, IV)", c1X + (colW1 / 2), t1Y + 20.2, { align: "center" });
+
+      doc.text("VIBRAÇÃO VELOCIDADE", c2X + (colW2 / 2), t1Y + 16.2, { align: "center" });
+      doc.text("RMS (mm/s)", c2X + (colW2 / 2), t1Y + 20.2, { align: "center" });
+
+      doc.text("STATUS / ZONA DE SEVERIDADE", c3X + (colW3 / 2), t1Y + 18, { align: "center" });
+
+      // Linhas da Tabela de Severidade ISO 10816
+      const isoRows = [
+        { classe: "I", vel: "< 1.8", status: "Bom: < 1.8", bg: [22, 163, 74], textWhite: true },
+        { classe: "II", vel: "1.8 - 4.5", status: "Satisfatório: 1.8 - 4.5", bg: [250, 204, 21], textWhite: false },
+        { classe: "III", vel: "2.3 - 7.0", status: "Alerta: 2.3 - 7.0", bg: [234, 88, 12], textWhite: true },
+        { classe: "IV", vel: "> 7.1", status: "Inaceitável: > 7.1", bg: [220, 38, 38], textWhite: true }
+      ];
+
+      const rowH_iso = 18.5;
+      isoRows.forEach((r, idx) => {
+        const curY = t1Y + 22 + (idx * rowH_iso);
+        // Coluna 3 colorida conforme severidade
+        doc.setFillColor(r.bg[0], r.bg[1], r.bg[2]);
+        doc.rect(c3X, curY, colW3, rowH_iso, 'F');
+
+        // Borda horizontal
+        doc.setDrawColor(203, 213, 225);
+        doc.line(tableX, curY + rowH_iso, tableX + tableW, curY + rowH_iso);
+
+        // Texto Coluna 1
+        doc.setFontSize(8.5);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(15, 23, 42);
+        doc.text(r.classe, c1X + (colW1 / 2), curY + 11, { align: "center" });
+
+        // Texto Coluna 2
+        doc.text(r.vel, c2X + (colW2 / 2), curY + 11, { align: "center" });
+
+        // Texto Coluna 3
+        doc.setTextColor(r.textWhite ? 255 : 15, r.textWhite ? 255 : 23, r.textWhite ? 255 : 42);
+        doc.text(r.status, c3X + (colW3 / 2), curY + 11, { align: "center" });
+      });
+
+      // =======================================================================
+      // TABELA 2: CRITÉRIOS DE ABERTURA DE ORDEM SAP (SEVERIDADE E AÇÃO)
+      // =======================================================================
+      const t2Y = 153;
+      const t2H = 118;
+      doc.setFillColor(255, 255, 255);
+      doc.setDrawColor(203, 213, 225);
+      doc.roundedRect(tableX, t2Y, tableW, t2H, 2, 2, 'FD');
+
+      // Cabeçalho da Tabela 2
+      doc.setFillColor(224, 242, 254);
+      doc.roundedRect(tableX, t2Y, tableW, 12, 2, 2, 'F');
+      doc.rect(tableX, t2Y + 7, tableW, 5, 'F');
+      doc.setFontSize(9.5);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(15, 23, 42);
+      doc.text("CRITÉRIOS DE ABERTURA DE ORDEM SAP (SEVERIDADE E AÇÃO)", tableX + (tableW / 2), t2Y + 7.5, { align: "center" });
+
+      // Subtítulo da Tabela SAP
+      doc.setFillColor(248, 250, 252);
+      doc.rect(tableX, t2Y + 12, tableW, 8.5, 'F');
+      doc.setFontSize(7.2);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(71, 85, 105);
+      doc.text("*As ordens do SAP devem ser abertas entre os prazos indicados abaixo, com base na severidade.*", tableX + (tableW / 2), t2Y + 17.5, { align: "center" });
+
+      // Linha de Cabeçalhos das Colunas da Tabela SAP
+      doc.setFillColor(241, 245, 249);
+      doc.rect(tableX, t2Y + 20.5, tableW, 12, 'F');
+      doc.setDrawColor(203, 213, 225);
+      doc.line(tableX, t2Y + 32.5, tableX + tableW, t2Y + 32.5);
+
+      const sapColW1 = 62;
+      const sapColW2 = 62;
+      const sapColW3 = 62;
+      const sapC1X = tableX;
+      const sapC2X = tableX + sapColW1;
+      const sapC3X = tableX + sapColW1 + sapColW2;
+
+      doc.line(sapC2X, t2Y + 20.5, sapC2X, t2Y + 110);
+      doc.line(sapC3X, t2Y + 20.5, sapC3X, t2Y + 110);
+
+      doc.setFontSize(7.2);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(15, 23, 42);
+      doc.text("STATUS", sapC1X + (sapColW1 / 2), t2Y + 25.5, { align: "center" });
+      doc.text("(SEVERIDADE)", sapC1X + (sapColW1 / 2), t2Y + 29.5, { align: "center" });
+
+      doc.text("CLASSIFICAÇÃO", sapC2X + (sapColW2 / 2), t2Y + 25.5, { align: "center" });
+      doc.text("(DIAS DE PRIORIDADE)", sapC2X + (sapColW2 / 2), t2Y + 29.5, { align: "center" });
+
+      doc.text("CLASSIFICAÇÃO 'B/C'", sapC3X + (sapColW3 / 2), t2Y + 25.5, { align: "center" });
+      doc.text("(PRIORIDADE)", sapC3X + (sapColW3 / 2), t2Y + 29.5, { align: "center" });
+
+      // Linhas da Tabela de Ordem SAP
+      const sapRows = [
+        { status: "EMERGÊNCIA", dias: "<= 1", prioridade: "1 OU < 7", bg: [220, 38, 38], textWhite: true },
+        { status: "ALARME", dias: "<= 3", prioridade: "7 OU < 30", bg: [234, 88, 12], textWhite: true },
+        { status: "ALERTA", dias: "<= 7", prioridade: "30 OU < 90", bg: [250, 204, 21], textWhite: false },
+        { status: "OBSERVAÇÃO", dias: "<= 30", prioridade: "< 90", bg: [134, 239, 172], textWhite: false },
+        { status: "NORMAL", dias: "NA", prioridade: "NA", bg: [22, 163, 74], textWhite: true }
+      ];
+
+      const rowH_sap = 15.5;
+      sapRows.forEach((r, idx) => {
+        const curY = t2Y + 32.5 + (idx * rowH_sap);
+        // Fundo total da linha preenchido com a cor de severidade
+        doc.setFillColor(r.bg[0], r.bg[1], r.bg[2]);
+        doc.rect(tableX, curY, tableW, rowH_sap, 'F');
+
+        // Borda divisória horizontal
+        doc.setDrawColor(255, 255, 255);
+        doc.setLineWidth(0.3);
+        doc.line(tableX, curY + rowH_sap, tableX + tableW, curY + rowH_sap);
+
+        // Texto
+        doc.setFontSize(8.5);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(r.textWhite ? 255 : 15, r.textWhite ? 255 : 23, r.textWhite ? 255 : 42);
+
+        doc.text(r.status, sapC1X + (sapColW1 / 2), curY + 10, { align: "center" });
+        doc.text(r.dias, sapC2X + (sapColW2 / 2), curY + 10, { align: "center" });
+        doc.text(r.prioridade, sapC3X + (sapColW3 / 2), curY + 10, { align: "center" });
+      });
+
+      // Nota de rodapé da tabela SAP
+      doc.setFontSize(6.5);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(100, 116, 139);
+      doc.text("*Atualizado com feedback do campo", tableX + tableW - 3, t2Y + t2H - 2.5, { align: "right" });
+
+      // 4. RODAPÉ TÉCNICO INFERIOR DA CONTRACAPA
+      doc.setFillColor(241, 245, 249);
+      doc.rect(10, 277, 190, 10, 'F');
+      doc.setDrawColor(203, 213, 225);
+      doc.line(10, 277, 200, 277);
+
+      doc.setFontSize(7.2);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(71, 85, 105);
+      doc.text("RELATÓRIO DE ENGENHARIA - GUIA DO COLABORADOR  •  PÁGINA 2", 105, 283.5, { align: "center" });
+    }
+
   </script>
 </body>
 </html>
