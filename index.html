@@ -1000,12 +1000,6 @@
 
     // Fallback robusto inicial para garantir que rotas e tags nunca sumam
     let defaultRotas = ["Central de pó", "Sopradores Massas", "Extrusoras"];
-    // Rotas excluídas pelo usuário: nunca devem ser recriadas por cache, nuvem, registros ou laudos
-    let deletedRotas = [];
-    try {
-      const _del = JSON.parse(localStorage.getItem('inspectcbm_deleted_rotas') || '[]');
-      if (Array.isArray(_del)) deletedRotas = _del;
-    } catch(e) {}
     let defaultTagMap = { 
       "Central de pó": ["FM7011", "EX7002"],
       "Sopradores Massas": ["SP8001"],
@@ -1093,10 +1087,6 @@
     function mergeAndPersistRotasAndTags() {
       const routeSet = new Set(defaultRotas);
       try {
-        const _del = JSON.parse(localStorage.getItem('inspectcbm_deleted_rotas') || '[]');
-        if (Array.isArray(_del)) _del.forEach(r => { if (r && !deletedRotas.includes(r)) deletedRotas.push(r); });
-      } catch(e) {}
-      try {
         const local = localStorage.getItem('inspectcbm_saved_rotas');
         if (local) JSON.parse(local).forEach(r => r && routeSet.add(r));
       } catch(e) {}
@@ -1115,17 +1105,15 @@
       (cloudPreLaudos || []).forEach(p => { if(p.rota) routeSet.add(p.rota); });
       Object.keys(defaultTagMap || {}).forEach(r => { if(r) routeSet.add(r); });
 
-      const merged = Array.from(routeSet).filter(r => r && !deletedRotas.includes(r));
+      const merged = Array.from(routeSet).filter(Boolean);
       if (merged.length > 0) defaultRotas = merged;
-      // remove do mapa de tags qualquer rota excluída
-      deletedRotas.forEach(r => { delete defaultTagMap[r]; });
 
       defaultRotas.forEach(r => {
         if (!defaultTagMap[r]) defaultTagMap[r] = [];
       });
 
       (cloudRecords || []).forEach(r => {
-        if (r.rota && r.baseTag && !deletedRotas.includes(r.rota)) {
+        if (r.rota && r.baseTag) {
           if (!defaultTagMap[r.rota]) defaultTagMap[r.rota] = [];
           if (!defaultTagMap[r.rota].includes(r.baseTag)) {
             defaultTagMap[r.rota].push(r.baseTag);
@@ -1134,7 +1122,6 @@
       });
 
       try {
-        localStorage.setItem('inspectcbm_deleted_rotas', JSON.stringify(deletedRotas));
         localStorage.setItem('inspectcbm_saved_rotas', JSON.stringify(defaultRotas));
         localStorage.setItem('inspectcbm_saved_tagmap', JSON.stringify(defaultTagMap));
         localStorage.setItem('inspectcbm_cached_cfg', JSON.stringify({
@@ -1189,17 +1176,13 @@
       db.collection("inspectcbm_config").doc("rotas_tags").onSnapshot((doc) => {
         if (doc.exists) {
           const data = doc.data();
-          if (Array.isArray(data.deletedRotas)) {
-            data.deletedRotas.forEach(r => { if (r && !deletedRotas.includes(r)) deletedRotas.push(r); });
-          }
           if (Array.isArray(data.rotas) && data.rotas.length > 0) {
             data.rotas.forEach(r => {
-              if (r && !deletedRotas.includes(r) && !defaultRotas.includes(r)) defaultRotas.push(r);
+              if (r && !defaultRotas.includes(r)) defaultRotas.push(r);
             });
           }
           if (data.tagMap && typeof data.tagMap === 'object') {
             Object.keys(data.tagMap).forEach(k => {
-              if (deletedRotas.includes(k)) return;
               if (!defaultTagMap[k]) defaultTagMap[k] = [];
               (data.tagMap[k] || []).forEach(t => {
                 if (!defaultTagMap[k].includes(t)) defaultTagMap[k].push(t);
@@ -1217,7 +1200,6 @@
         } else {
           db.collection("inspectcbm_config").doc("rotas_tags").set({
             rotas: defaultRotas,
-            deletedRotas: deletedRotas,
             tagMap: defaultTagMap,
             inspetores: defaultInspetores,
             availableFalhaTypes: availableFalhaTypes
@@ -1309,7 +1291,6 @@
         mergeAndPersistRotasAndTags();
         await db.collection("inspectcbm_config").doc("rotas_tags").set({
           rotas: defaultRotas,
-          deletedRotas: deletedRotas,
           tagMap: defaultTagMap,
           inspetores: defaultInspetores,
           availableFalhaTypes: availableFalhaTypes
@@ -1551,7 +1532,6 @@
       const val = document.getElementById('nova_rota_input').value.trim();
       if(!val) return;
       if(!defaultRotas.includes(val)) {
-        deletedRotas = deletedRotas.filter(r => r !== val);
         defaultRotas.push(val);
         if(!defaultTagMap[val]) defaultTagMap[val] = [];
         await saveConfigToCloud();
@@ -1567,13 +1547,7 @@
       const rotaName = defaultRotas[index];
       defaultRotas.splice(index, 1);
       delete defaultTagMap[rotaName];
-      if (!deletedRotas.includes(rotaName)) deletedRotas.push(rotaName);
       await saveConfigToCloud();
-      // apaga também a chave da rota dentro do tagMap na nuvem (merge:true não remove chaves)
-      try {
-        await db.collection("inspectcbm_config").doc("rotas_tags")
-          .update(new firebase.firestore.FieldPath('tagMap', rotaName), firebase.firestore.FieldValue.delete());
-      } catch(e) { console.warn("Aviso ao limpar rota do tagMap na nuvem:", e); }
       renderRotasList();
       loadSavedRotas();
       populateFilters();
@@ -2671,39 +2645,195 @@
       renderChart(filtered);
     }
 
-    function updateRelMedidoStatus(baseTag, isMedido) {
-      if (!relatorioAnalysisState[baseTag]) {
-        relatorioAnalysisState[baseTag] = { isMedido: isMedido, statusVal: 'NORMAL', falhas: [], deteccao: '', problema: '', recomendacao: '', os: '' };
-      } else {
-        relatorioAnalysisState[baseTag].isMedido = isMedido;
+    const SEVERITY_RANK = {
+      'NORMAL': 1,
+      'OBSERVAÇÃO': 2,
+      'OBSERVACAO': 2,
+      'ALERTA': 3,
+      'ALARME': 4,
+      'EMERGÊNCIA': 5,
+      'EMERGENCIA': 5
+    };
+
+    function getAssetDefaultComponents(baseTag, record) {
+      const tagData = cloudTagRegistry[baseTag] || {};
+      let compKey = (tagData.composicao || (record ? record.componente : '') || '').toLowerCase();
+      let equipNome = ((tagData.equipamento_nome || '') + ' ' + (record ? record.equipamento_nome : '') + ' ' + (record ? record.componente : '')).toLowerCase();
+
+      let second = 'Elemento';
+      if (compKey.includes('bomba') || equipNome.includes('bomba')) second = 'Bomba';
+      else if (compKey.includes('redutor') || equipNome.includes('redutor')) second = 'Redutor';
+      else if (compKey.includes('mancal') || equipNome.includes('mancal')) second = 'Mancal';
+      else if (compKey.includes('exaustor') || equipNome.includes('exaustor')) second = 'Exaustor';
+      else if (compKey.includes('ventilador') || equipNome.includes('ventilador')) second = 'Ventilador';
+      else if (compKey.includes('compressor') || equipNome.includes('compressor')) second = 'Elemento';
+      else if (compKey.startsWith('motor_')) {
+        let raw = compKey.replace('motor_', '');
+        second = raw.charAt(0).toUpperCase() + raw.slice(1);
       }
+      return ['Motor', second];
+    }
+
+    function initOrGetRelState(baseTag, record, isMedidoDefault) {
+      if (!relatorioAnalysisState[baseTag]) {
+        const defaultComps = getAssetDefaultComponents(baseTag, record);
+        const compMap = {};
+        defaultComps.forEach(cName => {
+          compMap[cName] = {
+            statusVal: 'NORMAL',
+            falhas: [],
+            deteccao: 'Análise de Vibração',
+            problema: '',
+            recomendacao: '',
+            os: ''
+          };
+        });
+        relatorioAnalysisState[baseTag] = {
+          isMedido: isMedidoDefault !== undefined ? isMedidoDefault : (!!record),
+          statusVal: 'NORMAL',
+          activeTab: defaultComps[0] || 'Motor',
+          componentNames: defaultComps,
+          components: compMap,
+          falhas: [],
+          deteccao: 'Análise de Vibração',
+          problema: '',
+          recomendacao: '',
+          os: ''
+        };
+      } else {
+        const s = relatorioAnalysisState[baseTag];
+        if (!s.componentNames || !s.components) {
+          const defaultComps = getAssetDefaultComponents(baseTag, record);
+          s.componentNames = defaultComps;
+          s.components = {};
+          defaultComps.forEach((cName, idx) => {
+            s.components[cName] = {
+              statusVal: idx === 0 ? (s.statusVal || 'NORMAL') : 'NORMAL',
+              falhas: idx === 0 ? (s.falhas || []) : [],
+              deteccao: s.deteccao || 'Análise de Vibração',
+              problema: idx === 0 ? (s.problema || '') : '',
+              recomendacao: idx === 0 ? (s.recomendacao || '') : '',
+              os: s.os || ''
+            };
+          });
+          if (!s.activeTab) s.activeTab = defaultComps[0];
+        }
+      }
+      return relatorioAnalysisState[baseTag];
+    }
+
+    function recalculateOverallMachineStatus(baseTag) {
+      const s = relatorioAnalysisState[baseTag];
+      if (!s || !s.components) return;
+      let highestRank = 1;
+      let highestStatus = 'NORMAL';
+      Object.keys(s.components).forEach(cName => {
+        const c = s.components[cName];
+        const rank = SEVERITY_RANK[(c.statusVal || 'NORMAL').toUpperCase()] || 1;
+        if (rank > highestRank) {
+          highestRank = rank;
+          highestStatus = (c.statusVal || 'NORMAL').toUpperCase();
+        }
+      });
+      s.statusVal = highestStatus;
+    }
+
+    function switchRelComponentTab(baseTag, compName) {
+      if (relatorioAnalysisState[baseTag]) {
+        relatorioAnalysisState[baseTag].activeTab = compName;
+        renderRelatorioTab();
+      }
+    }
+
+    async function promptAddRelComponent(baseTag) {
+      const name = await customPrompt("Digite o nome do novo componente para este equipamento (ex: Mancal, Redutor, Ventilador, Polia):");
+      if (!name) return;
+      const cleanName = name.trim();
+      const s = initOrGetRelState(baseTag);
+      if (!s.componentNames) s.componentNames = ['Motor'];
+      if (!s.components) s.components = {};
+      if (!s.componentNames.includes(cleanName)) {
+        s.componentNames.push(cleanName);
+      }
+      if (!s.components[cleanName]) {
+        s.components[cleanName] = {
+          statusVal: 'NORMAL',
+          falhas: [],
+          deteccao: 'Análise de Vibração',
+          problema: '',
+          recomendacao: '',
+          os: ''
+        };
+      }
+      s.activeTab = cleanName;
+      recalculateOverallMachineStatus(baseTag);
+      renderRelatorioTab();
+      showToast(`Componente "${cleanName}" adicionado ao equipamento!`, "success");
+    }
+
+    function updateRelMedidoStatus(baseTag, isMedido) {
+      const s = initOrGetRelState(baseTag, null, isMedido);
+      s.isMedido = isMedido;
       renderRelatorioTab();
     }
 
-    function toggleRelFalha(baseTag, falhaName, checkboxEl) {
-      if (!relatorioAnalysisState[baseTag]) {
-        relatorioAnalysisState[baseTag] = { isMedido: true, statusVal: 'NORMAL', falhas: [], deteccao: '', problema: '', recomendacao: '', os: '' };
+    function updateRelComponentField(baseTag, compName, field, value) {
+      const s = initOrGetRelState(baseTag);
+      if (!s.components[compName]) {
+        s.components[compName] = {
+          statusVal: 'NORMAL',
+          falhas: [],
+          deteccao: 'Análise de Vibração',
+          problema: '',
+          recomendacao: '',
+          os: ''
+        };
       }
-      if (!relatorioAnalysisState[baseTag].falhas) {
-        relatorioAnalysisState[baseTag].falhas = [];
-      }
-      let arr = relatorioAnalysisState[baseTag].falhas;
-      if (checkboxEl.checked) {
-        if (!arr.includes(falhaName)) arr.push(falhaName);
-      } else {
-        relatorioAnalysisState[baseTag].falhas = arr.filter(f => f !== falhaName);
+      s.components[compName][field] = value;
+      if (field === 'statusVal') {
+        recalculateOverallMachineStatus(baseTag);
+        const sel = document.getElementById(`rel_status_select_${baseTag}_${compName}`);
+        if (sel) sel.className = `w-full border rounded-xl px-2.5 py-1.5 text-xs font-bold focus:outline-none shadow-sm ${getStatusBgColor(value)}`;
+        const overallBadge = document.getElementById(`rel_overall_badge_${baseTag}`);
+        if (overallBadge) {
+          overallBadge.className = `px-2 py-0.5 rounded-lg text-[10px] font-bold border font-mono ${getStatusBgColor(s.statusVal)}`;
+          overallBadge.textContent = s.statusVal;
+        }
       }
     }
 
+    function toggleRelComponentFalha(baseTag, compName, falhaName, checkboxEl) {
+      const s = initOrGetRelState(baseTag);
+      if (!s.components[compName]) {
+        s.components[compName] = {
+          statusVal: 'NORMAL',
+          falhas: [],
+          deteccao: 'Análise de Vibração',
+          problema: '',
+          recomendacao: '',
+          os: ''
+        };
+      }
+      if (!s.components[compName].falhas) s.components[compName].falhas = [];
+      const arr = s.components[compName].falhas;
+      if (checkboxEl.checked) {
+        if (!arr.includes(falhaName)) arr.push(falhaName);
+      } else {
+        s.components[compName].falhas = arr.filter(f => f !== falhaName);
+      }
+    }
+
+    // Compatibilidade reversa com chamadas anteriores
+    function toggleRelFalha(baseTag, falhaName, checkboxEl) {
+      const s = initOrGetRelState(baseTag);
+      const activeTab = s.activeTab || (s.componentNames && s.componentNames[0]) || 'Motor';
+      toggleRelComponentFalha(baseTag, activeTab, falhaName, checkboxEl);
+    }
+
     function updateRelAnalysisField(baseTag, field, value) {
-      if (!relatorioAnalysisState[baseTag]) {
-        relatorioAnalysisState[baseTag] = { isMedido: true, statusVal: 'NORMAL', falhas: [], deteccao: '', problema: '', recomendacao: '', os: '' };
-      }
-      relatorioAnalysisState[baseTag][field] = value;
-      if (field === 'statusVal') {
-        const sel = document.getElementById(`rel_status_select_${baseTag}`);
-        if (sel) sel.className = `w-full border rounded-xl px-2.5 py-1.5 text-xs font-bold focus:outline-none shadow-sm ${getStatusBgColor(value)}`;
-      }
+      const s = initOrGetRelState(baseTag);
+      const activeTab = s.activeTab || (s.componentNames && s.componentNames[0]) || 'Motor';
+      updateRelComponentField(baseTag, activeTab, field, value);
     }
 
     function getStatusBgColor(status) {
@@ -2877,10 +3007,7 @@
           } else {
             lastRecord = cloudRecords.find(r => r.baseTag === baseTag || r.tag.startsWith(baseTag));
           }
-          if (!relatorioAnalysisState[baseTag]) {
-            relatorioAnalysisState[baseTag] = { isMedido: !!lastRecord, statusVal: 'NORMAL', falhas: [], deteccao: '', problema: '', recomendacao: '', os: '' };
-          }
-          let currentState = relatorioAnalysisState[baseTag];
+          let currentState = initOrGetRelState(baseTag, lastRecord);
           if (filterStatus === 'MEDIDOS' && !currentState.isMedido) return;
           if (filterStatus === 'NAO_MEDIDOS' && currentState.isMedido) return;
           itemsToRender.push({
@@ -2888,11 +3015,7 @@
             rota: rota,
             isMedido: currentState.isMedido,
             statusVal: currentState.statusVal,
-            falhas: currentState.falhas || [],
-            deteccao: currentState.deteccao || '',
-            problema: currentState.problema || '',
-            recomendacao: currentState.recomendacao || '',
-            os: currentState.os || '',
+            currentState: currentState,
             record: lastRecord
           });
         });
@@ -2912,18 +3035,69 @@
         let tagData = cloudTagRegistry[item.baseTag] || {};
         let r = item.record;
         let photoSrc = r && r.photo ? r.photo : tagData.photo;
-        let statusBgClass = getStatusBgColor(item.statusVal);
+        let currentState = item.currentState;
+        
+        const compNames = currentState.componentNames || getAssetDefaultComponents(item.baseTag, item.record);
+        const activeTab = currentState.activeTab || compNames[0] || 'Motor';
+        const compData = (currentState.components && currentState.components[activeTab]) || {
+          statusVal: 'NORMAL',
+          falhas: [],
+          deteccao: 'Análise de Vibração',
+          problema: '',
+          recomendacao: '',
+          os: ''
+        };
+        const compStatusBgClass = getStatusBgColor(compData.statusVal || 'NORMAL');
+        const overallStatusBgClass = getStatusBgColor(currentState.statusVal || 'NORMAL');
+
         let checkboxesHtml = `<div class="max-h-36 overflow-y-auto space-y-1 my-1.5 bg-slate-900 p-2.5 rounded-xl border border-slate-800 text-[11px]">`;
         availableFalhaTypes.forEach(fType => {
-          let isChecked = item.falhas.includes(fType) ? 'checked' : '';
+          let isChecked = (compData.falhas || []).includes(fType) ? 'checked' : '';
           checkboxesHtml += `
             <label class="flex items-center space-x-2 cursor-pointer text-slate-300 hover:text-white py-0.5">
-              <input type="checkbox" ${isChecked} onchange="toggleRelFalha('${item.baseTag}', '${fType}', this)" class="rounded bg-slate-950 border-slate-700 text-amber-500 focus:ring-0">
+              <input type="checkbox" ${isChecked} onchange="toggleRelComponentFalha('${item.baseTag}', '${activeTab}', '${fType}', this)" class="rounded bg-slate-950 border-slate-700 text-amber-500 focus:ring-0">
               <span class="truncate">${fType}</span>
             </label>
           `;
         });
         checkboxesHtml += `</div>`;
+
+        let compTabsHtml = `
+          <div class="flex items-center justify-between pb-2 mb-2 border-b border-slate-800 gap-2">
+            <div class="flex items-center space-x-1.5 overflow-x-auto py-0.5">
+              <span class="text-[10px] text-slate-400 font-bold font-mono uppercase tracking-wider whitespace-nowrap"><i class="fa-solid fa-layer-group text-amber-400 mr-1"></i>Componentes:</span>
+              ${compNames.map(cName => {
+                const cD = (currentState.components && currentState.components[cName]) || {};
+                const cSt = (cD.statusVal || 'NORMAL').toUpperCase();
+                const isActive = cName === activeTab;
+                let icon = 'fa-gear';
+                const cLow = cName.toLowerCase();
+                if (cLow.includes('motor')) icon = 'fa-bolt';
+                else if (cLow.includes('bomba')) icon = 'fa-water';
+                else if (cLow.includes('mancal')) icon = 'fa-circle-dot';
+                else if (cLow.includes('redutor')) icon = 'fa-gears';
+                else if (cLow.includes('compressor') || cLow.includes('elemento')) icon = 'fa-wind';
+
+                let dotColor = 'bg-emerald-400';
+                if (cSt === 'EMERGÊNCIA' || cSt === 'ALARME') dotColor = 'bg-rose-500 animate-pulse';
+                else if (cSt === 'ALERTA') dotColor = 'bg-amber-400';
+                else if (cSt === 'OBSERVAÇÃO') dotColor = 'bg-blue-400';
+
+                return `
+                  <button type="button" onclick="switchRelComponentTab('${item.baseTag}', '${cName}')" class="px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition whitespace-nowrap ${isActive ? 'bg-amber-500/25 text-amber-300 border border-amber-500 shadow-sm' : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800 hover:border-slate-700'}">
+                    <i class="fa-solid ${icon} text-[10px]"></i>
+                    <span>${cName}</span>
+                    <span class="w-2 h-2 rounded-full ${dotColor} inline-block ml-0.5"></span>
+                  </button>
+                `;
+              }).join('')}
+            </div>
+            <button type="button" onclick="promptAddRelComponent('${item.baseTag}')" title="Adicionar Componente a este equipamento" class="text-[10px] text-amber-400 hover:text-amber-300 font-mono px-2 py-1 rounded-lg bg-slate-900 border border-slate-800 hover:border-amber-500/50 flex items-center whitespace-nowrap">
+              <i class="fa-solid fa-plus mr-1"></i>Componente
+            </button>
+          </div>
+        `;
+
         tr.innerHTML = `
           <td class="p-3">
             <div class="mb-2">
@@ -2953,45 +3127,54 @@
           </td>
           <td class="p-3">
             ${item.isMedido ? `
-              <div class="space-y-2.5 bg-slate-950 p-3 rounded-xl border border-slate-800">
-                <div class="flex justify-between items-center bg-slate-900/80 px-2.5 py-1 rounded-lg border border-slate-800 text-[10px]">
-                  <span class="text-slate-400 font-mono flex items-center"><i class="fa-solid fa-user-check text-amber-400 mr-1.5"></i> RESP. TÉCNICO:</span>
-                  <span class="font-bold text-amber-300 font-mono rel-resp-badge">${(document.getElementById('rel_responsavel_tecnico')?.value || document.getElementById('rel_responsavel_tecnico_bar')?.value || localStorage.getItem('inspectcbm_last_resp_tecnico') || 'CARLOS SILVA').toUpperCase()}</span>
+              <div class="space-y-2 bg-slate-950 p-3 rounded-xl border border-slate-800">
+                <div class="flex flex-wrap justify-between items-center bg-slate-900/90 px-2.5 py-1.5 rounded-lg border border-slate-800 text-[10px] gap-2">
+                  <div class="flex items-center space-x-1.5">
+                    <span class="text-slate-400 font-mono flex items-center"><i class="fa-solid fa-user-check text-amber-400 mr-1.5"></i> RESP. TÉCNICO:</span>
+                    <span class="font-bold text-amber-300 font-mono rel-resp-badge">${(document.getElementById('rel_responsavel_tecnico')?.value || document.getElementById('rel_responsavel_tecnico_bar')?.value || localStorage.getItem('inspectcbm_last_resp_tecnico') || 'CARLOS SILVA').toUpperCase()}</span>
+                  </div>
+                  <div class="flex items-center space-x-1.5">
+                    <span class="text-slate-400 font-mono">SEVERIDADE GERAL:</span>
+                    <span id="rel_overall_badge_${item.baseTag}" class="px-2 py-0.5 rounded-lg text-[10px] font-bold border font-mono ${overallStatusBgClass}">${currentState.statusVal}</span>
+                  </div>
                 </div>
+
+                ${compTabsHtml}
+
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <div>
-                    <label class="block text-[10px] text-slate-400 font-bold mb-1 font-mono"><i class="fa-solid fa-triangle-exclamation mr-1 text-amber-400"></i> SEVERIDADE:</label>
-                    <select id="rel_status_select_${item.baseTag}" onchange="updateRelAnalysisField('${item.baseTag}', 'statusVal', this.value)" class="w-full border rounded-xl px-2 py-1 text-xs font-bold focus:outline-none shadow-sm ${statusBgClass}">
-                      <option value="NORMAL" ${item.statusVal === 'NORMAL' ? 'selected' : ''}>NORMAL</option>
-                      <option value="OBSERVAÇÃO" ${item.statusVal === 'OBSERVAÇÃO' ? 'selected' : ''}>OBSERVAÇÃO</option>
-                      <option value="ALERTA" ${item.statusVal === 'ALERTA' ? 'selected' : ''}>ALERTA</option>
-                      <option value="ALARME" ${item.statusVal === 'ALARME' ? 'selected' : ''}>ALARME</option>
-                      <option value="EMERGÊNCIA" ${item.statusVal === 'EMERGÊNCIA' ? 'selected' : ''}>EMERGÊNCIA</option>
+                    <label class="block text-[10px] text-slate-400 font-bold mb-1 font-mono"><i class="fa-solid fa-triangle-exclamation mr-1 text-amber-400"></i> SEVERIDADE (${activeTab.toUpperCase()}):</label>
+                    <select id="rel_status_select_${item.baseTag}_${activeTab}" onchange="updateRelComponentField('${item.baseTag}', '${activeTab}', 'statusVal', this.value)" class="w-full border rounded-xl px-2 py-1 text-xs font-bold focus:outline-none shadow-sm ${compStatusBgClass}">
+                      <option value="NORMAL" ${compData.statusVal === 'NORMAL' ? 'selected' : ''}>NORMAL</option>
+                      <option value="OBSERVAÇÃO" ${compData.statusVal === 'OBSERVAÇÃO' ? 'selected' : ''}>OBSERVAÇÃO</option>
+                      <option value="ALERTA" ${compData.statusVal === 'ALERTA' ? 'selected' : ''}>ALERTA</option>
+                      <option value="ALARME" ${compData.statusVal === 'ALARME' ? 'selected' : ''}>ALARME</option>
+                      <option value="EMERGÊNCIA" ${compData.statusVal === 'EMERGÊNCIA' ? 'selected' : ''}>EMERGÊNCIA</option>
                     </select>
                   </div>
                   <div>
                     <label class="block text-[10px] text-slate-400 font-bold mb-1 font-mono"><i class="fa-solid fa-wrench mr-1 text-amber-400"></i> OS (ORDEM DE SERVIÇO):</label>
-                    <input type="text" value="${item.os}" oninput="updateRelAnalysisField('${item.baseTag}', 'os', this.value)" placeholder="Ex: 40012345" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-2 py-1 text-xs text-amber-300 font-mono focus:outline-none focus:border-amber-500">
+                    <input type="text" value="${compData.os || ''}" oninput="updateRelComponentField('${item.baseTag}', '${activeTab}', 'os', this.value)" placeholder="Ex: 40012345" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-2 py-1 text-xs text-amber-300 font-mono focus:outline-none focus:border-amber-500">
                   </div>
                 </div>
                 <div>
                   <div class="flex justify-between items-center mb-1">
-                    <label class="block text-[10px] text-slate-400 font-bold font-mono"><i class="fa-solid fa-list-check mr-1 text-amber-400"></i> TIPOS DE FALHA (Múltipla Seleção):</label>
+                    <label class="block text-[10px] text-slate-400 font-bold font-mono"><i class="fa-solid fa-list-check mr-1 text-amber-400"></i> TIPOS DE FALHA (${activeTab.toUpperCase()}):</label>
                     <button type="button" onclick="promptAddNewFalhaType()" class="text-[10px] text-amber-400 hover:underline font-mono"><i class="fa-solid fa-plus mr-1"></i>Adicionar Tipo</button>
                   </div>
                   ${checkboxesHtml}
                 </div>
                 <div>
-                  <label class="block text-[10px] text-slate-400 font-bold mb-1 font-mono"><i class="fa-solid fa-magnifying-glass mr-1 text-cyan-400"></i> DETECÇÃO / TÉCNICA:</label>
-                  <input type="text" value="${item.deteccao}" oninput="updateRelAnalysisField('${item.baseTag}', 'deteccao', this.value)" placeholder="Ex: Análise de Vibração" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-2 py-1 text-xs text-cyan-300 focus:outline-none focus:border-cyan-500">
+                  <label class="block text-[10px] text-slate-400 font-bold mb-1 font-mono"><i class="fa-solid fa-magnifying-glass mr-1 text-cyan-400"></i> DETECÇÃO / TÉCNICA (${activeTab.toUpperCase()}):</label>
+                  <input type="text" value="${compData.deteccao || ''}" oninput="updateRelComponentField('${item.baseTag}', '${activeTab}', 'deteccao', this.value)" placeholder="Ex: Análise de Vibração" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-2 py-1 text-xs text-cyan-300 focus:outline-none focus:border-cyan-500">
                 </div>
                 <div>
-                  <label class="block text-[10px] text-slate-400 font-bold mb-0.5 font-mono">DIAGNÓSTICO (PROBLEMA):</label>
-                  <input type="text" value="${item.problema}" oninput="updateRelAnalysisField('${item.baseTag}', 'problema', this.value)" placeholder="Descreva o diagnóstico detalhado..." class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-amber-300 focus:outline-none focus:border-amber-500">
+                  <label class="block text-[10px] text-slate-400 font-bold mb-0.5 font-mono">DIAGNÓSTICO / PROBLEMA (${activeTab.toUpperCase()}):</label>
+                  <input type="text" value="${compData.problema || ''}" oninput="updateRelComponentField('${item.baseTag}', '${activeTab}', 'problema', this.value)" placeholder="Descreva o diagnóstico específico do ${activeTab}..." class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-amber-300 focus:outline-none focus:border-amber-500">
                 </div>
                 <div>
-                  <label class="block text-[10px] text-slate-400 font-bold mb-0.5 font-mono">RECOMENDAÇÃO:</label>
-                  <input type="text" value="${item.recomendacao}" oninput="updateRelAnalysisField('${item.baseTag}', 'recomendacao', this.value)" placeholder="Descreva a ação recomendada..." class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-emerald-300 focus:outline-none focus:border-emerald-500">
+                  <label class="block text-[10px] text-slate-400 font-bold mb-0.5 font-mono">RECOMENDAÇÃO TÉCNICA (${activeTab.toUpperCase()}):</label>
+                  <input type="text" value="${compData.recomendacao || ''}" oninput="updateRelComponentField('${item.baseTag}', '${activeTab}', 'recomendacao', this.value)" placeholder="Descreva a recomendação para o ${activeTab}..." class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-emerald-300 focus:outline-none focus:border-emerald-500">
                 </div>
               </div>
             ` : `
@@ -3184,12 +3367,9 @@
     }
 
     function drawMachineCard(doc, r, startY, respTecnico) {
-      const state = r.analysisState;
+      const state = r.analysisState || {};
       const sevStatus = state.isMedido ? (state.statusVal || 'NORMAL').toUpperCase() : 'NÃO MEDIDO';
       const statusColor = getStatusRgbColor(sevStatus);
-      
-      let falhasTexto = (state.falhas && state.falhas.length > 0) ? state.falhas.join(', ') : 'Nenhuma anomalia identificada';
-      if (!state.isMedido) falhasTexto = 'Não avaliado (Equipamento não medido na coleta)';
       
       let photoSrc = r.photo || (cloudTagRegistry[r.baseTag] ? cloudTagRegistry[r.baseTag].photo : null);
 
@@ -3201,12 +3381,42 @@
         `TEMPERATURAS: Motor LA: ${r.temp_la !== null && r.temp_la !== undefined ? r.temp_la + '°C' : '-'}    |    Comp. 2: ${r.temp_c2_p1 !== null && r.temp_c2_p1 !== undefined ? r.temp_c2_p1 + '°C' : '-'}\n` +
         `INSPETOR DE CAMPO: ${r.inspetor || '-'}`;
 
-      let blocoParecer = 
-        `• TIPOS DE FALHA: ${falhasTexto}\n` +
-        `• TÉCNICA / DETECÇÃO: ${state.deteccao || 'Análise de Vibração & Termografia'}\n` +
-        `• DIAGNÓSTICO (PROBLEMA): ${state.isMedido && state.problema ? state.problema : 'Sem pendências críticas. Equipamento operando em conformidade técnica.'}\n` +
-        `• RECOMENDAÇÃO TÉCNICA: ${state.isMedido && state.recomendacao ? state.recomendacao : 'Manter rotina de inspeção e monitoramento preditivo periódico.'}\n` +
-        `• RESPONSÁVEL TÉCNICO: ${respTecnico.toUpperCase()}    |    STATUS: ${state.isMedido ? 'MEDIDO EM CAMPO' : 'NÃO MEDIDO'}`;
+      let blocoParecer = '';
+      if (!state.isMedido) {
+        blocoParecer = 
+          `• STATUS: Equipamento não medido na coleta de campo.\n` +
+          `• PARECER: Pendente de medição física ou equipamento fora de operação / sem acesso.\n` +
+          `• RESPONSÁVEL TÉCNICO: ${respTecnico.toUpperCase()}    |    STATUS: NÃO MEDIDO`;
+      } else if (state.components && Object.keys(state.components).length > 0) {
+        const compNames = state.componentNames || Object.keys(state.components);
+        const compParts = [];
+        compNames.forEach(cName => {
+          const c = state.components[cName] || {};
+          const cSev = (c.statusVal || 'NORMAL').toUpperCase();
+          const falhasList = (c.falhas && c.falhas.length > 0) ? c.falhas.join(', ') : 'Nenhuma anomalia identificada';
+          const osInfo = c.os ? `  |  OS: ${c.os}` : '';
+          const detInfo = c.deteccao || 'Análise de Vibração';
+          const probInfo = c.problema ? c.problema : 'Sem pendências críticas. Operando em conformidade técnica.';
+          const recInfo = c.recomendacao ? c.recomendacao : 'Manter rotina de inspeção e monitoramento preditivo periódico.';
+
+          compParts.push(
+            `• [${cName.toUpperCase()}]  SEVERIDADE: ${cSev}${osInfo}\n` +
+            `   - Falhas: ${falhasList}\n` +
+            `   - Técnica: ${detInfo}  |  Diagnóstico: ${probInfo}\n` +
+            `   - Recomendação Técnica: ${recInfo}`
+          );
+        });
+        compParts.push(`• RESPONSÁVEL TÉCNICO: ${respTecnico.toUpperCase()}    |    STATUS: MEDIDO EM CAMPO`);
+        blocoParecer = compParts.join('\n');
+      } else {
+        let falhasTexto = (state.falhas && state.falhas.length > 0) ? state.falhas.join(', ') : 'Nenhuma anomalia identificada';
+        blocoParecer = 
+          `• TIPOS DE FALHA: ${falhasTexto}\n` +
+          `• TÉCNICA / DETECÇÃO: ${state.deteccao || 'Análise de Vibração & Termografia'}\n` +
+          `• DIAGNÓSTICO (PROBLEMA): ${state.problema ? state.problema : 'Sem pendências críticas. Equipamento operando em conformidade técnica.'}\n` +
+          `• RECOMENDAÇÃO TÉCNICA: ${state.recomendacao ? state.recomendacao : 'Manter rotina de inspeção e monitoramento preditivo periódico.'}\n` +
+          `• RESPONSÁVEL TÉCNICO: ${respTecnico.toUpperCase()}    |    STATUS: MEDIDO EM CAMPO`;
+      }
 
       doc.autoTable({
         startY: startY,
@@ -3367,7 +3577,7 @@
           let tagsDaRota = defaultTagMap[rota] || [];
           tagsDaRota.forEach(baseTag => {
             let lastRecord = cloudRecords.find(r => (r.baseTag === baseTag || r.tag.startsWith(baseTag)) && (!dataColetaInput || r.data_coleta.startsWith(dataColetaInput)));
-            let state = relatorioAnalysisState[baseTag] || { isMedido: !!lastRecord, statusVal: 'NORMAL', falhas: [], deteccao: '', problema: '', recomendacao: '', os: '' };
+            let state = relatorioAnalysisState[baseTag] || initOrGetRelState(baseTag, lastRecord);
             if (filterStatus === 'MEDIDOS' && !state.isMedido) return;
             if (filterStatus === 'NAO_MEDIDOS' && state.isMedido) return;
             let tagData = cloudTagRegistry[baseTag] || {};
@@ -3460,11 +3670,11 @@
           doc.setTextColor(203, 213, 225); // slate-300
           doc.text("SUPERVISORY & CONDITION MONITORING SYSTEM  •  SCADA PREDICTIVE MAINTENANCE", 18, 19);
           
-          // Metadados à Direita no Topo
+          // Metadados à Direita no Topo (Sem sobreposição)
           doc.setFont("helvetica", "normal");
-          doc.setFontSize(6.8);
-          doc.setTextColor(148, 163, 184);
-          doc.text(`EMISSÃO / ANÁLISE: ${dataAnaliseFmt}`, 195, 19, { align: "right" });
+          doc.setFontSize(7.2);
+          doc.setTextColor(226, 232, 240);
+          doc.text(`EMISSÃO / ANÁLISE: ${dataAnaliseFmt}`, 195, 16.5, { align: "right" });
           
           // 2. FAIXA DE METADADOS: ROTA, DATAS E RESPONSÁVEL TÉCNICO
           doc.setFillColor(241, 245, 249); // slate-100
@@ -3548,11 +3758,6 @@
       // Friso decorativo sob a marca (sorriso laranja Mondelēz)
       doc.setFillColor(243, 112, 33); // Laranja Mondelēz
       doc.roundedRect(x + 24, y + 2.5, 17, 1.5, 0.5, 0.5, 'F');
-
-      doc.setFontSize(8.5);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(71, 85, 105);
-      doc.text("International", x, y + 7.5);
     }
 
     // =========================================================================
@@ -3611,25 +3816,25 @@
         }
       }
       if (!logoDrawn) {
-        drawMondelezVectorLogo(doc, 18, 26);
+        drawMondelezVectorLogo(doc, 18, 25);
       }
 
-      // Sub-legenda da unidade Mondelez
+      // Sub-legenda da unidade Mondelez (posicionada sem nenhuma sobreposição)
       doc.setFont("helvetica", "normal");
       doc.setFontSize(7.5);
       doc.setTextColor(100, 116, 139);
-      doc.text("Mondelez - Planta Curitiba - PR", 18, 34);
+      doc.text("Mondelez - Planta Curitiba - PR", 18, 33);
 
-      // Badge de Destaque Executivo: ÁREA UTILIDADES (Topo Direito)
+      // Badge de Destaque Executivo: ÁREA: UTILIDADES (Topo Direito)
       doc.setFillColor(56, 16, 83); // Roxo Mondelēz
       doc.roundedRect(122, 16, 70, 15.5, 2, 2, 'F');
       doc.setFillColor(243, 112, 33); // Barra de acentuação laranja
       doc.rect(122, 16, 2.5, 15.5, 'F');
 
-      doc.setFontSize(11);
+      doc.setFontSize(11.5);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(255, 255, 255);
-      doc.text("ÁREA: UTILIDADES", 128, 25.4);
+      doc.text("ÁREA: UTILIDADES", 130, 25.8);
 
       // Linha sutil separando o cabeçalho
       doc.setDrawColor(226, 232, 240);
@@ -3883,11 +4088,11 @@
       doc.setFillColor(248, 250, 252);
       doc.setDrawColor(203, 213, 225);
       doc.setLineWidth(0.35);
-      doc.roundedRect(12, 23.5, 186, 23, 2, 2, 'FD');
+      doc.roundedRect(29, 23.5, 152, 23, 2, 2, 'FD');
 
       doc.setFillColor(224, 242, 254); // Azul suave
-      doc.roundedRect(12, 23.5, 186, 6.5, 2, 2, 'F');
-      doc.rect(12, 27.5, 186, 2.5, 'F');
+      doc.roundedRect(29, 23.5, 152, 6.5, 2, 2, 'F');
+      doc.rect(29, 27.5, 152, 2.5, 'F');
 
       doc.setFontSize(8);
       doc.setFont("helvetica", "bold");
@@ -3898,40 +4103,33 @@
       doc.setFont("helvetica", "normal");
       doc.setTextColor(30, 41, 59);
       const textoTecnica = "A análise de vibração é uma técnica de manutenção preditiva não destrutiva que monitora a energia mecânica de equipamentos rotativos. Ela permite a identificação precoce de falhas em componentes como rolamentos, engrenagens, desalinhamentos, desbalanceamentos e folgas mecânicas, prevenindo paradas não programadas e quebras catastróficas.";
-      const splitTecnica = doc.splitTextToSize(textoTecnica, 180);
-      doc.text(splitTecnica, 15, 34);
+      const splitTecnica = doc.splitTextToSize(textoTecnica, 144);
+      doc.text(splitTecnica, 33, 34);
 
       // =======================================================================
-      // TABELAS TÉCNICAS REDUZIDAS E CENTRALIZADAS (ISO 10816 & CRITÉRIOS SAP)
+      // TABELAS TÉCNICAS CENTRALIZADAS (ISO 10816 & CRITÉRIOS SAP)
       // =======================================================================
-      const tableW = 150;
-      const tableX = (210 - tableW) / 2; // centralizada horizontalmente na folha A4
-
-      const t1H = 66;   // altura Tabela 1
-      const t2H = 92;   // altura Tabela 2
-      const tGap = 12;  // espaço entre as tabelas
-      const areaTop = 50;    // logo abaixo do box "A técnica de análise de vibração"
-      const areaBottom = 274; // logo acima do rodapé
-      const t1Y = areaTop + ((areaBottom - areaTop) - (t1H + tGap + t2H)) / 2; // centralizada na vertical
-      const t2Y = t1Y + t1H + tGap;
-
+      const tableX = 29;
+      const tableW = 152;
+      
       // =======================================================================
       // TABELA 1: TABELA DE SEVERIDADE DE VIBRAÇÃO (BASEADO EM ABNT NBR ISO 10816)
       // =======================================================================
+      const t1Y = 51;
+      const t1H = 90;
       doc.setFillColor(255, 255, 255);
       doc.setDrawColor(203, 213, 225);
-      doc.setLineWidth(0.35);
       doc.roundedRect(tableX, t1Y, tableW, t1H, 2, 2, 'FD');
 
       // Cabeçalho da Tabela 1
       doc.setFillColor(224, 242, 254);
       doc.roundedRect(tableX, t1Y, tableW, 12, 2, 2, 'F');
       doc.rect(tableX, t1Y + 7, tableW, 5, 'F');
-      doc.setFontSize(8.5);
+      doc.setFontSize(9.5);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(15, 23, 42);
       doc.text("TABELA DE SEVERIDADE DE VIBRAÇÃO", tableX + (tableW / 2), t1Y + 5.2, { align: "center" });
-      doc.setFontSize(7.2);
+      doc.setFontSize(7.8);
       doc.text("(BASEADO EM ABNT NBR ISO 10816)", tableX + (tableW / 2), t1Y + 9.8, { align: "center" });
 
       // Linha de Cabeçalhos das Colunas da Tabela ISO 10816
@@ -3940,9 +4138,9 @@
       doc.setDrawColor(203, 213, 225);
       doc.line(tableX, t1Y + 22, tableX + tableW, t1Y + 22);
 
-      const colW1 = 42;
+      const colW1 = 38;
       const colW2 = 50;
-      const colW3 = 58;
+      const colW3 = 64;
       const c1X = tableX;
       const c2X = tableX + colW1;
       const c3X = tableX + colW1 + colW2;
@@ -3950,7 +4148,7 @@
       doc.line(c2X, t1Y + 12, c2X, t1Y + t1H);
       doc.line(c3X, t1Y + 12, c3X, t1Y + t1H);
 
-      doc.setFontSize(7);
+      doc.setFontSize(7.5);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(15, 23, 42);
       doc.text("CLASSE DE MÁQUINA", c1X + (colW1 / 2), t1Y + 16.2, { align: "center" });
@@ -3969,7 +4167,7 @@
         { classe: "IV", vel: "> 7.1", status: "Inaceitável: > 7.1", bg: [220, 38, 38], textWhite: true }
       ];
 
-      const rowH_iso = 11;
+      const rowH_iso = 17;
       isoRows.forEach((r, idx) => {
         const curY = t1Y + 22 + (idx * rowH_iso);
         // Coluna 3 colorida conforme severidade
@@ -3981,70 +4179,72 @@
         doc.line(tableX, curY + rowH_iso, tableX + tableW, curY + rowH_iso);
 
         // Texto Coluna 1
-        doc.setFontSize(8);
+        doc.setFontSize(8.5);
         doc.setFont("helvetica", "bold");
         doc.setTextColor(15, 23, 42);
-        doc.text(r.classe, c1X + (colW1 / 2), curY + 6.8, { align: "center" });
+        doc.text(r.classe, c1X + (colW1 / 2), curY + 10.5, { align: "center" });
 
         // Texto Coluna 2
-        doc.text(r.vel, c2X + (colW2 / 2), curY + 6.8, { align: "center" });
+        doc.text(r.vel, c2X + (colW2 / 2), curY + 10.5, { align: "center" });
 
         // Texto Coluna 3
         doc.setTextColor(r.textWhite ? 255 : 15, r.textWhite ? 255 : 23, r.textWhite ? 255 : 42);
-        doc.text(r.status, c3X + (colW3 / 2), curY + 6.8, { align: "center" });
+        doc.text(r.status, c3X + (colW3 / 2), curY + 10.5, { align: "center" });
       });
 
       // =======================================================================
       // TABELA 2: CRITÉRIOS DE ABERTURA DE ORDEM SAP (SEVERIDADE E AÇÃO)
       // =======================================================================
+      const t2Y = 146;
+      const t2H = 104;
       doc.setFillColor(255, 255, 255);
       doc.setDrawColor(203, 213, 225);
-      doc.setLineWidth(0.35);
       doc.roundedRect(tableX, t2Y, tableW, t2H, 2, 2, 'FD');
 
       // Cabeçalho da Tabela 2
       doc.setFillColor(224, 242, 254);
-      doc.roundedRect(tableX, t2Y, tableW, 12, 2, 2, 'F');
-      doc.rect(tableX, t2Y + 7, tableW, 5, 'F');
-      doc.setFontSize(8.5);
+      doc.roundedRect(tableX, t2Y, tableW, 11, 2, 2, 'F');
+      doc.rect(tableX, t2Y + 6, tableW, 5, 'F');
+      doc.setFontSize(8.8);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(15, 23, 42);
-      doc.text("CRITÉRIOS DE ABERTURA DE ORDEM SAP (SEVERIDADE E AÇÃO)", tableX + (tableW / 2), t2Y + 7.5, { align: "center" });
+      doc.text("CRITÉRIOS DE ABERTURA DE ORDEM SAP (SEVERIDADE E AÇÃO)", tableX + (tableW / 2), t2Y + 7, { align: "center" });
 
       // Subtítulo da Tabela SAP
       doc.setFillColor(248, 250, 252);
-      doc.rect(tableX, t2Y + 12, tableW, 8.5, 'F');
-      doc.setFontSize(6.6);
+      doc.rect(tableX, t2Y + 11, tableW, 8, 'F');
+      doc.setFontSize(6.8);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(71, 85, 105);
-      doc.text("*As ordens do SAP devem ser abertas entre os prazos indicados abaixo, com base na severidade.*", tableX + (tableW / 2), t2Y + 17.5, { align: "center" });
+      doc.text("*As ordens do SAP devem ser abertas entre os prazos indicados abaixo, com base na severidade.*", tableX + (tableW / 2), t2Y + 16, { align: "center" });
 
       // Linha de Cabeçalhos das Colunas da Tabela SAP
       doc.setFillColor(241, 245, 249);
-      doc.rect(tableX, t2Y + 20.5, tableW, 12, 'F');
+      doc.rect(tableX, t2Y + 19, tableW, 11, 'F');
       doc.setDrawColor(203, 213, 225);
-      doc.line(tableX, t2Y + 32.5, tableX + tableW, t2Y + 32.5);
+      doc.line(tableX, t2Y + 30, tableX + tableW, t2Y + 30);
 
-      const sapColW1 = 50;
-      const sapColW2 = 50;
-      const sapColW3 = 50;
+      const sapColW1 = 48;
+      const sapColW2 = 52;
+      const sapColW3 = 52;
       const sapC1X = tableX;
       const sapC2X = tableX + sapColW1;
       const sapC3X = tableX + sapColW1 + sapColW2;
-      const rowH_sap = 10.5;
-      const sapBodyEnd = t2Y + 32.5 + (5 * rowH_sap);
 
-      doc.setFontSize(7);
+      doc.line(sapC2X, t2Y + 19, sapC2X, t2Y + 100);
+      doc.line(sapC3X, t2Y + 19, sapC3X, t2Y + 100);
+
+      doc.setFontSize(7.2);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(15, 23, 42);
-      doc.text("STATUS", sapC1X + (sapColW1 / 2), t2Y + 25.5, { align: "center" });
-      doc.text("(SEVERIDADE)", sapC1X + (sapColW1 / 2), t2Y + 29.5, { align: "center" });
+      doc.text("STATUS", sapC1X + (sapColW1 / 2), t2Y + 23.5, { align: "center" });
+      doc.text("(SEVERIDADE)", sapC1X + (sapColW1 / 2), t2Y + 27.5, { align: "center" });
 
-      doc.text("CLASSIFICAÇÃO", sapC2X + (sapColW2 / 2), t2Y + 25.5, { align: "center" });
-      doc.text("(DIAS DE PRIORIDADE)", sapC2X + (sapColW2 / 2), t2Y + 29.5, { align: "center" });
+      doc.text("CLASSIFICAÇÃO", sapC2X + (sapColW2 / 2), t2Y + 23.5, { align: "center" });
+      doc.text("(DIAS DE PRIORIDADE)", sapC2X + (sapColW2 / 2), t2Y + 27.5, { align: "center" });
 
-      doc.text("CLASSIFICAÇÃO 'B/C'", sapC3X + (sapColW3 / 2), t2Y + 25.5, { align: "center" });
-      doc.text("(PRIORIDADE)", sapC3X + (sapColW3 / 2), t2Y + 29.5, { align: "center" });
+      doc.text("CLASSIFICAÇÃO 'B/C'", sapC3X + (sapColW3 / 2), t2Y + 23.5, { align: "center" });
+      doc.text("(PRIORIDADE)", sapC3X + (sapColW3 / 2), t2Y + 27.5, { align: "center" });
 
       // Linhas da Tabela de Ordem SAP
       const sapRows = [
@@ -4055,8 +4255,9 @@
         { status: "NORMAL", dias: "NA", prioridade: "NA", bg: [22, 163, 74], textWhite: true }
       ];
 
+      const rowH_sap = 14;
       sapRows.forEach((r, idx) => {
-        const curY = t2Y + 32.5 + (idx * rowH_sap);
+        const curY = t2Y + 30 + (idx * rowH_sap);
         // Fundo total da linha preenchido com a cor de severidade
         doc.setFillColor(r.bg[0], r.bg[1], r.bg[2]);
         doc.rect(tableX, curY, tableW, rowH_sap, 'F');
@@ -4067,23 +4268,17 @@
         doc.line(tableX, curY + rowH_sap, tableX + tableW, curY + rowH_sap);
 
         // Texto
-        doc.setFontSize(8);
+        doc.setFontSize(8.2);
         doc.setFont("helvetica", "bold");
         doc.setTextColor(r.textWhite ? 255 : 15, r.textWhite ? 255 : 23, r.textWhite ? 255 : 42);
 
-        doc.text(r.status, sapC1X + (sapColW1 / 2), curY + 6.6, { align: "center" });
-        doc.text(r.dias, sapC2X + (sapColW2 / 2), curY + 6.6, { align: "center" });
-        doc.text(r.prioridade, sapC3X + (sapColW3 / 2), curY + 6.6, { align: "center" });
+        doc.text(r.status, sapC1X + (sapColW1 / 2), curY + 9, { align: "center" });
+        doc.text(r.dias, sapC2X + (sapColW2 / 2), curY + 9, { align: "center" });
+        doc.text(r.prioridade, sapC3X + (sapColW3 / 2), curY + 9, { align: "center" });
       });
 
-      // Divisórias verticais do cabeçalho de colunas da tabela SAP
-      doc.setDrawColor(203, 213, 225);
-      doc.setLineWidth(0.25);
-      doc.line(sapC2X, t2Y + 20.5, sapC2X, t2Y + 32.5);
-      doc.line(sapC3X, t2Y + 20.5, sapC3X, t2Y + 32.5);
-
       // Nota de rodapé da tabela SAP
-      doc.setFontSize(6.3);
+      doc.setFontSize(6.5);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(100, 116, 139);
       doc.text("*Atualizado com feedback do campo", tableX + tableW - 3, t2Y + t2H - 2.5, { align: "right" });
