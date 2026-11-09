@@ -1060,10 +1060,12 @@
         dashTab.classList.remove('hidden');
         btnDash.className = "px-3.5 py-2 rounded-xl text-xs font-semibold bg-cyan-500 text-slate-950 transition flex items-center shadow-md font-bold";
         renderDashboard();
+        fetchSavedPreLaudosHistory();
       } else if(tab === 'relatorio') {
         relTab.classList.remove('hidden');
         btnRel.className = "px-4 py-2 rounded-xl text-xs font-bold bg-amber-500 text-slate-950 transition flex items-center shadow-md font-bold";
         renderRelatorioTab();
+        fetchSavedLaudosHistory();
       }
     }
 
@@ -1080,8 +1082,8 @@
     function renderActiveTab() {
       const active = getActiveTabId();
       if (active === 'supervisorio') renderSupervisorioTab();
-      else if (active === 'dashboard') renderDashboard();
-      else if (active === 'relatorio') renderRelatorioTab();
+      else if (active === 'dashboard') { renderDashboard(); fetchSavedPreLaudosHistory(); }
+      else if (active === 'relatorio') { renderRelatorioTab(); fetchSavedLaudosHistory(); }
     }
 
     function mergeAndPersistRotasAndTags() {
@@ -1171,6 +1173,8 @@
       loadSavedInspetores();
       populateFilters();
       updateSupervisoryKPIs();
+      fetchSavedLaudosHistory();
+      fetchSavedPreLaudosHistory();
 
       // Sincronização em tempo real com o Firestore Cloud (sem resetar formulário ou inputs ativos)
       db.collection("inspectcbm_config").doc("rotas_tags").onSnapshot((doc) => {
@@ -1220,7 +1224,7 @@
         snapshot.forEach((doc) => {
           cloudRecords.push({ docId: doc.id, ...doc.data() });
         });
-        cloudRecords.sort((a, b) => b.id - a.id);
+        cloudRecords.sort((a, b) => (Number(b.id) || 0) - (Number(a.id) || 0));
         try { localStorage.setItem('inspectcbm_cached_records', JSON.stringify(cloudRecords)); } catch(e) {}
         mergeAndPersistRotasAndTags();
         loadSavedRotas();
@@ -1246,18 +1250,40 @@
       });
 
       db.collection("inspectcbm_laudos").onSnapshot((snapshot) => {
-        cloudLaudos = [];
+        const fetched = [];
         snapshot.forEach((doc) => {
-          cloudLaudos.push({ docId: doc.id, ...doc.data() });
+          fetched.push({ docId: doc.id, ...doc.data() });
         });
-        cloudLaudos.sort((a, b) => b.id - a.id);
-        try { localStorage.setItem('inspectcbm_cached_laudos', JSON.stringify(cloudLaudos)); } catch(e) {}
+        fetched.sort((a, b) => (Number(b.id) || 0) - (Number(a.id) || 0));
+        if (fetched.length > 0) {
+          cloudLaudos = fetched;
+          try { localStorage.setItem('inspectcbm_cached_laudos', JSON.stringify(cloudLaudos)); } catch(e) {}
+        } else if (cloudLaudos.length === 0) {
+          try {
+            const cached = localStorage.getItem('inspectcbm_cached_laudos');
+            if (cached) {
+              const parsed = JSON.parse(cached);
+              if (Array.isArray(parsed) && parsed.length > 0) cloudLaudos = parsed;
+            }
+          } catch(e) {}
+        }
         mergeAndPersistRotasAndTags();
         populateSupLaudosFilter();
         fetchSavedLaudosHistory();
         renderActiveTab();
       }, (err) => {
         console.warn("Firestore laudos listener offline:", err);
+        try {
+          const cached = localStorage.getItem('inspectcbm_cached_laudos');
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              cloudLaudos = parsed;
+              populateSupLaudosFilter();
+              fetchSavedLaudosHistory();
+            }
+          }
+        } catch(e) {}
       });
 
       db.collection("inspectcbm_prelaudos").onSnapshot((snapshot) => {
@@ -2677,6 +2703,7 @@
     function initOrGetRelState(baseTag, record, isMedidoDefault) {
       if (!relatorioAnalysisState[baseTag]) {
         const defaultComps = getAssetDefaultComponents(baseTag, record);
+        if (defaultComps.length < 2) defaultComps.push('Elemento');
         const compMap = {};
         defaultComps.forEach(cName => {
           compMap[cName] = {
@@ -2704,6 +2731,7 @@
         const s = relatorioAnalysisState[baseTag];
         if (!s.componentNames || !s.components) {
           const defaultComps = getAssetDefaultComponents(baseTag, record);
+          if (defaultComps.length < 2) defaultComps.push('Elemento');
           s.componentNames = defaultComps;
           s.components = {};
           defaultComps.forEach((cName, idx) => {
@@ -2717,6 +2745,22 @@
             };
           });
           if (!s.activeTab) s.activeTab = defaultComps[0];
+        } else if (s.componentNames.length === 1) {
+          const defaultComps = getAssetDefaultComponents(baseTag, record);
+          const secondComp = defaultComps[1] || 'Elemento';
+          if (!s.componentNames.includes(secondComp)) {
+            s.componentNames.push(secondComp);
+          }
+          if (!s.components[secondComp]) {
+            s.components[secondComp] = {
+              statusVal: 'NORMAL',
+              falhas: [],
+              deteccao: 'Análise de Vibração',
+              problema: '',
+              recomendacao: '',
+              os: ''
+            };
+          }
         }
       }
       return relatorioAnalysisState[baseTag];
@@ -2745,12 +2789,73 @@
       }
     }
 
+    async function changeRelComponentSlot(baseTag, slotIndex, newName) {
+      if (!newName) return;
+      if (newName === '__CUSTOM__') {
+        const custom = await customPrompt("Digite o nome do componente (ex: Bomba, Mancal, Redutor, Ventilador):");
+        if (!custom || !custom.trim()) {
+          renderRelatorioTab();
+          return;
+        }
+        newName = custom.trim();
+      }
+      const s = initOrGetRelState(baseTag);
+      if (!s.componentNames || s.componentNames.length === 0) {
+        s.componentNames = ['Motor', 'Elemento'];
+      }
+      const oldName = s.componentNames[slotIndex];
+      if (!oldName || oldName === newName) {
+        renderRelatorioTab();
+        return;
+      }
+
+      s.componentNames[slotIndex] = newName;
+
+      // Migra dados do componente anterior se o novo ainda não tiver dados
+      if (s.components && s.components[oldName] && !s.components[newName]) {
+        s.components[newName] = s.components[oldName];
+        delete s.components[oldName];
+      } else if (!s.components[newName]) {
+        s.components[newName] = {
+          statusVal: 'NORMAL',
+          falhas: [],
+          deteccao: 'Análise de Vibração',
+          problema: '',
+          recomendacao: '',
+          os: ''
+        };
+      }
+
+      if (s.activeTab === oldName) {
+        s.activeTab = newName;
+      }
+
+      recalculateOverallMachineStatus(baseTag);
+      renderRelatorioTab();
+      showToast(`Componente alterado para "${newName}"!`, "success");
+    }
+
+    function removeRelComponentSlot(baseTag, slotIndex) {
+      const s = initOrGetRelState(baseTag);
+      if (!s.componentNames || s.componentNames.length <= 2) {
+        showToast("Mantenha pelo menos os 2 componentes base.", "info");
+        return;
+      }
+      const removed = s.componentNames.splice(slotIndex, 1)[0];
+      if (s.activeTab === removed) {
+        s.activeTab = s.componentNames[0] || 'Motor';
+      }
+      recalculateOverallMachineStatus(baseTag);
+      renderRelatorioTab();
+      showToast(`Componente "${removed}" removido.`, "info");
+    }
+
     async function promptAddRelComponent(baseTag) {
       const name = await customPrompt("Digite o nome do novo componente para este equipamento (ex: Mancal, Redutor, Ventilador, Polia):");
       if (!name) return;
       const cleanName = name.trim();
       const s = initOrGetRelState(baseTag);
-      if (!s.componentNames) s.componentNames = ['Motor'];
+      if (!s.componentNames) s.componentNames = ['Motor', 'Elemento'];
       if (!s.components) s.components = {};
       if (!s.componentNames.includes(cleanName)) {
         s.componentNames.push(cleanName);
@@ -2868,20 +2973,41 @@
         responsavelTecnico: respTecnicoInput,
         state: JSON.parse(JSON.stringify(relatorioAnalysisState))
       };
+
+      // Adiciona imediatamente ao array local e cache para exibição instantânea
+      if (!cloudLaudos.some(l => l.id === laudoObj.id)) {
+        cloudLaudos.unshift(laudoObj);
+        try { localStorage.setItem('inspectcbm_cached_laudos', JSON.stringify(cloudLaudos)); } catch(e) {}
+      }
+      populateSupLaudosFilter();
+      fetchSavedLaudosHistory();
+
       try {
-        await db.collection("inspectcbm_laudos").add(laudoObj);
+        const docRef = await db.collection("inspectcbm_laudos").add(laudoObj);
+        laudoObj.docId = docRef.id;
+        try { localStorage.setItem('inspectcbm_cached_laudos', JSON.stringify(cloudLaudos)); } catch(e) {}
         showToast("Análise técnica salva com sucesso na nuvem! O Supervisório foi atualizado.", "success");
         populateSupLaudosFilter();
+        fetchSavedLaudosHistory();
         renderSupervisorioTab();
       } catch (err) {
-        showToast("Erro ao salvar na nuvem: " + err.message, "error");
+        showToast("Análise técnica salva no histórico local! (Aviso na nuvem: " + err.message + ")", "info");
       }
     }
 
     function fetchSavedLaudosHistory() {
       const container = document.getElementById('saved-laudos-list');
       if(!container) return;
-      if (cloudLaudos.length === 0) {
+      if (!cloudLaudos || cloudLaudos.length === 0) {
+        try {
+          const cached = localStorage.getItem('inspectcbm_cached_laudos');
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed) && parsed.length > 0) cloudLaudos = parsed;
+          }
+        } catch(e) {}
+      }
+      if (!cloudLaudos || cloudLaudos.length === 0) {
         container.innerHTML = `<p class="text-xs text-slate-500 italic">Nenhum laudo salvo no histórico ainda.</p>`;
         return;
       }
@@ -3064,9 +3190,9 @@
 
         let compTabsHtml = `
           <div class="flex items-center justify-between pb-2 mb-2 border-b border-slate-800 gap-2">
-            <div class="flex items-center space-x-1.5 overflow-x-auto py-0.5">
+            <div class="flex items-center space-x-2 overflow-x-auto py-0.5">
               <span class="text-[10px] text-slate-400 font-bold font-mono uppercase tracking-wider whitespace-nowrap"><i class="fa-solid fa-layer-group text-amber-400 mr-1"></i>Componentes:</span>
-              ${compNames.map(cName => {
+              ${compNames.map((cName, idx) => {
                 const cD = (currentState.components && currentState.components[cName]) || {};
                 const cSt = (cD.statusVal || 'NORMAL').toUpperCase();
                 const isActive = cName === activeTab;
@@ -3077,6 +3203,8 @@
                 else if (cLow.includes('mancal')) icon = 'fa-circle-dot';
                 else if (cLow.includes('redutor')) icon = 'fa-gears';
                 else if (cLow.includes('compressor') || cLow.includes('elemento')) icon = 'fa-wind';
+                else if (cLow.includes('ventilador') || cLow.includes('exaustor')) icon = 'fa-fan';
+                else if (cLow.includes('polia') || cLow.includes('acoplamento')) icon = 'fa-link';
 
                 let dotColor = 'bg-emerald-400';
                 if (cSt === 'EMERGÊNCIA' || cSt === 'ALARME') dotColor = 'bg-rose-500 animate-pulse';
@@ -3084,11 +3212,30 @@
                 else if (cSt === 'OBSERVAÇÃO') dotColor = 'bg-blue-400';
 
                 return `
-                  <button type="button" onclick="switchRelComponentTab('${item.baseTag}', '${cName}')" class="px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition whitespace-nowrap ${isActive ? 'bg-amber-500/25 text-amber-300 border border-amber-500 shadow-sm' : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800 hover:border-slate-700'}">
-                    <i class="fa-solid ${icon} text-[10px]"></i>
-                    <span>${cName}</span>
-                    <span class="w-2 h-2 rounded-full ${dotColor} inline-block ml-0.5"></span>
-                  </button>
+                  <div class="inline-flex items-center rounded-xl border transition ${isActive ? 'bg-amber-500/25 border-amber-500 shadow-md ring-1 ring-amber-500/30 text-amber-300' : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'}">
+                    <button type="button" onclick="switchRelComponentTab('${item.baseTag}', '${cName}')" class="px-2.5 py-1 text-xs font-semibold flex items-center space-x-1.5 focus:outline-none ${isActive ? 'text-amber-300' : 'text-slate-300 hover:text-white'}" title="Clique para abrir e preencher a análise de ${cName}">
+                      <i class="fa-solid ${icon} text-[11px] ${isActive ? 'text-amber-400' : 'text-slate-400'}"></i>
+                      <span class="font-bold tracking-wide">${cName}</span>
+                      <span class="w-2 h-2 rounded-full ${dotColor} inline-block ml-0.5"></span>
+                    </button>
+                    <div class="border-l border-slate-800/80 pr-1 pl-0.5 py-0.5 flex items-center" title="Trocar componente deste campo (Motor, Elemento, Bomba, Redutor, Mancal...)">
+                      <select onchange="changeRelComponentSlot('${item.baseTag}', ${idx}, this.value)" class="bg-slate-950 text-[10px] font-bold text-amber-400 hover:text-amber-300 rounded px-1.5 py-0.5 border border-slate-800 focus:outline-none cursor-pointer">
+                        <option value="${cName}" selected>▾ Mudar</option>
+                        <option value="Motor" ${cName === 'Motor' ? 'disabled' : ''}>Motor</option>
+                        <option value="Elemento" ${cName === 'Elemento' ? 'disabled' : ''}>Elemento</option>
+                        <option value="Bomba" ${cName === 'Bomba' ? 'disabled' : ''}>Bomba</option>
+                        <option value="Redutor" ${cName === 'Redutor' ? 'disabled' : ''}>Redutor</option>
+                        <option value="Mancal" ${cName === 'Mancal' ? 'disabled' : ''}>Mancal</option>
+                        <option value="Ventilador" ${cName === 'Ventilador' ? 'disabled' : ''}>Ventilador</option>
+                        <option value="Exaustor" ${cName === 'Exaustor' ? 'disabled' : ''}>Exaustor</option>
+                        <option value="Compressor" ${cName === 'Compressor' ? 'disabled' : ''}>Compressor</option>
+                        <option value="__CUSTOM__">+ Outro...</option>
+                      </select>
+                    </div>
+                    ${compNames.length > 2 ? `
+                      <button type="button" onclick="removeRelComponentSlot('${item.baseTag}', ${idx})" class="text-rose-400 hover:text-rose-300 px-1 py-0.5 text-[10px] pr-1.5" title="Remover componente"><i class="fa-solid fa-xmark"></i></button>
+                    ` : ''}
+                  </div>
                 `;
               }).join('')}
             </div>
@@ -3182,6 +3329,7 @@
         `;
         tbody.appendChild(tr);
       });
+      fetchSavedLaudosHistory();
     }
 
     async function deleteCloudRecord(docId) {
