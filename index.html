@@ -83,24 +83,13 @@
           <p class="text-[11px] text-slate-400 font-medium">Supervisory & Condition Monitoring System</p>
         </div>
       </div>
-      <!-- Seletor Rápido de Fábrica & KPIs -->
-      <div class="flex items-center space-x-3">
-        <div class="flex items-center space-x-2 bg-slate-950/80 px-3 py-1.5 rounded-xl border border-purple-500/30 text-xs shadow-inner">
-          <i class="fa-solid fa-industry text-purple-400 text-xs"></i>
-          <span class="text-[10px] text-slate-400 font-mono uppercase hidden sm:inline">Fábrica:</span>
-          <select id="header_fabrica_select" onchange="switchFabrica(this.value)" class="bg-transparent text-purple-300 font-bold font-mono focus:outline-none cursor-pointer text-xs">
-            <option value="Planta Curitiba">Planta Curitiba</option>
-          </select>
-        </div>
-
-        <!-- Supervisory Quick KPIs Header -->
-        <div class="hidden lg:flex items-center space-x-4 bg-slate-950/60 px-4 py-1.5 rounded-xl border border-slate-800/80 text-xs font-mono">
-          <div><span class="text-slate-500">TAGS:</span> <span id="kpi-total-tags" class="text-amber-400 font-bold">0</span></div>
-          <span class="text-slate-800">|</span>
-          <div><span class="text-slate-500">REGISTOS:</span> <span id="kpi-total-records" class="text-cyan-400 font-bold">0</span></div>
-          <span class="text-slate-800">|</span>
-          <div><span class="text-slate-500">STATUS:</span> <span class="text-emerald-400 font-bold">ONLINE</span></div>
-        </div>
+      <!-- Supervisory Quick KPIs Header -->
+      <div class="hidden lg:flex items-center space-x-4 bg-slate-950/60 px-4 py-1.5 rounded-xl border border-slate-800/80 text-xs font-mono">
+        <div><span class="text-slate-500">TAGS:</span> <span id="kpi-total-tags" class="text-amber-400 font-bold">0</span></div>
+        <span class="text-slate-800">|</span>
+        <div><span class="text-slate-500">REGISTOS:</span> <span id="kpi-total-records" class="text-cyan-400 font-bold">0</span></div>
+        <span class="text-slate-800">|</span>
+        <div><span class="text-slate-500">STATUS:</span> <span class="text-emerald-400 font-bold">ONLINE</span></div>
       </div>
       <!-- Navegação por Abas -->
       <div class="flex items-center space-x-2 flex-wrap">
@@ -115,9 +104,6 @@
         </button>
         <button id="btn-tab-supervisorio" onclick="switchTab('supervisorio')" class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition flex items-center border border-slate-700/50 shadow-inner">
           <i class="fa-solid fa-network-wired mr-1.5 text-emerald-400"></i> Supervisório
-        </button>
-        <button id="btn-tab-fabricas" onclick="switchTab('fabricas')" class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition flex items-center border border-slate-700/50 shadow-inner">
-          <i class="fa-solid fa-industry mr-1.5 text-purple-400"></i> Fábricas
         </button>
       </div>
     </div>
@@ -815,52 +801,6 @@
         </div>
       </div>
     </div>
-
-    <!-- SEÇÃO: GESTÃO E SELEÇÃO DE FÁBRICAS / UNIDADES -->
-    <div id="tab-fabricas" class="hidden space-y-6">
-      <div class="bg-slate-900/90 backdrop-blur-md rounded-2xl p-5 border border-slate-800 shadow-2xl flex flex-col md:flex-row justify-between items-center gap-4">
-        <div>
-          <h2 class="text-sm font-bold text-white uppercase tracking-wider font-mono flex items-center">
-            <i class="fa-solid fa-industry text-purple-400 mr-2 text-base"></i> Gestão & Seleção de Fábricas / Plantas
-          </h2>
-          <p class="text-xs text-slate-400 mt-1">Selecione a fábrica operacional ativa para direcionar Coletas, Pré-Análises, Laudos Técnicos e Supervisório SCADA exclusivo.</p>
-        </div>
-        <div class="flex items-center space-x-2">
-          <span class="text-xs text-slate-400 font-mono">Fábrica em Operação:</span>
-          <span id="fabricas-current-badge" class="px-3 py-1.5 rounded-xl text-xs font-bold font-mono bg-purple-500/20 text-purple-300 border border-purple-500/40 flex items-center shadow-inner">
-            <span class="w-2 h-2 rounded-full bg-purple-400 animate-pulse mr-2"></span>
-            Planta Curitiba
-          </span>
-        </div>
-      </div>
-
-      <!-- Card: Cadastrar Nova Fábrica -->
-      <div class="bg-slate-900/90 backdrop-blur-md rounded-2xl p-5 border border-slate-800 shadow-xl space-y-3">
-        <h3 class="text-xs font-bold text-amber-400 uppercase tracking-widest font-mono flex items-center">
-          <i class="fa-solid fa-plus-circle mr-2 text-sm"></i> Cadastrar Nova Fábrica / Unidade
-        </h3>
-        <p class="text-xs text-slate-400">Ao cadastrar uma nova fábrica, o sistema criará um espaço isolado para as rotas, tags, coletas e laudos específicos dessa unidade.</p>
-        <div class="flex flex-col sm:flex-row gap-3 pt-1">
-          <input type="text" id="nova_fabrica_input" placeholder="Ex: Fábrica Chocolate, Fábrica Biscoitos, Planta Ponta Grossa..." class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 font-medium">
-          <button onclick="addNewFabrica()" class="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold px-5 py-2.5 rounded-xl text-xs transition flex items-center justify-center shadow-lg shadow-purple-600/20">
-            <i class="fa-solid fa-plus mr-1.5"></i> Cadastrar e Ativar Fábrica
-          </button>
-        </div>
-      </div>
-
-      <!-- Lista de Fábricas Cadastradas -->
-      <div class="space-y-3">
-        <div class="flex justify-between items-center">
-          <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider font-mono flex items-center">
-            <i class="fa-solid fa-layer-group text-slate-400 mr-2"></i> Unidades Industriais Cadastradas (<span id="total-fabricas-count">0</span>)
-          </h3>
-          <span class="text-[11px] text-slate-500 font-mono">Clique em "Selecionar" para operar o sistema nessa unidade</span>
-        </div>
-        <div id="lista-fabricas-cards" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <!-- Renderizado dinamicamente por renderFabricasTab() -->
-        </div>
-      </div>
-    </div>
   </main>
 
   <!-- MODAIS -->
@@ -1059,12 +999,6 @@
     }
 
     // Fallback robusto inicial para garantir que rotas e tags nunca sumam
-    let availableFabricas = ["Planta Curitiba"];
-    let currentFabrica = "Planta Curitiba";
-    let fabricaRotasMap = {};
-    let fabricaTagMap = {};
-    let deletedRotas = [];
-
     let defaultRotas = ["Central de pó", "Sopradores Massas", "Extrusoras"];
     let defaultTagMap = { 
       "Central de pó": ["FM7011", "EX7002"],
@@ -1099,48 +1033,39 @@
       const formTab = document.getElementById('tab-form');
       const dashTab = document.getElementById('tab-dashboard');
       const relTab = document.getElementById('tab-relatorio');
-      const fabTab = document.getElementById('tab-fabricas');
       
       const btnSup = document.getElementById('btn-tab-supervisorio');
       const btnForm = document.getElementById('btn-tab-form');
       const btnDash = document.getElementById('btn-tab-dashboard');
       const btnRel = document.getElementById('btn-tab-relatorio');
-      const btnFab = document.getElementById('btn-tab-fabricas');
       
-      if (supTab) supTab.classList.add('hidden');
-      if (formTab) formTab.classList.add('hidden');
-      if (dashTab) dashTab.classList.add('hidden');
-      if (relTab) relTab.classList.add('hidden');
-      if (fabTab) fabTab.classList.add('hidden');
+      supTab.classList.add('hidden');
+      formTab.classList.add('hidden');
+      dashTab.classList.add('hidden');
+      relTab.classList.add('hidden');
       
-      const defaultBtnClass = "px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition flex items-center border border-slate-700/50 shadow-inner";
-      if (btnSup) btnSup.className = defaultBtnClass;
-      if (btnForm) btnForm.className = defaultBtnClass;
-      if (btnDash) btnDash.className = defaultBtnClass;
-      if (btnRel) btnRel.className = defaultBtnClass;
-      if (btnFab) btnFab.className = defaultBtnClass;
+      btnSup.className = "px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition flex items-center border border-slate-700/50 shadow-inner";
+      btnForm.className = "px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition flex items-center border border-slate-700/50 shadow-inner";
+      btnDash.className = "px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition flex items-center border border-slate-700/50 shadow-inner";
+      btnRel.className = "px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition flex items-center border border-slate-700/50 shadow-inner";
       
       if(tab === 'supervisorio') {
-        if (supTab) supTab.classList.remove('hidden');
-        if (btnSup) btnSup.className = "px-3.5 py-2 rounded-xl text-xs font-semibold bg-emerald-500 text-slate-950 transition flex items-center shadow-md font-bold";
+        supTab.classList.remove('hidden');
+        btnSup.className = "px-3.5 py-2 rounded-xl text-xs font-semibold bg-emerald-500 text-slate-950 transition flex items-center shadow-md font-bold";
         renderSupervisorioTab();
       } else if(tab === 'form') {
-        if (formTab) formTab.classList.remove('hidden');
-        if (btnForm) btnForm.className = "px-3.5 py-2 rounded-xl text-xs font-semibold bg-amber-500 text-slate-950 transition flex items-center shadow-md font-bold";
+        formTab.classList.remove('hidden');
+        btnForm.className = "px-3.5 py-2 rounded-xl text-xs font-semibold bg-amber-500 text-slate-950 transition flex items-center shadow-md font-bold";
       } else if(tab === 'dashboard') {
-        if (dashTab) dashTab.classList.remove('hidden');
-        if (btnDash) btnDash.className = "px-3.5 py-2 rounded-xl text-xs font-semibold bg-cyan-500 text-slate-950 transition flex items-center shadow-md font-bold";
+        dashTab.classList.remove('hidden');
+        btnDash.className = "px-3.5 py-2 rounded-xl text-xs font-semibold bg-cyan-500 text-slate-950 transition flex items-center shadow-md font-bold";
         renderDashboard();
         fetchSavedPreLaudosHistory();
       } else if(tab === 'relatorio') {
-        if (relTab) relTab.classList.remove('hidden');
-        if (btnRel) btnRel.className = "px-4 py-2 rounded-xl text-xs font-bold bg-amber-500 text-slate-950 transition flex items-center shadow-md font-bold";
+        relTab.classList.remove('hidden');
+        btnRel.className = "px-4 py-2 rounded-xl text-xs font-bold bg-amber-500 text-slate-950 transition flex items-center shadow-md font-bold";
         renderRelatorioTab();
         fetchSavedLaudosHistory();
-      } else if(tab === 'fabricas') {
-        if (fabTab) fabTab.classList.remove('hidden');
-        if (btnFab) btnFab.className = "px-3.5 py-2 rounded-xl text-xs font-bold bg-purple-500 text-slate-950 transition flex items-center shadow-md font-bold";
-        renderFabricasTab();
       }
     }
 
@@ -1148,11 +1073,9 @@
       const supTab = document.getElementById('tab-supervisorio');
       const dashTab = document.getElementById('tab-dashboard');
       const relTab = document.getElementById('tab-relatorio');
-      const fabTab = document.getElementById('tab-fabricas');
       if (supTab && !supTab.classList.contains('hidden')) return 'supervisorio';
       if (dashTab && !dashTab.classList.contains('hidden')) return 'dashboard';
       if (relTab && !relTab.classList.contains('hidden')) return 'relatorio';
-      if (fabTab && !fabTab.classList.contains('hidden')) return 'fabricas';
       return 'form';
     }
 
@@ -1161,240 +1084,41 @@
       if (active === 'supervisorio') renderSupervisorioTab();
       else if (active === 'dashboard') { renderDashboard(); fetchSavedPreLaudosHistory(); }
       else if (active === 'relatorio') { renderRelatorioTab(); fetchSavedLaudosHistory(); }
-      else if (active === 'fabricas') { renderFabricasTab(); }
-    }
-
-    function updateFabricaUI() {
-      const headerSelect = document.getElementById('header_fabrica_select');
-      if (headerSelect) {
-        headerSelect.innerHTML = '';
-        availableFabricas.forEach(fab => {
-          const opt = document.createElement('option');
-          opt.value = fab;
-          opt.textContent = fab;
-          if (fab === currentFabrica) opt.selected = true;
-          headerSelect.appendChild(opt);
-        });
-        headerSelect.value = currentFabrica;
-      }
-      const badgeCurrent = document.getElementById('fabricas-current-badge');
-      if (badgeCurrent) {
-        badgeCurrent.innerHTML = `<span class="w-2 h-2 rounded-full bg-purple-400 animate-pulse mr-2"></span>${currentFabrica}`;
-      }
-    }
-
-    function switchFabrica(newFabrica) {
-      if (!newFabrica || !availableFabricas.includes(newFabrica)) return;
-      currentFabrica = newFabrica;
-      try { localStorage.setItem('inspectcbm_current_fabrica', currentFabrica); } catch(e) {}
-      
-      if (!fabricaRotasMap[currentFabrica] || fabricaRotasMap[currentFabrica].length === 0) {
-        fabricaRotasMap[currentFabrica] = ["Rota Principal"];
-        fabricaTagMap[currentFabrica] = { "Rota Principal": [] };
-      }
-      defaultRotas = (fabricaRotasMap[currentFabrica] || []).filter(r => !deletedRotas.includes(r));
-      if (defaultRotas.length === 0) {
-        defaultRotas = ["Rota Principal"];
-        fabricaRotasMap[currentFabrica] = defaultRotas;
-      }
-      defaultTagMap = fabricaTagMap[currentFabrica] || {};
-      defaultRotas.forEach(r => {
-        if (!defaultTagMap[r]) defaultTagMap[r] = [];
-      });
-
-      mergeAndPersistRotasAndTags();
-      updateFabricaUI();
-      loadSavedRotas();
-      populateFilters();
-      updateSupervisoryKPIs();
-      renderActiveTab();
-      showToast(`Fábrica ativa: ${currentFabrica}`, "info");
-    }
-
-    function renderFabricasTab() {
-      const container = document.getElementById('lista-fabricas-cards');
-      const badgeCurrent = document.getElementById('fabricas-current-badge');
-      const countEl = document.getElementById('total-fabricas-count');
-      if (badgeCurrent) badgeCurrent.innerHTML = `<span class="w-2 h-2 rounded-full bg-purple-400 animate-pulse mr-2"></span>${currentFabrica}`;
-      if (countEl) countEl.textContent = availableFabricas.length;
-      if (!container) return;
-      
-      container.innerHTML = '';
-      availableFabricas.forEach((fab) => {
-        const isActive = fab === currentFabrica;
-        
-        const rotasDaFabrica = (fabricaRotasMap[fab] || []).filter(r => !deletedRotas.includes(r));
-        let tagsCount = 0;
-        const tagMapDaFab = fabricaTagMap[fab] || {};
-        rotasDaFabrica.forEach(r => {
-          tagsCount += (tagMapDaFab[r] || []).length;
-        });
-        
-        const recCount = (cloudRecords || []).filter(r => (r.fabrica || 'Planta Curitiba') === fab).length;
-        const laudoCount = (cloudLaudos || []).filter(l => (l.fabrica || 'Planta Curitiba') === fab).length;
-
-        const card = document.createElement('div');
-        card.className = `p-5 rounded-2xl border transition-all duration-200 flex flex-col justify-between ${
-          isActive 
-            ? 'bg-slate-900/95 border-purple-500/70 shadow-xl shadow-purple-500/10 ring-1 ring-purple-500/40' 
-            : 'bg-slate-900/60 border-slate-800/80 hover:border-slate-700'
-        }`;
-        
-        card.innerHTML = `
-          <div class="space-y-3">
-            <div class="flex justify-between items-start gap-2">
-              <div class="flex items-center space-x-2.5">
-                <div class="w-8 h-8 rounded-xl ${isActive ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' : 'bg-slate-800 text-slate-400'} flex items-center justify-center text-xs">
-                  <i class="fa-solid fa-industry"></i>
-                </div>
-                <div>
-                  <h4 class="font-bold text-sm text-white">${fab}</h4>
-                  <span class="text-[10px] font-mono ${isActive ? 'text-purple-400 font-semibold' : 'text-slate-500'}">
-                    ${isActive ? '● Unidade Ativa no Momento' : 'Unidade Cadastrada'}
-                  </span>
-                </div>
-              </div>
-              ${isActive ? `
-                <span class="px-2.5 py-1 rounded-full text-[10px] font-bold font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center">
-                  <i class="fa-solid fa-check mr-1"></i> ATIVA
-                </span>
-              ` : `
-                <button onclick="switchFabrica('${fab}')" class="px-3 py-1 rounded-xl text-xs font-bold font-mono bg-purple-600 hover:bg-purple-500 text-white transition shadow flex items-center">
-                  Selecionar
-                </button>
-              `}
-            </div>
-
-            <div class="grid grid-cols-2 gap-2 bg-slate-950/70 p-3 rounded-xl border border-slate-800/80 text-[11px] font-mono">
-              <div><span class="text-slate-500">Rotas:</span> <span class="font-bold text-amber-400">${rotasDaFabrica.length}</span></div>
-              <div><span class="text-slate-500">Tags:</span> <span class="font-bold text-cyan-400">${tagsCount}</span></div>
-              <div><span class="text-slate-500">Registos:</span> <span class="font-bold text-emerald-400">${recCount}</span></div>
-              <div><span class="text-slate-500">Laudos:</span> <span class="font-bold text-rose-400">${laudoCount}</span></div>
-            </div>
-          </div>
-
-          <div class="flex items-center justify-between pt-4 mt-3 border-t border-slate-800/80 text-xs">
-            <button onclick="renameFabrica('${fab}')" class="text-slate-400 hover:text-white transition flex items-center text-[11px]">
-              <i class="fa-solid fa-pen-to-square mr-1"></i> Renomear
-            </button>
-            ${availableFabricas.length > 1 ? `
-              <button onclick="removeFabrica('${fab}')" class="text-rose-400 hover:text-rose-300 transition flex items-center text-[11px]">
-                <i class="fa-solid fa-trash-can mr-1"></i> Excluir
-              </button>
-            ` : `
-              <span class="text-[10px] text-slate-600 font-mono italic">Padrão do Sistema</span>
-            `}
-          </div>
-        `;
-        container.appendChild(card);
-      });
-    }
-
-    async function addNewFabrica() {
-      const input = document.getElementById('nova_fabrica_input');
-      const val = input ? input.value.trim() : '';
-      if (!val) {
-        showToast("Digite o nome da nova fábrica.", "error");
-        return;
-      }
-      if (availableFabricas.includes(val)) {
-        showToast("Esta fábrica já está cadastrada.", "error");
-        return;
-      }
-      availableFabricas.push(val);
-      fabricaRotasMap[val] = ["Rota 01 - Principal"];
-      fabricaTagMap[val] = { "Rota 01 - Principal": [] };
-      
-      await saveConfigToCloud();
-      if (input) input.value = '';
-      
-      switchFabrica(val);
-      showToast(`Fábrica "${val}" cadastrada e ativada com sucesso!`, "success");
-    }
-
-    async function removeFabrica(fabName) {
-      if (availableFabricas.length <= 1) {
-        alert("Deve manter pelo menos uma fábrica cadastrada no sistema.");
-        return;
-      }
-      const confirmed = await customConfirm(`Deseja realmente excluir a fábrica "${fabName}"?`);
-      if (!confirmed) return;
-      
-      availableFabricas = availableFabricas.filter(f => f !== fabName);
-      delete fabricaRotasMap[fabName];
-      delete fabricaTagMap[fabName];
-      
-      if (currentFabrica === fabName) {
-        currentFabrica = availableFabricas[0];
-        try { localStorage.setItem('inspectcbm_current_fabrica', currentFabrica); } catch(e) {}
-        defaultRotas = (fabricaRotasMap[currentFabrica] || []).filter(r => !deletedRotas.includes(r));
-        defaultTagMap = fabricaTagMap[currentFabrica] || {};
-      }
-      await saveConfigToCloud();
-      updateFabricaUI();
-      loadSavedRotas();
-      populateFilters();
-      updateSupervisoryKPIs();
-      renderActiveTab();
-      renderFabricasTab();
-      showToast("Fábrica excluída com sucesso.", "success");
-    }
-
-    async function renameFabrica(fabName) {
-      const novoNome = await customPrompt("Digite o novo nome para a fábrica:", fabName);
-      if (!novoNome || !novoNome.trim() || novoNome.trim() === fabName) return;
-      const cleanNome = novoNome.trim();
-      if (availableFabricas.includes(cleanNome)) {
-        alert("Já existe uma fábrica com esse nome.");
-        return;
-      }
-      const idx = availableFabricas.indexOf(fabName);
-      if (idx !== -1) availableFabricas[idx] = cleanNome;
-      fabricaRotasMap[cleanNome] = fabricaRotasMap[fabName] || [];
-      fabricaTagMap[cleanNome] = fabricaTagMap[fabName] || {};
-      delete fabricaRotasMap[fabName];
-      delete fabricaTagMap[fabName];
-      
-      if (currentFabrica === fabName) currentFabrica = cleanNome;
-      
-      cloudRecords.forEach(r => {
-        if ((r.fabrica || 'Planta Curitiba') === fabName) r.fabrica = cleanNome;
-      });
-      cloudLaudos.forEach(l => {
-        if ((l.fabrica || 'Planta Curitiba') === fabName) l.fabrica = cleanNome;
-      });
-      
-      await saveConfigToCloud();
-      updateFabricaUI();
-      renderFabricasTab();
-      renderActiveTab();
-      showToast("Fábrica renomeada com sucesso!", "success");
     }
 
     function mergeAndPersistRotasAndTags() {
-      // 1. Filtrar rotas excluídas pelo usuário para NUNCA ressuscitarem
-      defaultRotas = (defaultRotas || []).filter(r => r && !deletedRotas.includes(r));
-      
-      // 2. Atualizar mapas da fábrica ativa
-      if (!fabricaRotasMap[currentFabrica]) fabricaRotasMap[currentFabrica] = defaultRotas;
-      else fabricaRotasMap[currentFabrica] = defaultRotas;
+      const routeSet = new Set(defaultRotas);
+      try {
+        const local = localStorage.getItem('inspectcbm_saved_rotas');
+        if (local) JSON.parse(local).forEach(r => r && routeSet.add(r));
+      } catch(e) {}
+      try {
+        const cachedCfg = localStorage.getItem('inspectcbm_cached_cfg');
+        if (cachedCfg) {
+          const parsed = JSON.parse(cachedCfg);
+          if (Array.isArray(parsed.rotas)) parsed.rotas.forEach(r => r && routeSet.add(r));
+        }
+      } catch(e) {}
+      (cloudRecords || []).forEach(r => { if(r.rota) routeSet.add(r.rota); });
+      (cloudLaudos || []).forEach(l => {
+        if(l.rota) routeSet.add(l.rota);
+        if(Array.isArray(l.rotas)) l.rotas.forEach(r => routeSet.add(r));
+      });
+      (cloudPreLaudos || []).forEach(p => { if(p.rota) routeSet.add(p.rota); });
+      Object.keys(defaultTagMap || {}).forEach(r => { if(r) routeSet.add(r); });
 
-      if (!fabricaTagMap[currentFabrica]) fabricaTagMap[currentFabrica] = defaultTagMap;
-      else fabricaTagMap[currentFabrica] = defaultTagMap;
+      const merged = Array.from(routeSet).filter(Boolean);
+      if (merged.length > 0) defaultRotas = merged;
 
       defaultRotas.forEach(r => {
         if (!defaultTagMap[r]) defaultTagMap[r] = [];
       });
 
-      // 3. Enriquecer tags apenas para a fábrica ativa e para rotas que não foram excluídas
       (cloudRecords || []).forEach(r => {
-        const rFab = r.fabrica || 'Planta Curitiba';
-        if (rFab === currentFabrica && r.rota && r.baseTag && !deletedRotas.includes(r.rota)) {
-          if (defaultRotas.includes(r.rota)) {
-            if (!defaultTagMap[r.rota]) defaultTagMap[r.rota] = [];
-            if (!defaultTagMap[r.rota].includes(r.baseTag)) {
-              defaultTagMap[r.rota].push(r.baseTag);
-            }
+        if (r.rota && r.baseTag) {
+          if (!defaultTagMap[r.rota]) defaultTagMap[r.rota] = [];
+          if (!defaultTagMap[r.rota].includes(r.baseTag)) {
+            defaultTagMap[r.rota].push(r.baseTag);
           }
         }
       });
@@ -1402,19 +1126,11 @@
       try {
         localStorage.setItem('inspectcbm_saved_rotas', JSON.stringify(defaultRotas));
         localStorage.setItem('inspectcbm_saved_tagmap', JSON.stringify(defaultTagMap));
-        localStorage.setItem('inspectcbm_fabricas', JSON.stringify(availableFabricas));
-        localStorage.setItem('inspectcbm_current_fabrica', currentFabrica);
-        localStorage.setItem('inspectcbm_deleted_rotas', JSON.stringify(deletedRotas));
-        localStorage.setItem('inspectcbm_fabrica_rotas_map', JSON.stringify(fabricaRotasMap));
-        localStorage.setItem('inspectcbm_fabrica_tag_map', JSON.stringify(fabricaTagMap));
         localStorage.setItem('inspectcbm_cached_cfg', JSON.stringify({
           rotas: defaultRotas,
           tagMap: defaultTagMap,
           inspetores: defaultInspetores,
-          availableFalhaTypes: availableFalhaTypes,
-          fabricas: availableFabricas,
-          currentFabrica: currentFabrica,
-          deletedRotas: deletedRotas
+          availableFalhaTypes: availableFalhaTypes
         }));
       } catch(e) {}
     }
@@ -1422,34 +1138,10 @@
     function initCloudListeners() {
       // 1. Carregamento rápido via cache local para garantir estabilidade imediata
       try {
-        const cachedFab = localStorage.getItem('inspectcbm_fabricas');
-        if (cachedFab) {
-          const p = JSON.parse(cachedFab);
-          if (Array.isArray(p) && p.length > 0) availableFabricas = p;
-        }
-        const cachedCurFab = localStorage.getItem('inspectcbm_current_fabrica');
-        if (cachedCurFab && availableFabricas.includes(cachedCurFab)) currentFabrica = cachedCurFab;
-
-        const cachedDel = localStorage.getItem('inspectcbm_deleted_rotas');
-        if (cachedDel) {
-          const p = JSON.parse(cachedDel);
-          if (Array.isArray(p)) deletedRotas = p;
-        }
-        const cachedFabRotas = localStorage.getItem('inspectcbm_fabrica_rotas_map');
-        if (cachedFabRotas) {
-          const p = JSON.parse(cachedFabRotas);
-          if (p && typeof p === 'object') fabricaRotasMap = p;
-        }
-        const cachedFabTags = localStorage.getItem('inspectcbm_fabrica_tag_map');
-        if (cachedFabTags) {
-          const p = JSON.parse(cachedFabTags);
-          if (p && typeof p === 'object') fabricaTagMap = p;
-        }
-
         const cachedRotas = localStorage.getItem('inspectcbm_saved_rotas');
         if (cachedRotas) {
           const p = JSON.parse(cachedRotas);
-          if (Array.isArray(p) && p.length > 0) defaultRotas = p.filter(r => !deletedRotas.includes(r));
+          if (Array.isArray(p) && p.length > 0) defaultRotas = p;
         }
         const cachedTagMap = localStorage.getItem('inspectcbm_saved_tagmap');
         if (cachedTagMap) {
@@ -1459,14 +1151,11 @@
         const cachedCfg = localStorage.getItem('inspectcbm_cached_cfg');
         if (cachedCfg) {
           const parsed = JSON.parse(cachedCfg);
-          if (parsed.rotas && parsed.rotas.length > 0) defaultRotas = parsed.rotas.filter(r => !deletedRotas.includes(r));
+          if (parsed.rotas && parsed.rotas.length > 0) defaultRotas = parsed.rotas;
           if (parsed.tagMap && Object.keys(parsed.tagMap).length > 0) defaultTagMap = parsed.tagMap;
           if (parsed.inspetores && parsed.inspetores.length > 0) defaultInspetores = parsed.inspetores;
           if (parsed.availableFalhaTypes && parsed.availableFalhaTypes.length > 0) availableFalhaTypes = parsed.availableFalhaTypes;
         }
-        if (!fabricaRotasMap["Planta Curitiba"]) fabricaRotasMap["Planta Curitiba"] = defaultRotas;
-        if (!fabricaTagMap["Planta Curitiba"]) fabricaTagMap["Planta Curitiba"] = defaultTagMap;
-
         const cachedTags = localStorage.getItem('inspectcbm_cached_tags');
         if (cachedTags) cloudTagRegistry = JSON.parse(cachedTags);
         const cachedRecords = localStorage.getItem('inspectcbm_cached_records');
@@ -1480,7 +1169,6 @@
       }
 
       mergeAndPersistRotasAndTags();
-      updateFabricaUI();
       loadSavedRotas();
       loadSavedInspetores();
       populateFilters();
@@ -1492,58 +1180,36 @@
       db.collection("inspectcbm_config").doc("rotas_tags").onSnapshot((doc) => {
         if (doc.exists) {
           const data = doc.data();
-          if (data) {
-            if (Array.isArray(data.deletedRotas)) {
-              data.deletedRotas.forEach(dr => {
-                if (dr && !deletedRotas.includes(dr)) deletedRotas.push(dr);
-              });
-            }
-            if (Array.isArray(data.fabricas) && data.fabricas.length > 0) {
-              availableFabricas = data.fabricas;
-            }
-            if (data.fabricaRotasMap && typeof data.fabricaRotasMap === 'object') {
-              fabricaRotasMap = data.fabricaRotasMap;
-            }
-            if (data.fabricaTagMap && typeof data.fabricaTagMap === 'object') {
-              fabricaTagMap = data.fabricaTagMap;
-            }
-            if (!availableFabricas.includes(currentFabrica)) {
-              currentFabrica = availableFabricas[0] || 'Planta Curitiba';
-            }
-            if (!fabricaRotasMap[currentFabrica]) {
-              fabricaRotasMap[currentFabrica] = Array.isArray(data.rotas) ? data.rotas : defaultRotas;
-            }
-            if (!fabricaTagMap[currentFabrica]) {
-              fabricaTagMap[currentFabrica] = (data.tagMap && typeof data.tagMap === 'object') ? data.tagMap : defaultTagMap;
-            }
-
-            defaultRotas = (fabricaRotasMap[currentFabrica] || []).filter(r => !deletedRotas.includes(r));
-            defaultTagMap = fabricaTagMap[currentFabrica] || {};
-            defaultRotas.forEach(r => {
-              if (!defaultTagMap[r]) defaultTagMap[r] = [];
+          if (Array.isArray(data.rotas) && data.rotas.length > 0) {
+            data.rotas.forEach(r => {
+              if (r && !defaultRotas.includes(r)) defaultRotas.push(r);
             });
-
-            if (Array.isArray(data.inspetores) && data.inspetores.length > 0) {
-              defaultInspetores = data.inspetores;
-            }
-            if (Array.isArray(data.availableFalhaTypes) && data.availableFalhaTypes.length > 0) {
-              availableFalhaTypes = data.availableFalhaTypes;
-            }
+          }
+          if (data.tagMap && typeof data.tagMap === 'object') {
+            Object.keys(data.tagMap).forEach(k => {
+              if (!defaultTagMap[k]) defaultTagMap[k] = [];
+              (data.tagMap[k] || []).forEach(t => {
+                if (!defaultTagMap[k].includes(t)) defaultTagMap[k].push(t);
+              });
+            });
+          }
+          if (Array.isArray(data.inspetores) && data.inspetores.length > 0) {
+            data.inspetores.forEach(i => {
+              if (i && !defaultInspetores.includes(i)) defaultInspetores.push(i);
+            });
+          }
+          if (Array.isArray(data.availableFalhaTypes) && data.availableFalhaTypes.length > 0) {
+            availableFalhaTypes = data.availableFalhaTypes;
           }
         } else {
           db.collection("inspectcbm_config").doc("rotas_tags").set({
             rotas: defaultRotas,
             tagMap: defaultTagMap,
             inspetores: defaultInspetores,
-            availableFalhaTypes: availableFalhaTypes,
-            fabricas: availableFabricas,
-            fabricaRotasMap: { [currentFabrica]: defaultRotas },
-            fabricaTagMap: { [currentFabrica]: defaultTagMap },
-            deletedRotas: deletedRotas
+            availableFalhaTypes: availableFalhaTypes
           }, { merge: true }).catch(() => {});
         }
         mergeAndPersistRotasAndTags();
-        updateFabricaUI();
         loadSavedRotas();
         loadSavedInspetores();
         populateFilters();
@@ -1637,14 +1303,13 @@
 
     function updateSupervisoryKPIs() {
       let totalTagsCount = 0;
-      Object.keys(defaultTagMap || {}).forEach(r => {
+      Object.keys(defaultTagMap).forEach(r => {
         totalTagsCount += (defaultTagMap[r] || []).length;
       });
-      const fabRecords = (cloudRecords || []).filter(r => (r.fabrica || 'Planta Curitiba') === currentFabrica);
       const tagEl = document.getElementById('kpi-total-tags');
       const recEl = document.getElementById('kpi-total-records');
       if(tagEl) tagEl.textContent = totalTagsCount;
-      if(recEl) recEl.textContent = fabRecords.length;
+      if(recEl) recEl.textContent = cloudRecords.length;
     }
 
     async function saveConfigToCloud() {
@@ -1654,11 +1319,7 @@
           rotas: defaultRotas,
           tagMap: defaultTagMap,
           inspetores: defaultInspetores,
-          availableFalhaTypes: availableFalhaTypes,
-          fabricas: availableFabricas,
-          fabricaRotasMap: fabricaRotasMap,
-          fabricaTagMap: fabricaTagMap,
-          deletedRotas: deletedRotas
+          availableFalhaTypes: availableFalhaTypes
         }, { merge: true });
         updateSupervisoryKPIs();
       } catch (err) {
@@ -1897,50 +1558,25 @@
       const val = document.getElementById('nova_rota_input').value.trim();
       if(!val) return;
       if(!defaultRotas.includes(val)) {
-        deletedRotas = deletedRotas.filter(r => r !== val);
         defaultRotas.push(val);
         if(!defaultTagMap[val]) defaultTagMap[val] = [];
-        fabricaRotasMap[currentFabrica] = defaultRotas;
-        fabricaTagMap[currentFabrica] = defaultTagMap;
         await saveConfigToCloud();
         document.getElementById('nova_rota_input').value = '';
         renderRotasList();
         loadSavedRotas();
         populateFilters();
-        updateSupervisoryKPIs();
-        showToast(`Rota "${val}" adicionada à fábrica ${currentFabrica}!`, "success");
-      } else { alert(" Esta rota já existe nesta fábrica."); }
+      } else { alert(" Esta rota já existe."); }
     }
 
     async function removeRota(index) {
-      if(defaultRotas.length <= 1) { alert("Deve manter pelo menos uma rota cadastrada nesta fábrica."); return; }
+      if(defaultRotas.length <= 1) { alert("Deve manter pelo menos uma rota."); return; }
       const rotaName = defaultRotas[index];
-      const confirmed = await customConfirm(`Deseja realmente EXCLUIR DEFINITIVAMENTE a rota "${rotaName}" desta fábrica?`);
-      if(!confirmed) return;
-
       defaultRotas.splice(index, 1);
       delete defaultTagMap[rotaName];
-      if(!deletedRotas.includes(rotaName)) {
-        deletedRotas.push(rotaName);
-      }
-      fabricaRotasMap[currentFabrica] = defaultRotas;
-      fabricaTagMap[currentFabrica] = defaultTagMap;
-
-      try {
-        localStorage.setItem('inspectcbm_deleted_rotas', JSON.stringify(deletedRotas));
-        localStorage.setItem('inspectcbm_saved_rotas', JSON.stringify(defaultRotas));
-        localStorage.setItem('inspectcbm_saved_tagmap', JSON.stringify(defaultTagMap));
-        localStorage.setItem('inspectcbm_fabrica_rotas_map', JSON.stringify(fabricaRotasMap));
-        localStorage.setItem('inspectcbm_fabrica_tag_map', JSON.stringify(fabricaTagMap));
-      } catch(e) {}
-
       await saveConfigToCloud();
       renderRotasList();
       loadSavedRotas();
       populateFilters();
-      updateSupervisoryKPIs();
-      renderActiveTab();
-      showToast(`Rota "${rotaName}" excluída permanentemente!`, "success");
     }
 
     function manageTagsModal() {
@@ -2279,7 +1915,6 @@
       
       const record = {
         id: Date.now(),
-        fabrica: currentFabrica,
         data_coleta: document.getElementById('data_coleta').value,
         tag: getFullTag(),
         baseTag: baseTag,
@@ -2378,14 +2013,13 @@
       if(!supSelect) return;
       const currentVal = supSelect.value;
       supSelect.innerHTML = '<option value="CONSOLIDADO">Todos os Laudos (Último Status por Ativo)</option>';
-      const fabLaudos = (cloudLaudos || []).filter(l => (l.fabrica || 'Planta Curitiba') === currentFabrica);
-      fabLaudos.forEach((l, idx) => {
+      cloudLaudos.forEach((l, idx) => {
         const opt = document.createElement('option');
         opt.value = l.docId || String(l.id);
         const dataStr = l.dataAnalise || l.dataColeta || 'Sem data';
         const rotaStr = l.rota || (l.rotas ? l.rotas.join(', ') : 'Rota');
         const countAtivos = l.state ? Object.keys(l.state).filter(k => l.state[k].isMedido).length : 0;
-        opt.textContent = `Laudo #${fabLaudos.length - idx}: ${dataStr} - ${rotaStr} (${countAtivos} ativos)`;
+        opt.textContent = `Laudo #${cloudLaudos.length - idx}: ${dataStr} - ${rotaStr} (${countAtivos} ativos)`;
         supSelect.appendChild(opt);
       });
       if (currentVal && Array.from(supSelect.options).some(o => o.value === currentVal)) {
@@ -2409,8 +2043,8 @@
       const filterRota = document.getElementById('filter_rota').value;
       const filterSelect = document.getElementById('filter_tag');
       const currentVal = filterSelect.value;
-      let relevantRecords = (cloudRecords || []).filter(r => (r.fabrica || 'Planta Curitiba') === currentFabrica);
-      if(filterRota !== 'TODAS_ROTAS') relevantRecords = relevantRecords.filter(r => r.rota === filterRota);
+      let relevantRecords = cloudRecords;
+      if(filterRota !== 'TODAS_ROTAS') relevantRecords = cloudRecords.filter(r => r.rota === filterRota);
       const tags = [...new Set(relevantRecords.map(r => r.baseTag || r.tag))];
       filterSelect.innerHTML = '<option value="TODAS">-- Todas as Tags --</option>';
       tags.forEach(t => {
@@ -2425,8 +2059,8 @@
       const filterRota = document.getElementById('filter_rota').value;
       const dateSelect = document.getElementById('filter_date_select');
       const currentVal = dateSelect.value;
-      let relevantRecords = (cloudRecords || []).filter(r => (r.fabrica || 'Planta Curitiba') === currentFabrica);
-      if(filterRota !== 'TODAS_ROTAS') relevantRecords = relevantRecords.filter(r => r.rota === filterRota);
+      let relevantRecords = cloudRecords;
+      if(filterRota !== 'TODAS_ROTAS') relevantRecords = cloudRecords.filter(r => r.rota === filterRota);
       const datesSet = new Set();
       relevantRecords.forEach(r => {
         if(r.data_coleta) datesSet.add(r.data_coleta.slice(0, 10));
@@ -2500,7 +2134,6 @@
       }
       const preLaudoObj = {
         id: Date.now(),
-        fabrica: currentFabrica,
         rota: filterRota,
         tagFiltro: filterTag,
         dataSalvar: new Date().toISOString(),
@@ -2524,13 +2157,12 @@
     function fetchSavedPreLaudosHistory() {
       const container = document.getElementById('saved-prelaudos-list');
       if(!container) return;
-      const fabPreLaudos = (cloudPreLaudos || []).filter(p => (p.fabrica || 'Planta Curitiba') === currentFabrica);
-      if (fabPreLaudos.length === 0) {
-        container.innerHTML = `<p class="text-xs text-slate-500 italic">Nenhuma pré-análise salva no histórico desta fábrica ainda.</p>`;
+      if (cloudPreLaudos.length === 0) {
+        container.innerHTML = `<p class="text-xs text-slate-500 italic">Nenhuma pré-análise salva no histórico ainda.</p>`;
         return;
       }
       container.innerHTML = '';
-      fabPreLaudos.forEach((pl, idx) => {
+      cloudPreLaudos.forEach((pl, idx) => {
         const dataFmt = new Date(pl.dataSalvar).toLocaleString('pt-PT', {dateStyle:'short', timeStyle:'short'});
         const div = document.createElement('div');
         div.className = "flex flex-col sm:flex-row justify-between items-start sm:items-center bg-slate-950 p-3.5 rounded-xl border border-slate-800 text-xs gap-3";
@@ -2541,8 +2173,8 @@
             <span class="text-slate-400">Salvo em: ${dataFmt}</span>
           </div>
           <div class="flex items-center space-x-2">
-            <button onclick="loadSavedPreLaudo('${pl.docId || pl.id}')" class="bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/30 font-semibold px-2.5 py-1.5 rounded-lg transition flex items-center"><i class="fa-solid fa-arrow-rotate-left mr-1"></i> Carregar</button>
-            <button onclick="exportSavedPreLaudoPDF('${pl.docId || pl.id}')" class="bg-rose-600 hover:bg-rose-500 text-white font-semibold px-2.5 py-1.5 rounded-lg transition flex items-center shadow"><i class="fa-solid fa-file-pdf mr-1"></i> PDF</button>
+            <button onclick="loadSavedPreLaudo(${idx})" class="bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/30 font-semibold px-2.5 py-1.5 rounded-lg transition flex items-center"><i class="fa-solid fa-arrow-rotate-left mr-1"></i> Carregar</button>
+            <button onclick="exportSavedPreLaudoPDF(${idx})" class="bg-rose-600 hover:bg-rose-500 text-white font-semibold px-2.5 py-1.5 rounded-lg transition flex items-center shadow"><i class="fa-solid fa-file-pdf mr-1"></i> PDF</button>
             <button onclick="deleteSavedPreLaudo('${pl.docId}')" class="text-rose-400 hover:text-rose-300 px-2 py-1.5 transition" title="Excluir"><i class="fa-solid fa-trash-can"></i></button>
           </div>
         `;
@@ -2550,8 +2182,8 @@
       });
     }
 
-    function loadSavedPreLaudo(docIdOrIdx) {
-      const pl = (cloudPreLaudos || []).find(p => p.docId === docIdOrIdx || String(p.id) === String(docIdOrIdx)) || cloudPreLaudos[docIdOrIdx];
+    function loadSavedPreLaudo(idx) {
+      const pl = cloudPreLaudos[idx];
       if(!pl) return;
       document.getElementById('filter_rota').value = pl.rota;
       onFilterRotaChange();
@@ -2605,7 +2237,7 @@
     }
 
     async function exportSavedPreLaudoPDF(idx) {
-      const pl = (cloudPreLaudos || []).find(p => p.docId === idx || String(p.id) === String(idx)) || cloudPreLaudos[idx];
+      const pl = cloudPreLaudos[idx];
       if(!pl) return;
       
       const { jsPDF } = window.jspdf;
@@ -2613,12 +2245,12 @@
       doc.setFont("helvetica", "bold");
       doc.setFontSize(13);
       doc.setTextColor(30, 41, 59);
-      doc.text(`PRÉ-ANÁLISE SALVA (ROTA: ${pl.rota.toUpperCase()}) - ${pl.fabrica || currentFabrica}`, 14, 15);
+      doc.text(`PRÉ-ANÁLISE SALVA (ROTA: ${pl.rota.toUpperCase()})`, 14, 15);
       
       doc.setFontSize(8);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(100, 116, 139);
-      doc.text(`Fábrica: ${pl.fabrica || currentFabrica} | Data Salvamento: ${new Date(pl.dataSalvar).toLocaleString('pt-PT')} | Total Itens: ${pl.registros.length}`, 14, 20);
+      doc.text(`Data Salvamento: ${new Date(pl.dataSalvar).toLocaleString('pt-PT')} | Total Itens: ${pl.registros.length}`, 14, 20);
       
       const tableRows = [];
       const imageCellStore = [];
@@ -2700,9 +2332,8 @@
         rotasParaAnalisar = selectedRotas;
       }
 
-      const fabLaudos = (cloudLaudos || []).filter(l => (l.fabrica || 'Planta Curitiba') === currentFabrica);
       // Filtrar laudos do histórico na nuvem de acordo com os filtros de rota e data
-      let matchingLaudos = fabLaudos.filter(l => {
+      let matchingLaudos = (cloudLaudos || []).filter(l => {
         let matchRota = selectedRotas.includes('TODAS_ROTAS') || !l.rotas || l.rotas.some(r => selectedRotas.includes(r));
         let matchData = !filterColetaDate || l.dataColeta === filterColetaDate;
         let matchMes = !filterMesVal || (l.dataColeta && l.dataColeta.startsWith(filterMesVal)) || (l.dataAnalise && l.dataAnalise.startsWith(filterMesVal));
@@ -2713,15 +2344,15 @@
       let evaluatedAssetState = {};
       let assetSourceMap = {};
 
-      if (fabLaudos.length === 0) {
+      if (cloudLaudos.length === 0) {
         if (badgeSourceEl) {
           badgeSourceEl.className = "text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/30 px-2.5 py-0.5 rounded-full font-mono font-bold flex items-center";
-          badgeSourceEl.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-amber-400 mr-1.5"></span>Nenhum Laudo Salvo nesta Fábrica`;
+          badgeSourceEl.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-amber-400 mr-1.5"></span>Nenhum Laudo Salvo na Nuvem`;
         }
       } else if (selectedLaudoDocId === 'CONSOLIDADO') {
         // Modo Consolidado: Itera laudos do mais recente ao mais antigo.
         // O primeiro laudo que avaliou o ativo com medição define o seu estado mais recente.
-        const poolLaudos = matchingLaudos.length > 0 ? matchingLaudos : fabLaudos;
+        const poolLaudos = matchingLaudos.length > 0 ? matchingLaudos : cloudLaudos;
         poolLaudos.forEach(l => {
           if (!l.state) return;
           const laudoLabel = `${l.dataAnalise || l.dataColeta || 'Sem data'} (${l.rota || 'Geral'})`;
@@ -2749,11 +2380,11 @@
 
         if (badgeSourceEl) {
           badgeSourceEl.className = "text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2.5 py-0.5 rounded-full font-mono font-bold flex items-center";
-          badgeSourceEl.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse mr-1.5"></span>Consolidado (${poolLaudos.length} Laudos da Fábrica)`;
+          badgeSourceEl.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse mr-1.5"></span>Consolidado (${poolLaudos.length} Laudos da Nuvem)`;
         }
       } else {
         // Laudo Específico selecionado pelo usuário
-        const targetLaudo = fabLaudos.find(l => (l.docId || String(l.id)) === selectedLaudoDocId);
+        const targetLaudo = cloudLaudos.find(l => (l.docId || String(l.id)) === selectedLaudoDocId);
         if (targetLaudo && targetLaudo.state) {
           const laudoLabel = `${targetLaudo.dataAnalise || targetLaudo.dataColeta || 'Sem data'} (${targetLaudo.rota || 'Geral'})`;
           evaluatedAssetState = targetLaudo.state;
@@ -2980,7 +2611,7 @@
       const dateStart = document.getElementById('filter_date_start').value;
       const dateEnd = document.getElementById('filter_date_end').value;
       
-      let filtered = (cloudRecords || []).filter(r => (r.fabrica || 'Planta Curitiba') === currentFabrica);
+      let filtered = cloudRecords;
       if (filterRota !== 'TODAS_ROTAS') filtered = filtered.filter(r => r.rota === filterRota);
       if (filterTag !== 'TODAS') filtered = filtered.filter(r => (r.baseTag === filterTag || r.tag.includes(filterTag)));
       if (dateStart && dateEnd) {
@@ -3335,7 +2966,6 @@
       localStorage.setItem('inspectcbm_last_resp_tecnico', respTecnicoInput);
       const laudoObj = {
         id: Date.now(),
-        fabrica: currentFabrica,
         rotas: selectedRotas,
         rota: selectedRotas.join(', '),
         dataColeta: dataColeta,
@@ -3377,13 +3007,12 @@
           }
         } catch(e) {}
       }
-      const fabLaudos = (cloudLaudos || []).filter(l => (l.fabrica || 'Planta Curitiba') === currentFabrica);
-      if (fabLaudos.length === 0) {
-        container.innerHTML = `<p class="text-xs text-slate-500 italic">Nenhum laudo salvo no histórico desta fábrica ainda.</p>`;
+      if (!cloudLaudos || cloudLaudos.length === 0) {
+        container.innerHTML = `<p class="text-xs text-slate-500 italic">Nenhum laudo salvo no histórico ainda.</p>`;
         return;
       }
       container.innerHTML = '';
-      fabLaudos.forEach((laudo, idx) => {
+      cloudLaudos.forEach((laudo, idx) => {
         const div = document.createElement('div');
         div.className = "flex flex-col sm:flex-row justify-between items-start sm:items-center bg-slate-950 p-3.5 rounded-xl border border-slate-800 text-xs gap-3";
         div.innerHTML = `
@@ -3394,9 +3023,9 @@
             <span class="text-amber-300 font-semibold"><i class="fa-solid fa-user-check mr-1 text-amber-400"></i>${laudo.responsavelTecnico || 'Técnico Responsável'}</span>
           </div>
           <div class="flex items-center space-x-2 flex-wrap gap-y-1">
-            <button onclick="viewLaudoInSupervisorio('${laudo.docId || laudo.id}')" class="bg-emerald-600/30 hover:bg-emerald-600/40 text-emerald-300 border border-emerald-500/30 font-semibold px-2.5 py-1.5 rounded-lg transition flex items-center shadow" title="Alimentar e Visualizar no Supervisório"><i class="fa-solid fa-gauge mr-1"></i> Supervisório</button>
-            <button onclick="loadSavedLaudo('${laudo.docId || laudo.id}')" class="bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/30 font-semibold px-2.5 py-1.5 rounded-lg transition flex items-center"><i class="fa-solid fa-arrow-rotate-left mr-1"></i> Carregar</button>
-            <button onclick="generatePDFFromSavedLaudo('${laudo.docId || laudo.id}')" class="bg-rose-600 hover:bg-rose-500 text-white font-semibold px-2.5 py-1.5 rounded-lg transition flex items-center shadow"><i class="fa-solid fa-file-pdf mr-1"></i> PDF</button>
+            <button onclick="viewLaudoInSupervisorio('${laudo.docId}')" class="bg-emerald-600/30 hover:bg-emerald-600/40 text-emerald-300 border border-emerald-500/30 font-semibold px-2.5 py-1.5 rounded-lg transition flex items-center shadow" title="Alimentar e Visualizar no Supervisório"><i class="fa-solid fa-gauge mr-1"></i> Supervisório</button>
+            <button onclick="loadSavedLaudo(${idx})" class="bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/30 font-semibold px-2.5 py-1.5 rounded-lg transition flex items-center"><i class="fa-solid fa-arrow-rotate-left mr-1"></i> Carregar</button>
+            <button onclick="generatePDFFromSavedLaudo(${idx})" class="bg-rose-600 hover:bg-rose-500 text-white font-semibold px-2.5 py-1.5 rounded-lg transition flex items-center shadow"><i class="fa-solid fa-file-pdf mr-1"></i> PDF</button>
             <button onclick="deleteSavedLaudo('${laudo.docId}')" class="text-rose-400 hover:text-rose-300 px-2 py-1.5 transition" title="Excluir"><i class="fa-solid fa-trash-can"></i></button>
           </div>
         `;
@@ -3405,7 +3034,7 @@
     }
 
     function loadSavedLaudo(idx) {
-      const laudo = (cloudLaudos || []).find(l => l.docId === idx || String(l.id) === String(idx)) || cloudLaudos[idx];
+      const laudo = cloudLaudos[idx];
       if(!laudo) return;
       const relFilterRotaEl = document.getElementById('rel_filter_rota');
       const targetRotas = laudo.rotas || (laudo.rota ? laudo.rota.split(', ') : ['TODAS_ROTAS']);
@@ -3424,7 +3053,7 @@
     }
 
     async function generatePDFFromSavedLaudo(idx) {
-      const laudo = (cloudLaudos || []).find(l => l.docId === idx || String(l.id) === String(idx)) || cloudLaudos[idx];
+      const laudo = cloudLaudos[idx];
       if(!laudo) return;
       const previousState = JSON.parse(JSON.stringify(relatorioAnalysisState));
       const relFilterRotaEl = document.getElementById('rel_filter_rota');
@@ -3494,16 +3123,15 @@
       } else {
         rotasParaAnalisar = selectedRotas;
       }
-      const fabRecords = (cloudRecords || []).filter(r => (r.fabrica || 'Planta Curitiba') === currentFabrica);
       let itemsToRender = [];
       rotasParaAnalisar.forEach(rota => {
         let tagsDaRota = defaultTagMap[rota] || [];
         tagsDaRota.forEach(baseTag => {
           let lastRecord;
           if (filterColetaDate) {
-            lastRecord = fabRecords.find(r => (r.baseTag === baseTag || r.tag.startsWith(baseTag)) && r.data_coleta.startsWith(filterColetaDate));
+            lastRecord = cloudRecords.find(r => (r.baseTag === baseTag || r.tag.startsWith(baseTag)) && r.data_coleta.startsWith(filterColetaDate));
           } else {
-            lastRecord = fabRecords.find(r => r.baseTag === baseTag || r.tag.startsWith(baseTag));
+            lastRecord = cloudRecords.find(r => r.baseTag === baseTag || r.tag.startsWith(baseTag));
           }
           let currentState = initOrGetRelState(baseTag, lastRecord);
           if (filterStatus === 'MEDIDOS' && !currentState.isMedido) return;
@@ -3752,7 +3380,7 @@
       const dateStart = document.getElementById('filter_date_start').value;
       const dateEnd = document.getElementById('filter_date_end').value;
       
-      let filtered = (cloudRecords || []).filter(r => (r.fabrica || 'Planta Curitiba') === currentFabrica);
+      let filtered = cloudRecords;
       if (filterRota !== 'TODAS_ROTAS') filtered = filtered.filter(r => r.rota === filterRota);
       if (filterTag !== 'TODAS') filtered = filtered.filter(r => r.baseTag === filterTag || r.tag.includes(filterTag));
       if (dateStart && dateEnd) {
@@ -3769,14 +3397,14 @@
       }
       if(filtered.length === 0) { alert('Sem dados para exportar com este filtro.'); return; }
       
-      let csv = 'Fabrica;Data;Rota;Tag;SAP_Number;Componente;Equipamento;Setor;Area;Inspetor;Temp_Motor_LA;Temp_Comp2_P1;Operacao;Observacoes\n';
+      let csv = 'Data;Rota;Tag;SAP_Number;Componente;Equipamento;Setor;Area;Inspetor;Temp_Motor_LA;Temp_Comp2_P1;Operacao;Observacoes\n';
       filtered.forEach(r => {
-        csv += `"${r.fabrica || currentFabrica}";"${r.data_coleta}";"${r.rota}";"${r.tag}";"${r.sap_number || ''}";"${r.componente}";"${r.equipamento_nome}";"${r.setor}";"${r.area}";"${r.inspetor}";"${r.temp_la || ''}";"${r.temp_c2_p1 || ''}";"${r.status_operacao}";"${r.observacoes}"\n`;
+        csv += `"${r.data_coleta}";"${r.rota}";"${r.tag}";"${r.sap_number || ''}";"${r.componente}";"${r.equipamento_nome}";"${r.setor}";"${r.area}";"${r.inspetor}";"${r.temp_la || ''}";"${r.temp_c2_p1 || ''}";"${r.status_operacao}";"${r.observacoes}"\n`;
       });
       const blob = new Blob(["\ufeff" + csv], { type: 'text/csv;charset=utf-8;' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = `InspectCBM_SCADA_${currentFabrica.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0,10)}.csv`;
+      a.download = `InspectCBM_SCADA_${new Date().toISOString().slice(0,10)}.csv`;
       a.click();
     }
 
@@ -3788,7 +3416,7 @@
       const dateStart = document.getElementById('filter_date_start').value;
       const dateEnd = document.getElementById('filter_date_end').value;
       
-      let filtered = (cloudRecords || []).filter(r => (r.fabrica || 'Planta Curitiba') === currentFabrica);
+      let filtered = cloudRecords;
       if (filterRota !== 'TODAS_ROTAS') filtered = filtered.filter(r => r.rota === filterRota);
       if (filterTag !== 'TODAS') filtered = filtered.filter(r => r.baseTag === filterTag || r.tag.includes(filterTag));
       if (dateStart && dateEnd) {
@@ -3811,12 +3439,12 @@
       doc.setFont("helvetica", "bold");
       doc.setFontSize(13);
       doc.setTextColor(30, 41, 59);
-      doc.text(`PRÉ-ANÁLISE SCADA & HISTÓRICO - ${currentFabrica.toUpperCase()}`, 14, 15);
+      doc.text(`PRÉ-ANÁLISE SCADA & HISTÓRICO - INSPECTCBM`, 14, 15);
       
       doc.setFontSize(8);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(100, 116, 139);
-      doc.text(`Fábrica: ${currentFabrica} | Filtro Rota: ${filterRota} | Tag: ${filterTag} | Data Emissão: ${new Date().toLocaleDateString('pt-PT')}`, 14, 20);
+      doc.text(`Filtro Rota: ${filterRota} | Tag: ${filterTag} | Data Emissão: ${new Date().toLocaleDateString('pt-PT')}`, 14, 20);
       const tableRows = [];
       const imageCellStore = [];
       filtered.forEach((r, index) => {
@@ -4253,8 +3881,7 @@
           doc.text(`Folha ${pageIndex + 1} de ${totalEquipPages} (Equipamentos)  •  Pág. Geral ${pageIndex + 3} de ${totalReportPages}`, 198, 288, { align: "right" });
         });
 
-        const safeFab = (currentFabrica || 'Mondelez').replace(/[\s\/\\]+/g, '_');
-        const fileName = `Laudo_Tecnico_${safeFab}_${dataAnaliseFmt.replace(/\//g, '-')}.pdf`;
+        const fileName = `Laudo_Tecnico_Mondelez_${dataAnaliseFmt.replace(/\//g, '-')}.pdf`;
         try {
           doc.save(fileName);
         } catch(saveErr) {
@@ -4355,7 +3982,7 @@
       doc.setFont("helvetica", "normal");
       doc.setFontSize(7.5);
       doc.setTextColor(100, 116, 139);
-      doc.text(`Mondelez - ${currentFabrica}`, 18, 33);
+      doc.text("Mondelez - Planta Curitiba - PR", 18, 33);
 
       // Badge de Destaque Executivo: ÁREA: UTILIDADES (Topo Direito)
       doc.setFillColor(56, 16, 83); // Roxo Mondelēz
@@ -4421,7 +4048,7 @@
       doc.setFontSize(7);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(203, 213, 225);
-      doc.text(`${(currentFabrica || 'Planta').toUpperCase()} • REGISTRO OFICIAL`, 186, pY + 6.2, { align: "right" });
+      doc.text("PLANTA CURITIBA • REGISTRO OFICIAL", 186, pY + 6.2, { align: "right" });
 
       // CARD 1: ÁREA E ROTA DE INSPEÇÃO
       const c1Y = pY + 13;
