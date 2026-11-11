@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>InspectCBM - Supervisory & Condition Monitoring System</title>
+  <title>Mondelez CBM - Supervisory & Condition Monitoring System</title>
   <meta name="description" content="Sistema de Supervisório e Monitoramento Preditivo de Condição (CBM), coleta em campo, pré-análise e emissão de laudos técnicos SCADA." />
-  <meta property="og:title" content="InspectCBM - Supervisory & Condition Monitoring System" />
+  <meta property="og:title" content="Mondelez CBM - Supervisory & Condition Monitoring System" />
   <meta property="og:description" content="Sistema de Supervisório e Monitoramento Preditivo de Condição (CBM), coleta em campo, pré-análise e emissão de laudos técnicos SCADA." />
   <meta property="og:type" content="website" />
   <!-- Tailwind CSS -->
@@ -51,12 +51,14 @@
       if(document.getElementById("sup_mes_filtro")) document.getElementById("sup_mes_filtro").value = isoNow.slice(0,7);
       
       initCloudListeners();
+      switchTab('form');
     });
   </script>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
     body { font-family: 'Inter', sans-serif; background-color: #030712; color: #f3f4f6; }
     .font-mono { font-family: 'JetBrains Mono', monospace; }
+    .font-cursive { font-family: 'Dancing Script', cursive, sans-serif; }
     select option { background-color: #0f172a !important; color: #f8fafc !important; }
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: #0b0f19; }
@@ -68,56 +70,56 @@
   
   <!-- Supervisory Top Bar / Header -->
   <header class="bg-slate-900/90 backdrop-blur-md border-b border-slate-800 sticky top-0 z-50 shadow-2xl">
-    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-col md:flex-row justify-between items-center gap-3">
-      <div class="flex items-center space-x-3">
-        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-500/20 border border-amber-400/30">
-          <i class="fa-solid fa-industry text-slate-950 text-base"></i>
+    <div class="w-full max-w-[1700px] mx-auto px-2 sm:px-4 py-2 flex flex-row flex-nowrap justify-between items-center gap-2 overflow-hidden">
+      <div class="flex items-center space-x-2 shrink-0">
+        <div class="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-md shadow-amber-500/20 border border-amber-400/30 shrink-0">
+          <i class="fa-solid fa-industry text-slate-950 text-xs"></i>
         </div>
         <div>
-          <h1 class="font-bold text-base tracking-wide text-white flex items-center">
-            Inspect<span class="text-amber-400">CBM</span> 
-            <span class="ml-2.5 text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono flex items-center">
-              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse mr-1.5"></span>SCADA Cloud Live
+          <h1 class="font-bold text-sm tracking-tight text-white flex items-center leading-none">
+            Mondelez <span class="text-amber-400 ml-0.5">CBM</span> 
+            <span class="ml-2.5 text-xs text-emerald-400 font-bold tracking-normal whitespace-nowrap flex items-center select-none">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse mr-1.5 inline-block"></span>SCADA Cloud Live
             </span>
           </h1>
-          <p class="text-[11px] text-slate-400 font-medium">Supervisory & Condition Monitoring System</p>
+          <p class="text-[9px] text-slate-400 font-medium hidden 2xl:block mt-0.5">Supervisory & Condition Monitoring System</p>
         </div>
       </div>
       <!-- Seletor Rápido de Fábrica & KPIs -->
-      <div class="flex items-center space-x-3">
-        <div class="flex items-center space-x-2 bg-slate-950/80 px-3 py-1.5 rounded-xl border border-purple-500/30 text-xs shadow-inner">
-          <i class="fa-solid fa-industry text-purple-400 text-xs"></i>
-          <span class="text-[10px] text-slate-400 font-mono uppercase hidden sm:inline">Fábrica:</span>
-          <select id="header_fabrica_select" onchange="switchFabrica(this.value)" class="bg-transparent text-purple-300 font-bold font-mono focus:outline-none cursor-pointer text-xs">
+      <div class="flex items-center space-x-1.5 shrink-0">
+        <div class="flex items-center space-x-1 bg-slate-950/80 px-2 py-1 rounded-lg border border-purple-500/30 text-xs shadow-inner shrink-0">
+          <i class="fa-solid fa-industry text-purple-400 text-[10px]"></i>
+          <span class="text-[9px] text-slate-400 font-mono uppercase hidden lg:inline">Fábrica:</span>
+          <select id="header_fabrica_select" onchange="switchFabrica(this.value)" class="bg-transparent text-purple-300 font-bold font-mono focus:outline-none cursor-pointer text-[10.5px]">
             <option value="Planta Curitiba">Planta Curitiba</option>
           </select>
         </div>
 
         <!-- Supervisory Quick KPIs Header -->
-        <div class="hidden lg:flex items-center space-x-4 bg-slate-950/60 px-4 py-1.5 rounded-xl border border-slate-800/80 text-xs font-mono">
-          <div><span class="text-slate-500">TAGS:</span> <span id="kpi-total-tags" class="text-amber-400 font-bold">0</span></div>
+        <div class="hidden md:flex items-center space-x-2 bg-slate-950/60 px-2 py-1 rounded-lg border border-slate-800/80 text-[10px] font-mono shrink-0">
+          <div><span class="text-slate-500 text-[9px]">TAGS:</span> <span id="kpi-total-tags" class="text-amber-400 font-bold">0</span></div>
           <span class="text-slate-800">|</span>
-          <div><span class="text-slate-500">REGISTOS:</span> <span id="kpi-total-records" class="text-cyan-400 font-bold">0</span></div>
+          <div><span class="text-slate-500 text-[9px]">REGISTOS:</span> <span id="kpi-total-records" class="text-cyan-400 font-bold">0</span></div>
           <span class="text-slate-800">|</span>
-          <div><span class="text-slate-500">STATUS:</span> <span class="text-emerald-400 font-bold">ONLINE</span></div>
+          <div><span class="text-slate-500 text-[9px]">STATUS:</span> <span class="text-emerald-400 font-bold">ONLINE</span></div>
         </div>
       </div>
       <!-- Navegação por Abas -->
-      <div class="flex items-center space-x-2 flex-wrap">
-        <button id="btn-tab-form" onclick="switchTab('form')" class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition flex items-center border border-slate-700/50 shadow-inner">
-          <i class="fa-solid fa-clipboard-check mr-1.5 text-amber-400"></i> Coleta
+      <div class="flex items-center space-x-1 flex-nowrap shrink-0">
+        <button id="btn-tab-form" onclick="switchTab('form')" class="px-2 py-1 rounded-lg text-[10.5px] font-bold bg-amber-500 text-slate-950 transition flex items-center shadow-sm whitespace-nowrap shrink-0">
+          <i class="fa-solid fa-clipboard-check mr-1 text-slate-950 text-[10px]"></i> Coleta
         </button>
-        <button id="btn-tab-dashboard" onclick="switchTab('dashboard')" class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition flex items-center border border-slate-700/50 shadow-inner">
-          <i class="fa-solid fa-chart-line mr-1.5 text-cyan-400"></i> Pré-Análise
+        <button id="btn-tab-dashboard" onclick="switchTab('dashboard')" class="px-2 py-1 rounded-lg text-[10.5px] font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition flex items-center border border-slate-700/50 shadow-inner whitespace-nowrap shrink-0">
+          <i class="fa-solid fa-chart-line mr-1 text-cyan-400 text-[10px]"></i> Pré-Análise
         </button>
-        <button id="btn-tab-relatorio" onclick="switchTab('relatorio')" class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition flex items-center border border-slate-700/50 shadow-inner">
-          <i class="fa-solid fa-file-pdf mr-1.5 text-amber-400"></i> Laudo Técnico
+        <button id="btn-tab-relatorio" onclick="switchTab('relatorio')" class="px-2 py-1 rounded-lg text-[10.5px] font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition flex items-center border border-slate-700/50 shadow-inner whitespace-nowrap shrink-0">
+          <i class="fa-solid fa-file-pdf mr-1 text-amber-400 text-[10px]"></i> Laudo Técnico
         </button>
-        <button id="btn-tab-supervisorio" onclick="switchTab('supervisorio')" class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition flex items-center border border-slate-700/50 shadow-inner">
-          <i class="fa-solid fa-network-wired mr-1.5 text-emerald-400"></i> Supervisório
+        <button id="btn-tab-supervisorio" onclick="switchTab('supervisorio')" class="px-2 py-1 rounded-lg text-[10.5px] font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition flex items-center border border-slate-700/50 shadow-inner whitespace-nowrap shrink-0">
+          <i class="fa-solid fa-network-wired mr-1 text-emerald-400 text-[10px]"></i> Supervisório
         </button>
-        <button id="btn-tab-fabricas" onclick="switchTab('fabricas')" class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition flex items-center border border-slate-700/50 shadow-inner">
-          <i class="fa-solid fa-industry mr-1.5 text-purple-400"></i> Fábricas
+        <button id="btn-tab-fabricas" onclick="switchTab('fabricas')" class="px-2 py-1 rounded-lg text-[10.5px] font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition flex items-center border border-slate-700/50 shadow-inner whitespace-nowrap shrink-0">
+          <i class="fa-solid fa-industry mr-1 text-purple-400 text-[10px]"></i> Fábricas
         </button>
       </div>
     </div>
@@ -166,36 +168,41 @@
       </div>
 
       <!-- CARDS DE RESUMO EXECUTIVO (KPIs) -->
-      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-        <div class="bg-slate-900/90 backdrop-blur-md p-4 rounded-2xl border border-slate-800 shadow-xl relative overflow-hidden flex flex-col justify-between">
+      <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 sm:gap-2.5">
+        <div class="bg-slate-900/90 backdrop-blur-md p-3 rounded-xl border border-slate-800 shadow-xl relative overflow-hidden flex flex-col justify-between">
           <div class="absolute top-0 left-0 w-1 h-full bg-cyan-500"></div>
-          <span class="text-[11px] font-mono text-slate-400 uppercase">Total Ativos</span>
-          <span id="sup-kpi-total" class="text-2xl font-bold font-mono text-white mt-2">0</span>
+          <span class="text-[10px] font-mono text-slate-400 uppercase tracking-wider font-semibold">Total Ativos</span>
+          <span id="sup-kpi-total" class="text-xl sm:text-2xl font-bold font-mono text-white mt-1.5">0</span>
         </div>
-        <div class="bg-slate-900/90 backdrop-blur-md p-4 rounded-2xl border border-emerald-500/30 shadow-xl relative overflow-hidden flex flex-col justify-between">
+        <div class="bg-slate-900/90 backdrop-blur-md p-3 rounded-xl border border-emerald-500/30 shadow-xl relative overflow-hidden flex flex-col justify-between">
           <div class="absolute top-0 left-0 w-1 h-full bg-emerald-500"></div>
-          <span class="text-[11px] font-mono text-emerald-400 uppercase">Normal</span>
-          <span id="sup-kpi-normal" class="text-2xl font-bold font-mono text-emerald-400 mt-2">0</span>
+          <span class="text-[10px] font-mono text-emerald-400 uppercase tracking-wider font-semibold">Normal</span>
+          <span id="sup-kpi-normal" class="text-xl sm:text-2xl font-bold font-mono text-emerald-400 mt-1.5">0</span>
         </div>
-        <div class="bg-slate-900/90 backdrop-blur-md p-4 rounded-2xl border border-blue-500/30 shadow-xl relative overflow-hidden flex flex-col justify-between">
+        <div class="bg-slate-900/90 backdrop-blur-md p-3 rounded-xl border border-blue-500/40 shadow-xl relative overflow-hidden flex flex-col justify-between">
           <div class="absolute top-0 left-0 w-1 h-full bg-blue-600"></div>
-          <span class="text-[11px] font-mono text-blue-400 uppercase">Observação</span>
-          <span id="sup-kpi-observacao" class="text-2xl font-bold font-mono text-blue-400 mt-2">0</span>
+          <span class="text-[10px] font-mono text-blue-300 uppercase tracking-wider font-semibold">Observação</span>
+          <span id="sup-kpi-observacao" class="text-xl sm:text-2xl font-bold font-mono text-blue-300 mt-1.5">0</span>
         </div>
-        <div class="bg-slate-900/90 backdrop-blur-md p-4 rounded-2xl border border-amber-500/30 shadow-xl relative overflow-hidden flex flex-col justify-between">
-          <div class="absolute top-0 left-0 w-1 h-full bg-amber-400"></div>
-          <span class="text-[11px] font-mono text-amber-400 uppercase">Alerta</span>
-          <span id="sup-kpi-alerta" class="text-2xl font-bold font-mono text-amber-400 mt-2">0</span>
+        <div class="bg-slate-900/90 backdrop-blur-md p-3 rounded-xl border border-amber-500/30 shadow-xl relative overflow-hidden flex flex-col justify-between">
+          <div class="absolute top-0 left-0 w-1 h-full bg-amber-500"></div>
+          <span class="text-[10px] font-mono text-amber-400 uppercase tracking-wider font-semibold">Alerta</span>
+          <span id="sup-kpi-alerta" class="text-xl sm:text-2xl font-bold font-mono text-amber-400 mt-1.5">0</span>
         </div>
-        <div class="bg-slate-900/90 backdrop-blur-md p-4 rounded-2xl border border-rose-500/30 shadow-xl relative overflow-hidden flex flex-col justify-between">
-          <div class="absolute top-0 left-0 w-1 h-full bg-rose-600"></div>
-          <span class="text-[11px] font-mono text-rose-400 uppercase">Alarme / Emergência</span>
-          <span id="sup-kpi-alarme" class="text-2xl font-bold font-mono text-rose-400 mt-2">0</span>
+        <div class="bg-slate-900/90 backdrop-blur-md p-3 rounded-xl border border-rose-500/30 shadow-xl relative overflow-hidden flex flex-col justify-between">
+          <div class="absolute top-0 left-0 w-1 h-full bg-rose-500"></div>
+          <span class="text-[10px] font-mono text-rose-400 uppercase tracking-wider font-semibold">Alarme</span>
+          <span id="sup-kpi-alarme" class="text-xl sm:text-2xl font-bold font-mono text-rose-400 mt-1.5">0</span>
         </div>
-        <div class="bg-slate-900/90 backdrop-blur-md p-4 rounded-2xl border border-slate-700 shadow-xl relative overflow-hidden flex flex-col justify-between">
+        <div class="bg-slate-900/90 backdrop-blur-md p-3 rounded-xl border border-red-700/60 shadow-xl relative overflow-hidden flex flex-col justify-between">
+          <div class="absolute top-0 left-0 w-1 h-full bg-red-700"></div>
+          <span class="text-[10px] font-mono text-red-300 uppercase tracking-wider font-semibold">Emergência</span>
+          <span id="sup-kpi-emergencia" class="text-xl sm:text-2xl font-bold font-mono text-red-300 mt-1.5">0</span>
+        </div>
+        <div class="bg-slate-900/90 backdrop-blur-md p-3 rounded-xl border border-slate-700 shadow-xl relative overflow-hidden flex flex-col justify-between">
           <div class="absolute top-0 left-0 w-1 h-full bg-slate-500"></div>
-          <span class="text-[11px] font-mono text-slate-400 uppercase">Não Medidos</span>
-          <span id="sup-kpi-naomedido" class="text-2xl font-bold font-mono text-slate-300 mt-2">0</span>
+          <span class="text-[10px] font-mono text-slate-400 uppercase tracking-wider font-semibold">Não Medidos</span>
+          <span id="sup-kpi-naomedido" class="text-xl sm:text-2xl font-bold font-mono text-slate-300 mt-1.5">0</span>
         </div>
       </div>
 
@@ -1113,7 +1120,7 @@
       if (relTab) relTab.classList.add('hidden');
       if (fabTab) fabTab.classList.add('hidden');
       
-      const defaultBtnClass = "px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition flex items-center border border-slate-700/50 shadow-inner";
+      const defaultBtnClass = "px-2 py-1 rounded-lg text-[10.5px] font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition flex items-center border border-slate-700/50 shadow-inner whitespace-nowrap shrink-0";
       if (btnSup) btnSup.className = defaultBtnClass;
       if (btnForm) btnForm.className = defaultBtnClass;
       if (btnDash) btnDash.className = defaultBtnClass;
@@ -1122,24 +1129,24 @@
       
       if(tab === 'supervisorio') {
         if (supTab) supTab.classList.remove('hidden');
-        if (btnSup) btnSup.className = "px-3.5 py-2 rounded-xl text-xs font-semibold bg-emerald-500 text-slate-950 transition flex items-center shadow-md font-bold";
+        if (btnSup) btnSup.className = "px-2 py-1 rounded-lg text-[10.5px] font-bold bg-emerald-500 text-slate-950 transition flex items-center shadow-sm whitespace-nowrap shrink-0";
         renderSupervisorioTab();
       } else if(tab === 'form') {
         if (formTab) formTab.classList.remove('hidden');
-        if (btnForm) btnForm.className = "px-3.5 py-2 rounded-xl text-xs font-semibold bg-amber-500 text-slate-950 transition flex items-center shadow-md font-bold";
+        if (btnForm) btnForm.className = "px-2 py-1 rounded-lg text-[10.5px] font-bold bg-amber-500 text-slate-950 transition flex items-center shadow-sm whitespace-nowrap shrink-0";
       } else if(tab === 'dashboard') {
         if (dashTab) dashTab.classList.remove('hidden');
-        if (btnDash) btnDash.className = "px-3.5 py-2 rounded-xl text-xs font-semibold bg-cyan-500 text-slate-950 transition flex items-center shadow-md font-bold";
+        if (btnDash) btnDash.className = "px-2 py-1 rounded-lg text-[10.5px] font-bold bg-cyan-500 text-slate-950 transition flex items-center shadow-sm whitespace-nowrap shrink-0";
         renderDashboard();
         fetchSavedPreLaudosHistory();
       } else if(tab === 'relatorio') {
         if (relTab) relTab.classList.remove('hidden');
-        if (btnRel) btnRel.className = "px-4 py-2 rounded-xl text-xs font-bold bg-amber-500 text-slate-950 transition flex items-center shadow-md font-bold";
+        if (btnRel) btnRel.className = "px-2 py-1 rounded-lg text-[10.5px] font-bold bg-amber-500 text-slate-950 transition flex items-center shadow-sm whitespace-nowrap shrink-0";
         renderRelatorioTab();
         fetchSavedLaudosHistory();
       } else if(tab === 'fabricas') {
         if (fabTab) fabTab.classList.remove('hidden');
-        if (btnFab) btnFab.className = "px-3.5 py-2 rounded-xl text-xs font-bold bg-purple-500 text-slate-950 transition flex items-center shadow-md font-bold";
+        if (btnFab) btnFab.className = "px-2 py-1 rounded-lg text-[10.5px] font-bold bg-purple-500 text-slate-950 transition flex items-center shadow-sm whitespace-nowrap shrink-0";
         renderFabricasTab();
       }
     }
@@ -2783,6 +2790,7 @@
       let countObservacao = 0;
       let countAlerta = 0;
       let countAlarme = 0;
+      let countEmergencia = 0;
       let countNaoMedido = 0;
       
       let falhasEstratificacaoCount = {};
@@ -2806,10 +2814,12 @@
           countNaoMedido++;
           isMedido = false;
         } else {
-          if (statusVal === 'NORMAL') countNormal++;
-          else if (statusVal === 'OBSERVAÇÃO') countObservacao++;
-          else if (statusVal === 'ALERTA') countAlerta++;
-          else if (statusVal === 'ALARME' || statusVal === 'EMERGÊNCIA') countAlarme++;
+          const sUpper = (statusVal || '').toUpperCase();
+          if (sUpper === 'NORMAL') countNormal++;
+          else if (sUpper === 'OBSERVAÇÃO' || sUpper === 'OBSERVACAO') countObservacao++;
+          else if (sUpper === 'ALERTA') countAlerta++;
+          else if (sUpper === 'ALARME') countAlarme++;
+          else if (sUpper === 'EMERGÊNCIA' || sUpper === 'EMERGENCIA') countEmergencia++;
           else countNormal++;
           
           falhasList.forEach(falha => {
@@ -2837,6 +2847,9 @@
       document.getElementById('sup-kpi-observacao').textContent = countObservacao;
       document.getElementById('sup-kpi-alerta').textContent = countAlerta;
       document.getElementById('sup-kpi-alarme').textContent = countAlarme;
+      if (document.getElementById('sup-kpi-emergencia')) {
+        document.getElementById('sup-kpi-emergencia').textContent = countEmergencia;
+      }
       document.getElementById('sup-kpi-naomedido').textContent = countNaoMedido;
       document.getElementById('sup-table-count').textContent = `${tableItems.length} ativos`;
       
@@ -2895,19 +2908,19 @@
           tbody.appendChild(tr);
         });
       }
-      renderSupervisorioCharts(countNormal, countObservacao, countAlerta, countAlarme, countNaoMedido, falhasEstratificacaoCount);
+      renderSupervisorioCharts(countNormal, countObservacao, countAlerta, countAlarme, countEmergencia, countNaoMedido, falhasEstratificacaoCount);
     }
 
-    function renderSupervisorioCharts(normal, observacao, alerta, alarme, naomedido, falhasCounts) {
+    function renderSupervisorioCharts(normal, observacao, alerta, alarme, emergencia, naomedido, falhasCounts) {
       const ctxDoughnut = document.getElementById('supDoughnutChart').getContext('2d');
       if (supDoughnutInstance) supDoughnutInstance.destroy();
       supDoughnutInstance = new Chart(ctxDoughnut, {
         type: 'doughnut',
         data: {
-          labels: ['Normal', 'Observação', 'Alerta', 'Alarme / Emergência', 'Não Medido'],
+          labels: ['Normal', 'Observação', 'Alerta', 'Alarme', 'Emergência', 'Não Medido'],
           datasets: [{
-            data: [normal, observacao, alerta, alarme, naomedido],
-            backgroundColor: ['#10b981', '#1e3a8a', '#f59e0b', '#dc2626', '#475569'],
+            data: [normal, observacao, alerta, alarme, emergencia, naomedido],
+            backgroundColor: ['#10b981', '#2563eb', '#f59e0b', '#e11d48', '#b91c1c', '#64748b'],
             borderWidth: 2,
             borderColor: '#0f172a'
           }]
@@ -2926,11 +2939,11 @@
       supBarInstance = new Chart(ctxBar, {
         type: 'bar',
         data: {
-          labels: ['Normal', 'Observação', 'Alerta', 'Alarme / Emerg.', 'Não Medidos'],
+          labels: ['Normal', 'Observação', 'Alerta', 'Alarme', 'Emergência', 'Não Medidos'],
           datasets: [{
             label: 'Qtd de Ativos',
-            data: [normal, observacao, alerta, alarme, naomedido],
-            backgroundColor: ['#10b981', '#1e3a8a', '#f59e0b', '#dc2626', '#475569'],
+            data: [normal, observacao, alerta, alarme, emergencia, naomedido],
+            backgroundColor: ['#10b981', '#2563eb', '#f59e0b', '#e11d48', '#b91c1c', '#64748b'],
             borderRadius: 6
           }]
         },
@@ -3311,13 +3324,16 @@
     }
 
     function getStatusBgColor(status) {
-      switch(status) {
+      const s = (status || '').toUpperCase();
+      switch(s) {
         case 'NORMAL': return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40';
-        case 'OBSERVAÇÃO': return 'bg-blue-900/40 text-blue-300 border-blue-600/50';
+        case 'OBSERVAÇÃO':
+        case 'OBSERVACAO': return 'bg-blue-900/40 text-blue-300 border-blue-600/50';
         case 'ALERTA': return 'bg-amber-500/20 text-amber-400 border-amber-500/40';
         case 'ALARME': return 'bg-rose-600/30 text-rose-400 border-rose-500/50';
-        case 'EMERGÊNCIA': return 'bg-red-950 text-red-200 border-red-700/80';
-        default: return 'bg-slate-800 text-white border-slate-700';
+        case 'EMERGÊNCIA':
+        case 'EMERGENCIA': return 'bg-red-950 text-red-200 border-red-700/80';
+        default: return 'bg-slate-800 text-slate-400 border-slate-700';
       }
     }
 
@@ -3579,9 +3595,10 @@
                 else if (cLow.includes('polia') || cLow.includes('acoplamento')) icon = 'fa-link';
 
                 let dotColor = 'bg-emerald-400';
-                if (cSt === 'EMERGÊNCIA' || cSt === 'ALARME') dotColor = 'bg-rose-500 animate-pulse';
+                if (cSt === 'EMERGÊNCIA' || cSt === 'EMERGENCIA') dotColor = 'bg-red-600 animate-pulse';
+                else if (cSt === 'ALARME') dotColor = 'bg-rose-500 animate-pulse';
                 else if (cSt === 'ALERTA') dotColor = 'bg-amber-400';
-                else if (cSt === 'OBSERVAÇÃO') dotColor = 'bg-blue-400';
+                else if (cSt === 'OBSERVAÇÃO' || cSt === 'OBSERVACAO') dotColor = 'bg-blue-400';
 
                 return `
                   <div class="inline-flex items-center rounded-xl border transition ${isActive ? 'bg-amber-500/25 border-amber-500 shadow-md ring-1 ring-amber-500/30 text-amber-300' : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'}">
@@ -3873,11 +3890,14 @@
     function getStatusRgbColor(status) {
       switch((status || '').toUpperCase()) {
         case 'NORMAL': return [16, 185, 129];      // emerald-500
-        case 'OBSERVAÇÃO': return [37, 99, 235];   // blue-600
+        case 'OBSERVAÇÃO':
+        case 'OBSERVACAO': return [37, 99, 235];   // blue-600
         case 'ALERTA': return [245, 158, 11];      // amber-500
         case 'ALARME': return [225, 29, 72];       // rose-600
-        case 'EMERGÊNCIA': return [185, 28, 28];   // red-700
-        case 'NÃO MEDIDO': return [100, 116, 139]; // slate-500
+        case 'EMERGÊNCIA':
+        case 'EMERGENCIA': return [185, 28, 28];   // red-700
+        case 'NÃO MEDIDO':
+        case 'NAO MEDIDO': return [100, 116, 139]; // slate-500
         default: return [100, 116, 139];
       }
     }
@@ -4305,12 +4325,13 @@
       const qtdItens = filtered.length;
 
       // 1. Contagem sintética de status dos ativos
-      let countNormal = 0, countObs = 0, countAlerta = 0, countAlarme = 0;
+      let countNormal = 0, countObs = 0, countAlerta = 0, countAlarme = 0, countEmergencia = 0;
       filtered.forEach(item => {
         const s = item.analysisState;
         if (!s || !s.isMedido) return;
         const st = (s.statusVal || '').toUpperCase();
-        if (st === 'ALARME' || st === 'EMERGÊNCIA') countAlarme++;
+        if (st === 'EMERGÊNCIA' || st === 'EMERGENCIA') countEmergencia++;
+        else if (st === 'ALARME') countAlarme++;
         else if (st === 'ALERTA') countAlerta++;
         else if (st === 'OBSERVAÇÃO' || st === 'OBSERVACAO') countObs++;
         else countNormal++;
@@ -4509,16 +4530,16 @@
       doc.setTextColor(51, 65, 85);
       doc.text("Técnico de Confiabilidade / Vibração", 106, c2Y + 28);
 
-      // RESUMO DOS ATIVOS DA ROTA (4 CHIPS DE STATUS SINTÉTICOS)
+      // RESUMO DOS ATIVOS DA ROTA (5 CHIPS DE STATUS SINTÉTICOS: NORMAL, OBSERVAÇÃO, ALERTA, ALARME, EMERGÊNCIA)
       const c3Y = c2Y + 36;
       doc.setFontSize(7.2);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(100, 116, 139);
       doc.text("PANORAMA GERAL DE SEVERIDADE DOS ATIVOS:", 24, c3Y + 4);
 
-      const kpiW = 38.5;
+      const kpiW = 30.5;
       const kpiH = 15;
-      const kpiGap = 3.3;
+      const kpiGap = 2.8;
       const startKpiX = 23;
 
       function drawSimpleKpi(x, label, count, colorRgb, bgRgb) {
@@ -4528,14 +4549,14 @@
         doc.roundedRect(x, c3Y + 7, kpiW, kpiH, 1.5, 1.5, 'FD');
 
         doc.setFillColor(colorRgb[0], colorRgb[1], colorRgb[2]);
-        doc.circle(x + 5, c3Y + 12.5, 1.7, 'F');
+        doc.circle(x + 4.5, c3Y + 12.5, 1.5, 'F');
 
-        doc.setFontSize(6.8);
+        doc.setFontSize(6.2);
         doc.setFont("helvetica", "bold");
         doc.setTextColor(colorRgb[0], colorRgb[1], colorRgb[2]);
-        doc.text(label, x + 9, c3Y + 13.5);
+        doc.text(label, x + 7.5, c3Y + 13.5);
 
-        doc.setFontSize(9);
+        doc.setFontSize(8.5);
         doc.setFont("helvetica", "bold");
         doc.setTextColor(15, 23, 42);
         doc.text(`${count} ativo(s)`, x + (kpiW / 2), c3Y + 19, { align: "center" });
@@ -4543,8 +4564,9 @@
 
       drawSimpleKpi(startKpiX, "NORMAL", countNormal, [16, 185, 129], [236, 253, 245]);
       drawSimpleKpi(startKpiX + (kpiW + kpiGap), "OBSERVAÇÃO", countObs, [37, 99, 235], [239, 246, 255]);
-      drawSimpleKpi(startKpiX + (kpiW + kpiGap) * 2, "ALERTA", countAlerta, [217, 119, 6], [254, 243, 199]);
-      drawSimpleKpi(startKpiX + (kpiW + kpiGap) * 3, "ALARME", countAlarme, [220, 38, 38], [254, 242, 242]);
+      drawSimpleKpi(startKpiX + (kpiW + kpiGap) * 2, "ALERTA", countAlerta, [245, 158, 11], [254, 243, 199]);
+      drawSimpleKpi(startKpiX + (kpiW + kpiGap) * 3, "ALARME", countAlarme, [225, 29, 72], [255, 241, 242]);
+      drawSimpleKpi(startKpiX + (kpiW + kpiGap) * 4, "EMERGÊNCIA", countEmergencia, [185, 28, 28], [254, 226, 226]);
 
       // =======================================================================
       // 4. BLOCO DE ASSINATURA: TÉCNICO QUE ANALISOU (COMPACTO NA PARTE DE BAIXO)
@@ -4780,11 +4802,11 @@
 
       // Linhas da Tabela de Ordem SAP
       const sapRows = [
-        { status: "EMERGÊNCIA", dias: "<= 1", prioridade: "1 OU < 7", bg: [220, 38, 38], textWhite: true },
-        { status: "ALARME", dias: "<= 3", prioridade: "7 OU < 30", bg: [234, 88, 12], textWhite: true },
-        { status: "ALERTA", dias: "<= 7", prioridade: "30 OU < 90", bg: [250, 204, 21], textWhite: false },
-        { status: "OBSERVAÇÃO", dias: "<= 30", prioridade: "< 90", bg: [134, 239, 172], textWhite: false },
-        { status: "NORMAL", dias: "NA", prioridade: "NA", bg: [22, 163, 74], textWhite: true }
+        { status: "EMERGÊNCIA", dias: "<= 1", prioridade: "1 OU < 7", bg: [185, 28, 28], textWhite: true },
+        { status: "ALARME", dias: "<= 3", prioridade: "7 OU < 30", bg: [225, 29, 72], textWhite: true },
+        { status: "ALERTA", dias: "<= 7", prioridade: "30 OU < 90", bg: [245, 158, 11], textWhite: true },
+        { status: "OBSERVAÇÃO", dias: "<= 30", prioridade: "< 90", bg: [37, 99, 235], textWhite: true },
+        { status: "NORMAL", dias: "NA", prioridade: "NA", bg: [16, 185, 129], textWhite: true }
       ];
 
       const rowH_sap = 14;
